@@ -17,14 +17,24 @@
 # *   Suite 330, Boston, MA  02111-1307, USA                             *
 # ************************************************************************
 
-__title__ = "FreeCAD Collaboration API"
-__author__ = "Stefan Troeger"
-__url__ = "http://www.freecadweb.org"
+#! /usr/bin/env python
+import os, glob
 
-'''The Collaboration module provides functions to work on documents with others'''
+qrc_filename = 'resources.qrc'
+assert not os.path.exists(qrc_filename)
 
-import FreeCAD
-if FreeCAD.GuiUp:
-        import FreeCADGui
-        FreeCADGui.updateLocale()
+qrc = '''<RCC version="1.0">
+        <qresource prefix="/Collaboration">'''
+for fn in glob.glob('Icons/*') + glob.glob('ui/*.ui'):
+    qrc = qrc + '\n\t\t<file>%s</file>' % fn
+qrc = qrc + '''\n\t</qresource>
+</RCC>'''
 
+print(qrc)
+
+f = open(qrc_filename,'w')
+f.write(qrc)
+f.close()
+
+os.system('rcc -binary %s -o resources.rcc' % qrc_filename)
+os.remove(qrc_filename)

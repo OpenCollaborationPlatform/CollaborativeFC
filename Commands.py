@@ -17,14 +17,33 @@
 # *   Suite 330, Boston, MA  02111-1307, USA                             *
 # ************************************************************************
 
-__title__ = "FreeCAD Collaboration API"
-__author__ = "Stefan Troeger"
-__url__ = "http://www.freecadweb.org"
-
-'''The Collaboration module provides functions to work on documents with others'''
-
 import FreeCAD
+from Connection import Connection
 if FreeCAD.GuiUp:
-        import FreeCADGui
-        FreeCADGui.updateLocale()
+    import FreeCADGui
+    from PySide import QtGui, QtCore
 
+
+connection = Connection()
+
+
+class _CommandConnect:
+    "the Collaboration command definition"
+    def GetResources(self):
+        return {'Pixmap'  : ':/Collaboration/Icons/connect.png',
+                'MenuText': QtCore.QT_TRANSLATE_NOOP("Collab_Connect","Connect to FreeCAD collaboration services"),
+                'ToolTip': QtCore.QT_TRANSLATE_NOOP("Collab_Connect","Establishes a connection to the FreeCAD collaboration server"), 
+                'Checkable': False}
+
+    def IsActive(self):
+        return True
+
+    def Activated(self, index):
+        print("does this work?")
+        if index == 1:
+            connection.connect()
+        else:
+            connection.disconnect()
+
+if FreeCAD.GuiUp:
+    FreeCADGui.addCommand('Collab_Connect',_CommandConnect())
