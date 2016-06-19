@@ -17,44 +17,38 @@
 # *   Suite 330, Boston, MA  02111-1307, USA                             *
 # ************************************************************************
 
-try:
-    import asyncio
-except ImportError:
-    # Trollius >= 0.3 was renamed to asyncio
-    import trollius as asyncio
-    from trollius import From
-
-import txaio
-txaio.use_asyncio()
-
-from autobahn.wamp import protocol
-from autobahn.asyncio.websocket import WampWebSocketClientFactory
-from autobahn.wamp.types import ComponentConfig
+from twisted.internet import reactor
+from autobahn.twisted.wamp import ApplicationSession
+from autobahn.twisted.websocket import WampWebSocketClientFactory
+from twisted.internet.defer import inlineCallbacks
 from autobahn.wamp.serializer import JsonSerializer
+from autobahn.wamp.types import ComponentConfig
 from autobahn.websocket.util import parse_url
 from PySide import QtCore
-
 import signal
+
+import txaio
+txaio.use_twisted()
 
 
 class Connection():
 
-    class Session(protocol.ApplicationSession):
+    class Session(ApplicationSession):
 
         def onJoin(self, details):
             print("session joined")
             print(details)
 
             ui = self.config.extra['ui']
+            assert isinstance(ui, Connection)
             ui.session = self
-            ui.__onJoin()
-
-            self.subscribe(ui.__onMessage, u'com.myapp.topic2')
+            ui.onJoin()
 
         def onClose(self, wasClean):
             print("leave session")
             ui = self.config.extra['ui']
-            ui.__onClose()
+            assert isinstance(ui, Connection)
+            ui.onClose()
 
     def __init__(self):
         print "init"
@@ -63,55 +57,63 @@ class Connection():
         self.realm = u"freecad"
         self.serializers = [JsonSerializer()]
         self.ssl = None
+        self.proxy = None
 
         self.__timer = QtCore.QTimer(None)
         self.__timer.timeout.connect(self.__onTimer)
         self.session = None
 
-        # setup the connection stuff
-        def create():
-            cfg = ComponentConfig(self.realm, dict(ui=self))
-            try:
-                session = Connection.Session(cfg)
-            except Exception:
-                self.log.failure("App session could not be created! ")
-                asyncio.get_event_loop().stop()
-            else:
-                return session
-
-        isSecure, host, port, resource, path, params = parse_url(self.url)
-
-        if self.ssl is None:
-            self.ssl = isSecure
-        else:
-            if self.ssl and not isSecure:
-                raise RuntimeError(
-                    'ssl argument value passed to %s conflicts with the "ws:" '
-                    'prefix of the url argument. Did you mean to use "wss:"?' %
-                    self.__class__.__name__)
-            ssl = self.ssl
-
-        # 2) create a WAMP-over-WebSocket transport client factory
-        self.factory = WampWebSocketClientFactory(create, self.url, self.serializers)
-        self.loop = asyncio.get_event_loop()
-        txaio.use_asyncio()
-        txaio.config.loop = self.loop
+        txaio.use_twisted()
+        txaio.config.loop = reactor
         txaio.start_logging(level='info')
 
-        try:
-            self.loop.add_signal_handler(signal.SIGTERM, self.loop.stop)
-        except NotImplementedError:
-            # signals are not available on Windows
-            pass
+        self.__isSecure, self.__host, self.__port, resource, path, params = parse_url(self.url)
+
+        # factory for use ApplicationSession
+        extra = dict(ui=self)
+
+        def create():
+            cfg = ComponentConfig(realm=self.realm, extra=extra)
+            try:
+                session = Connection.Session(cfg)
+            except Exception as e:
+                print("Session could not be created")
+
+            return session
+
+        # create a WAMP-over-WebSocket transport client factory
+        self.transport_factory = WampWebSocketClientFactory(create, url=self.url,
+                                                            serializers=self.serializers,
+                                                            proxy=self.proxy)
+        # supress pointless log noise like
+        self.transport_factory.noisy = False
+
+        # build our errror collector to handle errors in the reactor
+        class ErrorCollector(object):
+            exception = None
+
+            def __call__(self, failure):
+                self.exception = failure.value
+                reactor.stop()
+
+        self.connect_error = ErrorCollector()
+
+        # start with a unsecure connection
+        if self.__isSecure:
+            raise "Secure connections are not yet supported"
+
+        reactor.startRunning(installSignalHandlers=0)
 
     def connect(self):
 
         if self.session:
             self.disconnect()
 
-        isSecure, host, port, resource, path, params = parse_url(self.url)
-        coro = self.loop.create_connection(self.factory, host, port, ssl=self.ssl)
-        (self.transport, self.session) = self.loop.run_until_complete(coro)
+        from twisted.internet import reactor
+        from twisted.internet.endpoints import TCP4ClientEndpoint
+        client = TCP4ClientEndpoint(reactor, self.__host, self.__port)
+        d = client.connect(self.transport_factory)
+        d.addErrback(self.connect_error)
 
         self.__timer.stop()
         self.__timer.setInterval(50)
@@ -120,6 +122,9 @@ class Connection():
     def disconnect(self):
         if self.session:
             self.session.disconnect()
+            # just in case we call disconnect from connect we should finish it before return
+            reactor.runUntilCurrent()
+            reactor.doIteration(0)
 
     def isConnected(self):
         return self.session is not None
@@ -127,24 +132,27 @@ class Connection():
     def __onTimer(self):
 
         self.__timer.stop()
-        # stop/run_forever compo ensures that the event queue is procesed once
-        self.loop.stop()
-        self.loop.run_forever()
+
+        # handle all events
+        reactor.runUntilCurrent()
+        reactor.doIteration(0)
+
+        # if we exited due to a connection error, raise that
+        if self.connect_error.exception:
+            raise self.connect_error.exception
+
         # go for the next timer event
         self.__timer.start()
 
-    def __onJoin(self):
+    def onJoin(self):
         print "YeAH YEAH YEAAAAAHHHH"
 
-    def __onClose(self):
+    def onClose(self):
         self.__timer.stop()
         self.__timer.setInterval(500)
         self.__timer.start()
         self.session = None
         print "Ohh ohahahah wehhhhhh"
-
-    def __onMessage(self, msg):
-        print msg
 
 
 # we provide a global connection object for everyone to use, as it is sensible to have
