@@ -22,9 +22,11 @@ __author__ = "Stefan Troeger"
 __url__ = "http://www.freecadweb.org"
 
 '''The Collaboration module provides functions to work on documents with others'''
-
 import FreeCAD
+import Observer
+import Commands
+from Connection import Connection
+
 if FreeCAD.GuiUp:
         import FreeCADGui
         FreeCADGui.updateLocale()
-

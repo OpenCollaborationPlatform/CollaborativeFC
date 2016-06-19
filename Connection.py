@@ -22,6 +22,7 @@ try:
 except ImportError:
     # Trollius >= 0.3 was renamed to asyncio
     import trollius as asyncio
+    from trollius import From
 
 import txaio
 txaio.use_asyncio()
@@ -46,26 +47,26 @@ class Connection():
 
             ui = self.config.extra['ui']
             ui.session = self
-            ui.onJoin()
+            ui.__onJoin()
 
-            self.subscribe(ui.onMessage, u'com.myapp.topic2')
+            self.subscribe(ui.__onMessage, u'com.myapp.topic2')
 
         def onClose(self, wasClean):
             print("leave session")
             ui = self.config.extra['ui']
-            ui.onClose()
+            ui.__onClose()
 
     def __init__(self):
         print "init"
 
         self.url = u"ws://localhost:9000/ws"
-        self.realm = u"realm1"
+        self.realm = u"freecad"
         self.serializers = [JsonSerializer()]
         self.ssl = None
 
         self.__timer = QtCore.QTimer(None)
-        self.__timer.timeout.connect(self.onTimer)
-        self.__session = None
+        self.__timer.timeout.connect(self.__onTimer)
+        self.session = None
 
         # setup the connection stuff
         def create():
@@ -105,22 +106,25 @@ class Connection():
 
     def connect(self):
 
-        if self.__session:
+        if self.session:
             self.disconnect()
 
         isSecure, host, port, resource, path, params = parse_url(self.url)
         coro = self.loop.create_connection(self.factory, host, port, ssl=self.ssl)
-        (self.transport, self.__session) = self.loop.run_until_complete(coro)
+        (self.transport, self.session) = self.loop.run_until_complete(coro)
 
         self.__timer.stop()
         self.__timer.setInterval(50)
         self.__timer.start()
 
     def disconnect(self):
-        if self.__session:
-            self.__session.disconnect()
+        if self.session:
+            self.session.disconnect()
 
-    def onTimer(self):
+    def isConnected(self):
+        return self.session is not None
+
+    def __onTimer(self):
 
         self.__timer.stop()
         # stop/run_forever compo ensures that the event queue is procesed once
@@ -129,15 +133,20 @@ class Connection():
         # go for the next timer event
         self.__timer.start()
 
-    def onJoin(self):
+    def __onJoin(self):
         print "YeAH YEAH YEAAAAAHHHH"
 
-    def onClose(self):
+    def __onClose(self):
         self.__timer.stop()
         self.__timer.setInterval(500)
         self.__timer.start()
-        self.__session = None
+        self.session = None
         print "Ohh ohahahah wehhhhhh"
 
-    def onMessage(self, msg):
+    def __onMessage(self, msg):
         print msg
+
+
+# we provide a global connection object for everyone to use, as it is sensible to have
+# a single connection only
+connection = Connection()
