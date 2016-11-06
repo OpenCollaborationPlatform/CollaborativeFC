@@ -17,50 +17,36 @@
 # *   Suite 330, Boston, MA  02111-1307, USA                             *
 # ************************************************************************
 
-import os
-import FreeCADGui
-from PySide import QtCore
 
-# load resources
-import Reactor
-import Collaboration
-from Interface.Browser import browser
-from Interface.Server import server
+import FreeCAD
+import Collaboration, Reactor, Observer, Commands
+from Connection         import Connection
+from Interface.Browser  import browser
+from Interface.Server   import server
+   
+# setup the toolbar
+group = FreeCAD.ParamGet("User parameter:BaseApp/Workbench/Global/Toolbar")
 
-path_collaboration = os.path.dirname(Collaboration.__file__)
-path_resources = os.path.join(path_collaboration, 'Resources', 'resources.rcc')
-resourcesLoaded = QtCore.QResource.registerResource(path_resources)
+# as the GUI for custom global toolbars always rename them to "Custom_X" we need to search if 
+# a colaboration toolbar is already set up
+alreadySetup = False
+for i in range(1,100):
+    if group.HasGroup("Custom_"+str(i)):
+        custom = group.GetGroup("Custom_"+str(i))
+        if custom.GetBool("CollaborationAutoSetup", False):
+            alreadySetup = True
+        else:
+            custom.RemBool("CollaborationAutoSetup")
+    else:
+        break
 
-
-class CollaborationWorkbench(Workbench):
-    "Collaboration workbench object"
-    MenuText = "Collaboration"
-    ToolTip = "Collaboration workbench"
-    # Icon = FreeCAD.getResourceDir() + "Mod/Arch/Resources/icons/ArchWorkbench.svg"
-
-    def Initialize(self):
-        # load the module
-        import Collaboration
-
-        self.collabtools = ["Collab_Connect"]
-
-        def QT_TRANSLATE_NOOP(scope, text): return text
-        self.appendToolbar(QT_TRANSLATE_NOOP("Workbench", "Collaboration tools"),self.collabtools)
-
-        obs = Collaboration.Observer.DocumentObserver()
-        FreeCAD.addDocumentObserver(obs)
-        
-    def Activated(self):
-        if hasattr(FreeCADGui, "collaborationToolBar"):
-            FreeCADGui.collaborationToolBar.Activated()
-        Msg("Collaboration workbench activated\n")
-
-    def Deactivated(self):
-        if hasattr(FreeCADGui, "collaborationToolBar"):
-            FreeCADGui.collaborationToolBar.Deactivated()
-        Msg("Collaboration workbench deactivated\n")
-
-    def GetClassName(self):
-        return "Gui::PythonWorkbench"
-
-Gui.addWorkbench(CollaborationWorkbench())
+#if not already done add our global toolbar
+if not alreadySetup:
+    # add the toolbar and make it findable
+    collab = group.GetGroup("Custom_"+str(i))
+    collab.SetString("Name", "Collaboration Services")
+    collab.SetBool("Active", True)
+    collab.SetBool("CollaborationAutoSetup", True)
+    
+    # add the tools
+    collab.SetString("Connect", "Commands")

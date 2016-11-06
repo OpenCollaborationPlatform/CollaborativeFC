@@ -22,11 +22,11 @@ __author__ = "Stefan Troeger"
 __url__ = "http://www.freecadweb.org"
 
 '''The Collaboration module provides functions to work on documents with others'''
-import FreeCAD
-import Observer
-import Commands
-from Connection import Connection
 
-if FreeCAD.GuiUp:
-        import FreeCADGui
-        FreeCADGui.updateLocale()
+import os
+from PySide import QtCore
+
+#needs to be done before anything access the icons in the resource
+path_collaboration = os.path.dirname(__file__)
+path_resources = os.path.join(path_collaboration, 'Resources', 'resources.rcc')
+resourcesLoaded = QtCore.QResource.registerResource(path_resources)

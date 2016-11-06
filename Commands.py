@@ -18,16 +18,11 @@
 # ************************************************************************
 
 import FreeCAD
-from Connection import connection
-from Interface import Browser
-
-if FreeCAD.GuiUp:
-    import FreeCADGui
-    from PySide import QtCore
 
 class _CommandConnect:
     "the Collaboration command definition"
     def GetResources(self):
+        from PySide import QtCore
         return {'Pixmap': ':/Collaboration/Icons/icon_small.svg',
                 'MenuText': QtCore.QT_TRANSLATE_NOOP("Collab_Connect","Connect to FreeCAD collaboration services"),
                 'ToolTip': QtCore.QT_TRANSLATE_NOOP("Collab_Connect","Establishes a connection to the FreeCAD collaboration server")}
@@ -36,8 +31,9 @@ class _CommandConnect:
         return True
 
     def Activated(self):
-        print("does this work?")
+        from Interface import Browser
         Browser.browser.show()
 
 if FreeCAD.GuiUp:
-    FreeCADGui.addCommand('Collab_Connect',_CommandConnect())
+    import FreeCADGui
+    FreeCADGui.addCommand('Connect',_CommandConnect())
