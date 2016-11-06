@@ -35,16 +35,44 @@ class Backend(QObject):
         
     @Slot(str, str)
     def saveLoginData(self, token, profile):
+        # store JWT and profile string to be accessible from python
+        
         p = FreeCAD.ParamGet("User parameter:BaseApp/Preferences/Mod/Collaboration")
         p.SetString("JSONWebToken", token)
         p.SetString("Profile", profile)
+      
+    @Slot()
+    def clearLoginData(self):
+        # clear all stored data for logout
+        
+        group = FreeCAD.ParamGet("User parameter:BaseApp/Preferences/Mod/Collaboration")
+        group.SetString("JSONWebToken", "")
+        group.SetString("Profile", "")
         
     @Slot(result=str)
     def getToken(self):
+        # returned the stored JWT without any checks
+        
         return FreeCAD.ParamGet("User parameter:BaseApp/Preferences/Mod/Collaboration").GetString("JSONWebToken")
+    
+    @Slot(result=str)
+    def getValidToken(self):
+        # return the JWT if that the token has not expired
+        
+        token = FreeCAD.ParamGet("User parameter:BaseApp/Preferences/Mod/Collaboration").GetString("JSONWebToken");
+        if(token):
+            import jwt, time
+            dec = jwt.decode(token, verify=False)
+            if dec["exp"] < int(time.time()):
+                self.clearLoginData()
+                token = ""
+            
+        return token     
         
     @Slot(result=str)
     def getProfile(self):
+        # returned the saved profile text
+        
         return FreeCAD.ParamGet("User parameter:BaseApp/Preferences/Mod/Collaboration").GetString("Profile")
 
 class BrowserWidget(QFrame):

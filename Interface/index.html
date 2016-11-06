@@ -44,7 +44,7 @@
                       if (err) {
                           return webix.alert('error fetching profile: ' + JSON.stringify(err));
                       }
-                      backend.saveLoginData(JSON.stringify(result.idToken), JSON.stringify(profile))
+                      backend.saveLoginData(result.idToken, JSON.stringify(profile))
                       setProfile(profile, true)
                   });
                   $$("ui").hideProgress();
@@ -124,6 +124,14 @@
                 ]
               }
             ]
+        };
+        
+        var logout = function() {
+            //remove all login data and close the connection
+            backend.clearLoginData()
+            
+            //show the login screen
+            $$("auth").show()
         };
         
         var signup = {
@@ -222,8 +230,8 @@
                   template: "not yet specified"                
                 },
                 { view:"button", 
-                  value:"Logout"//,
-                  //on:{'onItemClick': logout} 
+                  value:"Logout",
+                  on:{'onItemClick': logout} 
                 }
             ]
         };
@@ -247,7 +255,7 @@
               if (err) {
                 return webix.alert('error fetching profile: ' + JSON.stringify(err));
               }
-              backend.saveLoginData(JSON.stringify(result.idToken), JSON.stringify(profile))
+              backend.saveLoginData(result.idToken, JSON.stringify(profile))
               setProfile(profile, true)
             });
         } else if (result && result.error) {
@@ -255,10 +263,11 @@
         }
                
         //check if we have a token and directly login if so
-        token = backend.getToken()
-        webix.alert(backend.getProfile())
-        if(token)
-            setProfile(JSON.parse(backend.getProfile()), true)
+        token = backend.getValidToken()
+        if(token) {
+            //backend is responsible for checking if the token is valid!
+            setProfile(JSON.parse(backend.getProfile()), true)   
+        }
         
         </script>
     </body> 
