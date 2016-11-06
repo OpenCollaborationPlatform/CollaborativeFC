@@ -17,13 +17,16 @@
 # *   Suite 330, Boston, MA  02111-1307, USA                             *
 # ************************************************************************
 
-
-import FreeCADGui
 import os
+import FreeCADGui
 from PySide import QtCore
 
 # load resources
+import Reactor
 import Collaboration
+from Interface.Browser import browser
+from Interface.Server import server
+
 path_collaboration = os.path.dirname(Collaboration.__file__)
 path_resources = os.path.join(path_collaboration, 'Resources', 'resources.rcc')
 resourcesLoaded = QtCore.QResource.registerResource(path_resources)
@@ -46,7 +49,7 @@ class CollaborationWorkbench(Workbench):
 
         obs = Collaboration.Observer.DocumentObserver()
         FreeCAD.addDocumentObserver(obs)
-
+        
     def Activated(self):
         if hasattr(FreeCADGui, "collaborationToolBar"):
             FreeCADGui.collaborationToolBar.Activated()

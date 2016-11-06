@@ -17,27 +17,19 @@
 # *   Suite 330, Boston, MA  02111-1307, USA                             *
 # ************************************************************************
 
-import FreeCAD
-from Connection import connection
-from Interface import Browser
+from twisted.web.server import Site
+from twisted.web.static import File
+from twisted.internet import reactor, endpoints
 
-if FreeCAD.GuiUp:
-    import FreeCADGui
-    from PySide import QtCore
+class HttpServer(object):
+    
+    def __init__(self):
+        import os
+        path = os.path.dirname(os.path.abspath(__file__))
+        self.resource = File(path)
+        self.factory = Site(self.resource)
+        self.endpoint = endpoints.TCP4ServerEndpoint(reactor, 8000)
+        self.endpoint.listen(self.factory)
 
-class _CommandConnect:
-    "the Collaboration command definition"
-    def GetResources(self):
-        return {'Pixmap': ':/Collaboration/Icons/icon_small.svg',
-                'MenuText': QtCore.QT_TRANSLATE_NOOP("Collab_Connect","Connect to FreeCAD collaboration services"),
-                'ToolTip': QtCore.QT_TRANSLATE_NOOP("Collab_Connect","Establishes a connection to the FreeCAD collaboration server")}
-
-    def IsActive(self):
-        return True
-
-    def Activated(self):
-        print("does this work?")
-        Browser.browser.show()
-
-if FreeCAD.GuiUp:
-    FreeCADGui.addCommand('Collab_Connect',_CommandConnect())
+#provide singleton for global access        
+server = HttpServer()

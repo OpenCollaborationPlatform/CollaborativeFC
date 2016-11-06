@@ -17,6 +17,10 @@
 # *   Suite 330, Boston, MA  02111-1307, USA                             *
 # ************************************************************************
 
+# qt4 reactor to drive twisted eventloop: needed before any twisted import
+#import qt4reactor
+#qt4reactor.install()
+
 from twisted.internet import reactor
 from autobahn.twisted.wamp import ApplicationSession
 from autobahn.twisted.websocket import WampWebSocketClientFactory
@@ -26,6 +30,7 @@ from autobahn.wamp.types import ComponentConfig
 from autobahn.websocket.util import parse_url
 from PySide import QtCore
 import signal
+import sys
 
 import txaio
 txaio.use_twisted()
@@ -51,21 +56,14 @@ class Connection():
             ui.onClose()
 
     def __init__(self):
-        print "init"
+        self.__ownLoop = ("qt4reactor" not in sys.modules)
 
         self.url = u"ws://localhost:9000/ws"
         self.realm = u"freecad"
         self.serializers = [JsonSerializer()]
         self.ssl = None
         self.proxy = None
-
-        self.__timer = QtCore.QTimer(None)
-        self.__timer.timeout.connect(self.__onTimer)
         self.session = None
-
-        txaio.use_twisted()
-        txaio.config.loop = reactor
-        txaio.start_logging(level='info')
 
         self.__isSecure, self.__host, self.__port, resource, path, params = parse_url(self.url)
 
@@ -102,8 +100,6 @@ class Connection():
         if self.__isSecure:
             raise "Secure connections are not yet supported"
 
-        reactor.startRunning(installSignalHandlers=0)
-
     def connect(self):
 
         if self.session:
@@ -115,42 +111,17 @@ class Connection():
         d = client.connect(self.transport_factory)
         d.addErrback(self.connect_error)
 
-        self.__timer.stop()
-        self.__timer.setInterval(50)
-        self.__timer.start()
-
     def disconnect(self):
         if self.session:
             self.session.disconnect()
-            # just in case we call disconnect from connect we should finish it before return
-            reactor.runUntilCurrent()
-            reactor.doIteration(0)
-
+ 
     def isConnected(self):
         return self.session is not None
-
-    def __onTimer(self):
-
-        self.__timer.stop()
-
-        # handle all events
-        reactor.runUntilCurrent()
-        reactor.doIteration(0)
-
-        # if we exited due to a connection error, raise that
-        if self.connect_error.exception:
-            raise self.connect_error.exception
-
-        # go for the next timer event
-        self.__timer.start()
 
     def onJoin(self):
         print "YeAH YEAH YEAAAAAHHHH"
 
     def onClose(self):
-        self.__timer.stop()
-        self.__timer.setInterval(500)
-        self.__timer.start()
         self.session = None
         print "Ohh ohahahah wehhhhhh"
 

@@ -17,27 +17,44 @@
 # *   Suite 330, Boston, MA  02111-1307, USA                             *
 # ************************************************************************
 
-import FreeCAD
 from Connection import connection
-from Interface import Browser
+from twisted.internet.defer import inlineCallbacks
 
-if FreeCAD.GuiUp:
-    import FreeCADGui
-    from PySide import QtCore
 
-class _CommandConnect:
-    "the Collaboration command definition"
-    def GetResources(self):
-        return {'Pixmap': ':/Collaboration/Icons/icon_small.svg',
-                'MenuText': QtCore.QT_TRANSLATE_NOOP("Collab_Connect","Connect to FreeCAD collaboration services"),
-                'ToolTip': QtCore.QT_TRANSLATE_NOOP("Collab_Connect","Establishes a connection to the FreeCAD collaboration server")}
+class OnlineDocument():
 
-    def IsActive(self):
-        return True
+    def __init__(self, doc):
+        self.document = doc
+        print "new online document created"
+        
+    def getUid(self):
+        return self.document.Uid
 
-    def Activated(self):
-        print("does this work?")
-        Browser.browser.show()
+    @inlineCallbacks
+    def open(self):
+        # this opens a remote document and loads the remote data into the given local document
+        print("open")
 
-if FreeCAD.GuiUp:
-    FreeCADGui.addCommand('Collab_Connect',_CommandConnect())
+    @inlineCallbacks
+    def create(self):
+        # this creates a new remote document from the local one
+        try:
+            data = dict(Uid=str(self.document.Uid))
+            res = yield connection.session.call(u"fc.documents.create", data)
+            print(res)
+            res = yield connection.session.call(u"fc.documents.{0}.change".format(res), data)
+            print(res)
+        except Exception as e:
+            print("call error: {0}".format(e))
+
+    def newObject(self, obj):
+        print("prop")
+        print(type(prop))
+
+    def deletedObject(self, obj):
+        print("prop")
+        print(type(prop))
+
+    def changedObject(self, obj, prop):
+        print("prop")
+        print(type(prop))

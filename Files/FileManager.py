@@ -17,27 +17,46 @@
 # *   Suite 330, Boston, MA  02111-1307, USA                             *
 # ************************************************************************
 
-import FreeCAD
-from Connection import connection
-from Interface import Browser
+from PortMapper import PortMapper
+from Protocol import FileHandlingProtocol
+from Utils import looping_retry
 
-if FreeCAD.GuiUp:
-    import FreeCADGui
-    from PySide import QtCore
 
-class _CommandConnect:
-    "the Collaboration command definition"
-    def GetResources(self):
-        return {'Pixmap': ':/Collaboration/Icons/icon_small.svg',
-                'MenuText': QtCore.QT_TRANSLATE_NOOP("Collab_Connect","Connect to FreeCAD collaboration services"),
-                'ToolTip': QtCore.QT_TRANSLATE_NOOP("Collab_Connect","Establishes a connection to the FreeCAD collaboration server")}
+import stun
+from log import Logger, FileLogObserver
+from twisted.internet import reactor
+from twisted.python import log, logfile
 
-    def IsActive(self):
-        return True
+def startup():
+    
+    PORT = 9000
+    
+    # Define logging
+    logFile = logfile.LogFile.fromFullPath(
+        os.path.join(DATA_FOLDER, "debug.log")
+        rotateLength=15000000,
+        maxRotatedFiles=1)
+    log.addObserver(FileLogObserver(logFile, level=LOGLEVEL).emit)
+    log.addObserver(FileLogObserver(level=LOGLEVEL).emit)
+    logger = Logger(system="OpenBazaard")
 
-    def Activated(self):
-        print("does this work?")
-        Browser.browser.show()
+    # NAT traversal
+    p = PortMapper()
+    p.add_port_mapping(PORT, PORT, "UDP")
+    logger.info("Finding NAT Type...")
 
-if FreeCAD.GuiUp:
-    FreeCADGui.addCommand('Collab_Connect',_CommandConnect())
+    response = looping_retry(stun.get_ip_info, "0.0.0.0", PORT)
+        
+    logger.info("%s on %s:%s" % (response[0], response[1], response[2]))
+    ip_address = response[1]
+    port = response[2]
+
+    if response[0] == "Full Cone":
+        nat_type = FULL_CONE
+    elif response[0] == "Restric NAT":
+        nat_type = RESTRICTED
+    else:
+        nat_type = SYMMETRIC
+
+    protocol = FileHandlingProtocol((ip_address, port), nat_type)
+    looping_retry(reactor.listenUDP, port, protocol)
