@@ -20,7 +20,7 @@
 from PySide import QtCore, QtGui, QtWebKit, QtNetwork
 from PySide.QtCore import Qt, QObject, QUrl, Slot
 from PySide.QtGui  import QFrame, QGridLayout, QSizeGrip
-import FreeCAD
+import FreeCAD, FreeCADGui
 
 from Connection import connection
 
@@ -94,8 +94,8 @@ class Backend(QObject):
     
 class BrowserWidget(QFrame):
     
-    def __init__(self):
-        super(BrowserWidget, self).__init__()
+    def __init__(self, parent=None):
+        super(BrowserWidget, self).__init__(parent)
         QtWebKit.QWebSettings.globalSettings().setAttribute(QtWebKit.QWebSettings.DeveloperExtrasEnabled, True)
         self.initUI()
         
@@ -144,4 +144,4 @@ class BrowserWidget(QFrame):
     
         
 # provide a singleton for global access
-browser = BrowserWidget()
+browser = BrowserWidget(FreeCADGui.getMainWindow())
