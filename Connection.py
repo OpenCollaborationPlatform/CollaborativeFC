@@ -17,10 +17,6 @@
 # *   Suite 330, Boston, MA  02111-1307, USA                             *
 # ************************************************************************
 
-# qt4 reactor to drive twisted eventloop: needed before any twisted import
-#import qt4reactor
-#qt4reactor.install()
-
 from twisted.internet import reactor
 from autobahn.twisted.wamp import ApplicationSession
 from autobahn.twisted.websocket import WampWebSocketClientFactory
@@ -32,13 +28,22 @@ from PySide import QtCore
 import signal
 import sys
 
-import txaio
-txaio.use_twisted()
-
+import FreeCAD, json
 
 class Connection():
 
     class Session(ApplicationSession):
+
+        def onConnect(self):
+            ui = self.config.extra['ui']
+            self.join(ui.realm, [u'ticket'], ui.authid)
+
+        def onChallenge(self, challenge):
+            if challenge.method == u'ticket':
+                ui = self.config.extra['ui']
+                return ui.ticket
+            else:
+                raise Exception("Invalid authmethod {}".format(challenge.method))
 
         def onJoin(self, details):
             print("session joined")
@@ -56,8 +61,7 @@ class Connection():
             ui.onClose()
 
     def __init__(self):
-        self.__ownLoop = ("qt4reactor" not in sys.modules)
-
+ 
         self.url = u"ws://localhost:9000/ws"
         self.realm = u"freecad"
         self.serializers = [JsonSerializer()]
@@ -104,6 +108,24 @@ class Connection():
 
         if self.session:
             self.disconnect()
+            
+        # get the connection data
+        self.ticket = FreeCAD.ParamGet("User parameter:BaseApp/Preferences/Mod/Collaboration").GetString("JSONWebToken");
+        if(self.ticket):
+            import jwt, time
+            dec = jwt.decode(self.ticket, verify=False)
+            if dec["exp"] < int(time.time()):
+                raise Exception("JSON Web token expired")
+        else:
+            raise Exception("No JSON Web token set")
+        
+        profile = FreeCAD.ParamGet("User parameter:BaseApp/Preferences/Mod/Collaboration").GetString("Profile");
+        if(profile):
+            prof = json.loads(profile)
+            self.authid = prof["user_id"]
+            print self.authid
+        else:
+            raise Exception("Profile does not contain client ID")
 
         from twisted.internet import reactor
         from twisted.internet.endpoints import TCP4ClientEndpoint

@@ -20,11 +20,22 @@
         
         function setProfile(profile, show) {
             $$("ProfilePicture").define('src', String(profile.picture));
-            $$("Username").setValue(profile.username);
+            
+            if ("username" in profile)
+                $$("Username").setValue(profile.username);
+            else if ("name" in profile)
+                $$("Username").setValue(profile.name);
+            else if ("nickname" in profile)
+                $$("Username").setValue(profile.nickname);
+            else
+                $$("Username").setValue("Unknown");
+            
             $$("EMail").setValue(profile.email);
             $$("body").setHTML(JSON.stringify(profile))
-            if(show)
+            if(show) {
                 $$("info").show();
+                backend.openConnection();
+            }
             else
                 $$("auth").show();
         };
@@ -129,6 +140,7 @@
         var logout = function() {
             //remove all login data and close the connection
             backend.clearLoginData()
+            backend.closeConnection();
             
             //show the login screen
             $$("auth").show()

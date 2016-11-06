@@ -22,6 +22,7 @@ from PySide.QtCore import Qt, QObject, QUrl, Slot
 from PySide.QtGui  import QFrame, QGridLayout, QSizeGrip
 import FreeCAD
 
+from Connection import connection
 
 #class PersistantCookieJar(QtNetwork.QNetworkCookieJar()):
 #    
@@ -32,14 +33,16 @@ class Backend(QObject):
     
     def __init__(self, parent=None):
         super(Backend, self).__init__(parent)
-        
-    @Slot(str, str)
+      
+    # User identification management
+    # ******************************
+    
+    @Slot(unicode, unicode)
     def saveLoginData(self, token, profile):
         # store JWT and profile string to be accessible from python
-        
         p = FreeCAD.ParamGet("User parameter:BaseApp/Preferences/Mod/Collaboration")
+        p.SetString("Profile", profile.encode('utf-8'))
         p.SetString("JSONWebToken", token)
-        p.SetString("Profile", profile)
       
     @Slot()
     def clearLoginData(self):
@@ -75,6 +78,20 @@ class Backend(QObject):
         
         return FreeCAD.ParamGet("User parameter:BaseApp/Preferences/Mod/Collaboration").GetString("Profile")
 
+
+    # Router Connection management
+    # ****************************
+    
+    @Slot()
+    def openConnection(self):
+        # try to connect to the router
+        connection.connect()
+    
+    @Slot()
+    def closeConnection(self):
+        # try to connect to the router
+        connection.disconnect()
+    
 class BrowserWidget(QFrame):
     
     def __init__(self):
@@ -109,6 +126,10 @@ class BrowserWidget(QFrame):
         self.webView.load(QUrl("http://localhost:8000"))  
          
     def pageLoaded(self, ok):
+        if not self.loaded:
+            self.webView.load(QUrl("http://localhost:8000")) 
+            self.loaded = True
+
         #install our javascript backend for js<->python communication
         self.webView.page().mainFrame().addToJavaScriptWindowObject('backend', Backend())
          
@@ -118,11 +139,7 @@ class BrowserWidget(QFrame):
         widget = QtGui.qApp.widgetAt(pos)
         point = widget.rect().bottomLeft()
         global_point = widget.mapToGlobal(point)
-        self.move(global_point)
-        if not self.loaded:
-            self.webView.load(QUrl("http://localhost:8000")) 
-            self.loaded = True
-            
+        self.move(global_point)            
         super(BrowserWidget, self).show()        
     
         
