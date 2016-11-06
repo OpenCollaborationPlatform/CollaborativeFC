@@ -4,9 +4,11 @@
     <head>
         <meta charset="utf-8"/>
         <link rel="stylesheet" href="Resources/webix.css" type="text/css">
+        <script src="https://autobahn.s3.amazonaws.com/autobahnjs/latest/autobahn.min.jgz"></script> 
         <script src="Resources/webix.js" type="text/javascript"></script> 
         <script src="Resources/skin.js" type="text/javascript"></script>  
         <script src="https://cdn.auth0.com/w2/auth0-7.2.min.js"></script>
+        <script src="Connection.js" type="text/javascript"></script>  
     </head>
     <body>
         <script type="text/javascript" charset="utf-8">
@@ -35,6 +37,7 @@
             if(show) {
                 $$("info").show();
                 backend.openConnection();
+                connection.open()
             }
             else
                 $$("auth").show();
@@ -141,6 +144,7 @@
             //remove all login data and close the connection
             backend.clearLoginData()
             backend.closeConnection();
+            connection.close();
             
             //show the login screen
             $$("auth").show()
