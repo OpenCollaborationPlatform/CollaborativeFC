@@ -65,6 +65,13 @@ class ReactorDriver():
         self.__timer.stop()
         self.__timer.setInterval(500)
         self.__timer.start()
+    
+    def shutdown(self):
+
+        self.__timer.stop()
+        reactor.stop()
+        reactor.runUntilCurrent()
+        reactor.doIteration(0)
 
     def __onTimer(self):
 
@@ -82,3 +89,6 @@ class ReactorDriver():
 # a single connection only
 driver = ReactorDriver()
 driver.start()
+
+# we need to shutdown the reactor before closing FreeCAD, otherwise the application can't close
+QtCore.QCoreApplication.instance().aboutToQuit.connect(driver.shutdown)
