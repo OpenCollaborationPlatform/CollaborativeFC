@@ -1,5 +1,5 @@
 # ************************************************************************
-# *   Copyright (c) Stefan Troeger (stefantroeger@gmx.net) 2016          *
+# *   Copyright (c) Stefan Troeger (stefantroeger@gmx.net) 2019          *
 # *                                                                      *
 # *   This library is free software; you can redistribute it and/or      *
 # *   modify it under the terms of the GNU Library General Public        *
@@ -17,12 +17,8 @@
 # *   Suite 330, Boston, MA  02111-1307, USA                             *
 # ************************************************************************
 
-
-import FreeCAD
-import Collaboration, Reactor, Observer, Commands
-from Connection         import Connection
-from Interface.Browser  import browser
-from Interface.Server   import server
+import subprocess
+import FreeCAD, Collaboration, Commands, Connection
    
 # setup the toolbar
 group = FreeCAD.ParamGet("User parameter:BaseApp/Workbench/Global/Toolbar")
@@ -30,9 +26,9 @@ group = FreeCAD.ParamGet("User parameter:BaseApp/Workbench/Global/Toolbar")
 # as the GUI for custom global toolbars always rename them to "Custom_X" we need to search if 
 # a colaboration toolbar is already set up
 alreadySetup = False
-for i in range(1,100):
-    if group.HasGroup("Custom_"+str(i)):
-        custom = group.GetGroup("Custom_"+str(i))
+for i in range(1,1000):
+    if group.HasGroup("Custom_" + str(i)):
+        custom = group.GetGroup("Custom_" + str(i))
         if custom.GetBool("CollaborationAutoSetup", False):
             alreadySetup = True
         else:
@@ -43,10 +39,10 @@ for i in range(1,100):
 #if not already done add our global toolbar
 if not alreadySetup:
     # add the toolbar and make it findable
-    collab = group.GetGroup("Custom_"+str(i))
-    collab.SetString("Name", "Collaboration Services")
+    collab = group.GetGroup("Custom_" + str(i))
+    collab.SetString("Name", "Collaboration Network")
     collab.SetBool("Active", True)
     collab.SetBool("CollaborationAutoSetup", True)
     
     # add the tools
-    collab.SetString("Connect", "Commands")
+    collab.SetString("Collaborate", "Command")

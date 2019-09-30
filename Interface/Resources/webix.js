@@ -1629,5 +1629,5 @@ var a=t(r,s),l=e(r,s,a),c=function(t,e){var i=(e.filename||"data")+".pdf",s=new 
 //# sourceMappingURL=./webix.js.map
 
 //[Skin Customization]
-webix.skin.material.barHeight=30;webix.skin.material.tabbarHeight=30;webix.skin.material.rowHeight=30;webix.skin.material.listItemHeight=30;webix.skin.material.inputHeight=30;webix.skin.material.layoutMargin.wide=5;webix.skin.material.layoutMargin.space=5;webix.skin.material.layoutPadding.space=5;
+webix.skin.material.barHeight=45;webix.skin.material.tabbarHeight=45;webix.skin.material.rowHeight=30;webix.skin.material.listItemHeight=25;webix.skin.material.inputHeight=25;webix.skin.material.layoutMargin.wide=5;webix.skin.material.layoutMargin.space=5;webix.skin.material.layoutPadding.space=5;
  webix.skin.set('material')

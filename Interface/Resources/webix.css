@@ -1,6 +1,6 @@
 .webix_view {
   font-family: Arial;
-  font-size: 14px;
+  font-size: 15px;
   color: #545454;
   cursor: default;
   overflow: hidden;
@@ -31,10 +31,10 @@ button,
 	known types are: line, clean, wide, space;
 */
 .webix_layout_space {
-  background-color: #f7f7f7;
+  background-color: #ffffff;
 }
 .webix_layout_wide {
-  background-color: #f7f7f7;
+  background-color: #ffffff;
 }
 .webix_layout_line,
 .webix_multiview,
@@ -103,11 +103,11 @@ body.webix_full_screen {
   background-color: transparent;
   background-image: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAAUCAIAAADDbMD2AAAABnRSTlMA/wD/AP83WBt9AAAACXBIWXMAAA7EAAAOxAGVKw4bAAAAHElEQVR4nGP4//8/EwMDA158/vx5BmLUMTAwAADGhQiMQPqPwgAAAABJRU5ErkJggg==);
   background-repeat: repeat-x;
-  background-position: 7.5px;
+  background-position: 11.25px;
   color: #444;
   font-size: 10px;
   text-transform: uppercase;
-  line-height: 30px;
+  line-height: 45px;
 }
 .webix_section > .webix_template {
   padding: 0px 8px;
@@ -116,11 +116,11 @@ body.webix_full_screen {
 }
 .webix_layout_space > .webix_section > .webix_template {
   padding: 0px 8px;
-  background-color: #f7f7f7;
+  background-color: #ffffff;
 }
 .webix_layout_wide > .webix_section > .webix_template {
   padding: 0px 8px;
-  background-color: #f7f7f7;
+  background-color: #ffffff;
 }
 .webix_layout_line > .webix_section > .webix_template,
 .webix_layout_clean > .webix_section > .webix_template {
@@ -130,13 +130,12 @@ body.webix_full_screen {
 .webix_header > div {
   padding-left: 10px;
   font-family: Arial;
-  font-size: 14px;
   color: #545454;
-  font-size: 16px;
+  font-size: 15px;
   font-weight: bold;
   background: #ffffff;
-  line-height: 28px;
-  line-height: 30px;
+  line-height: 43px;
+  line-height: 45px;
   padding-top: 0;
   padding-bottom: 0;
 }
@@ -241,12 +240,11 @@ x\:ui {
   position: relative;
   z-index: 2;
   font-family: Arial;
-  font-size: 14px;
   color: #545454;
-  font-size: 16px;
+  font-size: 15px;
   font-weight: bold;
   background: #ffffff;
-  line-height: 28px;
+  line-height: 43px;
   cursor: pointer;
   overflow: hidden;
 }
@@ -259,7 +257,7 @@ x\:ui {
   position: relative;
   height: 11px;
   width: 11px;
-  margin: 12px 12px;
+  margin: 19.5px 19.5px;
 }
 /*
 .webix_accordionitem.vertical > .webix_accordionitem_header .webix_accordionitem_button{
@@ -535,7 +533,7 @@ x\:ui {
   -webkit-box-sizing: border-box;
   box-sizing: border-box;
   font-family: Arial;
-  font-size: 14px;
+  font-size: 15px;
 }
 /*selected  button of pager*/
 .webix_pager_item_selected {
@@ -810,7 +808,7 @@ x\:ui {
   border: 1px solid #ffd700;
   height: 100%;
   font-family: Arial;
-  font-size: 14px;
+  font-size: 15px;
   color: #545454;
 }
 .webix_dt_editor input[type="checkbox"] {
@@ -947,7 +945,7 @@ div.webix_modal_cover {
 }
 .webix_button input,
 .webix_popup_button div {
-  font-size: 14px;
+  font-size: 15px;
   color: #3498db;
   background: transparent;
   font-weight: bold;
@@ -969,13 +967,13 @@ div.webix_modal_cover {
 .webix_popup_text {
   margin: 0 0 5px 0;
   padding-top: 25px;
-  font-size: 14px;
+  font-size: 15px;
   color: #545454;
   min-height: 60px;
 }
 .webix_info,
 .webix_error {
-  font-size: 14px;
+  font-size: 15px;
   color: #545454;
   box-shadow: 0px 0px 10px #888;
   padding: 0px;
@@ -1004,7 +1002,7 @@ div.webix_modal_cover {
   box-shadow: 1px 1px 5px #edf2f1;
   background-color: white;
   font-family: Arial;
-  font-size: 14px;
+  font-size: 15px;
   color: #545454;
 }
 .webix_drag_zone .borderless {
@@ -1122,7 +1120,7 @@ div.webix_modal_cover {
   width: 100%;
   font-size: inherit;
   color: #545454 !important;
-  height: 26px;
+  height: 41px;
   margin-top: -2px;
   padding: 0 3px;
   vertical-align: top;
@@ -1356,14 +1354,13 @@ div.webix_modal_cover {
 }
 .webix_win_head > .webix_view > .webix_template {
   font-family: Arial;
-  font-size: 14px;
   color: #545454;
-  font-size: 16px;
+  font-size: 15px;
   font-weight: bold;
   background: #ffffff;
   padding: 0px;
   text-align: center;
-  line-height: 30px;
+  line-height: 45px;
 }
 /*----------------------------*/
 /* DO NOT CHANGE STYLES BELOW */
@@ -1833,12 +1830,11 @@ div.webix_modal_cover {
 .webix_property_label_line {
   padding-left: 10px;
   font-family: Arial;
-  font-size: 14px;
   color: #545454;
-  font-size: 16px;
+  font-size: 15px;
   font-weight: bold;
   background: #ffffff;
-  line-height: 28px;
+  line-height: 43px;
   line-height: 23px;
   border-bottom: 1px solid #edf2f1;
 }
@@ -1874,7 +1870,7 @@ div.webix_modal_cover {
   padding: 5px 10px;
   border: 1px solid #edf2f1;
   font-family: Arial;
-  font-size: 14px;
+  font-size: 15px;
   color: #545454;
   border-radius: 3px;
   box-shadow: 1px 1px 0px 0px #CCC;
@@ -1922,7 +1918,7 @@ div.webix_modal_cover {
   height: 100%;
   width: 100%;
   cursor: pointer;
-  font-size: 14px;
+  font-size: 15px;
   font-family: Arial;
   -webkit-appearance: none;
 }
@@ -1951,7 +1947,7 @@ div.webix_modal_cover {
   color: #3498db;
   background: transparent;
   font-weight: bold;
-  font-size: 14px;
+  font-size: 15px;
   font-family: Arial;
   padding: 0px;
   border: 0px;
@@ -2066,7 +2062,7 @@ input.webixtype_next {
   background-repeat: no-repeat;
   background-position: 2px center;
   height: 100%;
-  font-size: 14px;
+  font-size: 15px;
 }
 .webix_img_btn .webix_icon,
 .webix_img_btn_top .webix_icon,
@@ -2362,7 +2358,7 @@ body:not(:-moz-handler-blocked) .webix_el_select select {
   color: #3498db;
   background: transparent;
   font-weight: bold;
-  font-size: 14px;
+  font-size: 15px;
   font-family: Arial;
   cursor: pointer;
   padding: 0;
@@ -2629,7 +2625,7 @@ label.webix_required:after {
   border-left-width: 0px;
   background-color: #ffffff;
   color: #545454;
-  font-size: 16px;
+  font-size: 15px;
   -webkit-border-top-left-radius: 0px;
   -webkit-border-bottom-left-radius: 0px;
   -webkit-border-top-right-radius: 0px;
@@ -2654,7 +2650,7 @@ label.webix_required:after {
 .webix_item_tab.webix_selected {
   border-bottom-width: 0px;
   color: #545454;
-  font-size: 16px;
+  font-size: 15px;
 }
 .webixtype_bottom .webix_item_tab.webix_selected {
   border-bottom-width: 1px ;
@@ -5023,7 +5019,7 @@ label.webix_required:after {
   position: relative;
 }
 .webix_barcode .webix_canvas_text {
-  font-size: 14px;
+  font-size: 15px;
   padding: 0 2px;
   -moz-box-sizing: border-box;
   -webkit-box-sizing: border-box;
@@ -5266,7 +5262,7 @@ label.webix_required:after {
 }
 .webix_layout_space,
 .webix_layout_material {
-  background-color: #f7f7f7;
+  background-color: #ffffff;
 }
 .webix_layout_space > .webix_view {
   border-radius: 2px;
@@ -5336,7 +5332,7 @@ label.webix_required:after {
 .webix_popup_title {
   color: #545454 !important;
   background: #fff !important;
-  font-size: 16px !important;
+  font-size: 15px !important;
   font-weight: bold;
   border-bottom: 1px solid #dee7e5 !important;
   text-shadow: none !important;
@@ -5358,7 +5354,7 @@ label.webix_required:after {
   border-width: 0px;
   border-radius: 2px;
   font-family: Arial;
-  font-size: 14px;
+  font-size: 15px;
   color: #8bc4ea;
   font-weight: bold;
   text-transform: uppercase;
@@ -5399,7 +5395,7 @@ label.webix_required:after {
   border-width: 0px;
   border-radius: 2px;
   font-family: Arial;
-  font-size: 14px;
+  font-size: 15px;
   color: #8bc4ea;
   font-weight: bold;
   text-transform: uppercase;
@@ -5444,7 +5440,7 @@ label.webix_required:after {
   border-width: 0px;
   border-radius: 2px;
   font-family: Arial;
-  font-size: 14px;
+  font-size: 15px;
   color: #8bc4ea;
   font-weight: bold;
   text-transform: uppercase;
@@ -5495,7 +5491,7 @@ label.webix_required:after {
   border-width: 0px;
   border-radius: 2px;
   font-family: Arial;
-  font-size: 14px;
+  font-size: 15px;
   color: #8bc4ea;
   font-weight: bold;
   text-transform: uppercase;
@@ -5548,7 +5544,7 @@ label.webix_required:after {
   border-width: 0px;
   border-radius: 2px;
   font-family: Arial;
-  font-size: 14px;
+  font-size: 15px;
   color: #8bc4ea;
   font-weight: bold;
   text-transform: uppercase;
@@ -5599,7 +5595,7 @@ label.webix_required:after {
   border-width: 0px;
   border-radius: 2px;
   font-family: Arial;
-  font-size: 14px;
+  font-size: 15px;
   color: #8bc4ea;
   font-weight: bold;
   text-transform: uppercase;
@@ -5668,7 +5664,7 @@ label.webix_required:after {
   background: transparent;
   color: #545454;
   font-family: Arial;
-  font-size: 18.060000000000002px;
+  font-size: 19.35px;
   font-weight: normal;
 }
 .webix_template {
@@ -5700,7 +5696,7 @@ label.webix_required:after {
 }
 .webix_ss_sort_asc,
 .webix_ss_sort_desc {
-  font-size: 14px;
+  font-size: 15px;
   font-family: FontAwesome;
   top: 50%;
   line-height: 1px;
@@ -5824,7 +5820,7 @@ label.webix_required:after {
   padding-right: 80px;
 }
 .buttonStyle {
-  font-size: 14px;
+  font-size: 15px;
   font-family: Arial;
 }
 .webix_el_tabbar {
@@ -5838,7 +5834,7 @@ label.webix_required:after {
 }
 .webix_item_tab {
   font-family: Arial;
-  font-size: 14px;
+  font-size: 15px;
   color: #8bc4ea;
   font-weight: bold;
   text-transform: uppercase;
@@ -5855,7 +5851,7 @@ label.webix_required:after {
 }
 .webix_item_tab.webix_selected {
   font-family: Arial;
-  font-size: 14px;
+  font-size: 15px;
   color: #8bc4ea;
   font-weight: bold;
   text-transform: uppercase;
@@ -5876,7 +5872,7 @@ label.webix_required:after {
 }
 .webix_icon,
 .webix_input_icon {
-  font-size: 14px;
+  font-size: 15px;
 }
 .webix_img_btn .webix_icon,
 .webix_img_btn_top .webix_icon,
@@ -5892,7 +5888,7 @@ label.webix_required:after {
 .webix_ss_header {
   border-bottom: 1px solid #adadad;
   text-transform: uppercase;
-  font-size: 13.020000000000001px;
+  font-size: 13.950000000000001px;
 }
 .webix_ss_header,
 .webix_ss_header TD,
@@ -5923,7 +5919,7 @@ label.webix_required:after {
   border-width: 0px;
   border-radius: 2px;
   font-family: Arial;
-  font-size: 14px;
+  font-size: 15px;
   color: #8bc4ea;
   font-weight: bold;
   text-transform: uppercase;
@@ -6011,7 +6007,7 @@ label.webix_required:after {
   border-width: 0px;
   border-radius: 2px;
   font-family: Arial;
-  font-size: 14px;
+  font-size: 15px;
   color: #8bc4ea;
   font-weight: bold;
   text-transform: uppercase;
@@ -6102,7 +6098,7 @@ label.webix_required:after {
   border-width: 0px;
   border-radius: 2px;
   font-family: Arial;
-  font-size: 14px;
+  font-size: 15px;
   color: #8bc4ea;
   font-weight: bold;
   text-transform: uppercase;
@@ -6190,7 +6186,7 @@ label.webix_required:after {
   border-width: 0px;
   border-radius: 2px;
   font-family: Arial;
-  font-size: 14px;
+  font-size: 15px;
   color: #8bc4ea;
   font-weight: bold;
   text-transform: uppercase;
@@ -6294,7 +6290,7 @@ label.webix_required:after {
   border-width: 0px;
   border-radius: 2px;
   font-family: Arial;
-  font-size: 14px;
+  font-size: 15px;
   color: #8bc4ea;
   font-weight: bold;
   text-transform: uppercase;
@@ -6383,7 +6379,7 @@ label.webix_required:after {
   border-width: 0px;
   border-radius: 2px;
   font-family: Arial;
-  font-size: 14px;
+  font-size: 15px;
   color: #8bc4ea;
   font-weight: bold;
   text-transform: uppercase;
@@ -6474,7 +6470,7 @@ label.webix_required:after {
   border-width: 0px;
   border-radius: 2px;
   font-family: Arial;
-  font-size: 14px;
+  font-size: 15px;
   color: #8bc4ea;
   font-weight: bold;
   text-transform: uppercase;
@@ -6563,7 +6559,7 @@ label.webix_required:after {
   border-width: 0px;
   border-radius: 2px;
   font-family: Arial;
-  font-size: 14px;
+  font-size: 15px;
   color: #8bc4ea;
   font-weight: bold;
   text-transform: uppercase;
@@ -6654,7 +6650,7 @@ label.webix_required:after {
   border-width: 0px;
   border-radius: 2px;
   font-family: Arial;
-  font-size: 14px;
+  font-size: 15px;
   color: #8bc4ea;
   font-weight: bold;
   text-transform: uppercase;
@@ -6743,7 +6739,7 @@ label.webix_required:after {
   border-width: 0px;
   border-radius: 2px;
   font-family: Arial;
-  font-size: 14px;
+  font-size: 15px;
   color: #8bc4ea;
   font-weight: bold;
   text-transform: uppercase;
@@ -6834,7 +6830,7 @@ label.webix_required:after {
   border-width: 0px;
   border-radius: 2px;
   font-family: Arial;
-  font-size: 14px;
+  font-size: 15px;
   color: #8bc4ea;
   font-weight: bold;
   text-transform: uppercase;
@@ -6923,7 +6919,7 @@ label.webix_required:after {
   border-width: 0px;
   border-radius: 2px;
   font-family: Arial;
-  font-size: 14px;
+  font-size: 15px;
   color: #8bc4ea;
   font-weight: bold;
   text-transform: uppercase;
@@ -7029,7 +7025,7 @@ label.webix_required:after {
   border-width: 1px;
   border-radius: 2px;
   font-family: Arial;
-  font-size: 14px;
+  font-size: 15px;
   color: #8bc4ea;
   font-weight: bold;
   text-transform: uppercase;
@@ -7093,33 +7089,33 @@ label.webix_required:after {
 }
 .webix_inp_static .webix_placeholder {
   color: #b8b8b8;
-  font-size: 14px;
+  font-size: 15px;
 }
 ::-webkit-input-placeholder {
   color: #b8b8b8;
-  font-size: 14px;
+  font-size: 15px;
 }
 :-moz-placeholder {
   /* Firefox 18- */
 
   color: #b8b8b8;
-  font-size: 14px;
+  font-size: 15px;
 }
 ::-moz-placeholder {
   /* Firefox 19+ */
 
   color: #b8b8b8;
-  font-size: 14px;
+  font-size: 15px;
 }
 :-ms-input-placeholder {
   color: #b8b8b8;
-  font-size: 14px;
+  font-size: 15px;
 }
 .webix_form label,
 .webix_form .webix_el_label {
   color: #545454;
   font-family: Arial;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 700;
 }
 /*
@@ -7169,7 +7165,7 @@ label.webix_required:after {
 }
 .webix_el_radio .webix_label_right {
   color: #545454;
-  font-size: 14px;
+  font-size: 15px;
 }
 .webix_el_checkbox .webix_inp_checkbox_border input {
   display: none;
@@ -7202,7 +7198,7 @@ label.webix_required:after {
   width: 12px;
 }
 .webix_inp_label {
-  font-size: 14px;
+  font-size: 15px;
 }
 .webix_segment_0,
 .webix_segment_1,
@@ -7262,8 +7258,8 @@ label.webix_required:after {
 .webix_view input.webix_inp_counter_prev,
 .webix_view input.webix_inp_counter_next {
   width: 30px;
-  font-size: 23.939999999999998px;
-  line-height: 23.939999999999998px;
+  font-size: 25.65px;
+  line-height: 25.65px;
   border: none;
 }
 .webix_el_combo .webix_input_icon,
@@ -7275,7 +7271,7 @@ label.webix_required:after {
   top: 5px;
 }
 .webix_el_slider .webix_slider_title {
-  font-size: 12.04px;
+  font-size: 12.9px;
   margin-bottom: -4px;
   margin-top: -6px;
 }
@@ -7364,7 +7360,7 @@ label.webix_required:after {
   border-width: 0px;
   border-radius: 2px;
   font-family: Arial;
-  font-size: 14px;
+  font-size: 15px;
   color: #8bc4ea;
   font-weight: bold;
   text-transform: uppercase;
@@ -7407,7 +7403,7 @@ label.webix_required:after {
   border-width: 0px;
   border-radius: 2px;
   font-family: Arial;
-  font-size: 14px;
+  font-size: 15px;
   color: #8bc4ea;
   font-weight: bold;
   text-transform: uppercase;

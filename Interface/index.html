@@ -21,8 +21,7 @@
         });
         
         function setProfile(profile, show) {
-            $$("ProfilePicture").define('src', String(profile.picture));
-            
+            $$("ProfilePicture").define('template', '<img src="'+String(profile.picture)+'" height="50" width="50"/>');
             if ("username" in profile)
                 $$("Username").setValue(profile.username);
             else if ("name" in profile)
@@ -210,44 +209,64 @@
                 align:"center", 
                 multiview:true,
                 autoheight: true,
-                optionWidth:120
+                optionWidth:120,
+                type: "clean",
               },
               { view: "multiview",
                 id: "authviews",
-                cells:[login, signup]
+                cells:[login, signup],
+                type: "clean",
               },
             ]
         }
                  
         var info = {
-            type: "line",
+            type: "space",
             id: "info",
             rows: [
-                { cols: [
+                { view:"toolbar", 
+                  height: 50,
+                  padding:0,
+                  margin:2,
+                  elements:[
                     { id: "ProfilePicture",
-                      template: "<img src:https://s.gravatar.com/avatar/4d58414f4b795d8697466fbd37303fbb?s=480&r=pg&d=https%3A%2F%2Fcdn.auth0.com%2Favatars%2Fne.png>",
+                      borderless:true,
+                      type:"clean",
+                      template: '<img src="" height="50" width="50"/>',
                       width: 50,
                       height: 50
                     },
                     { rows: [
-                        {  id: "Username",
-                           view:"label",
-                           label: "Text"
+                        { id: "Username",
+                          view: "label",
+                          label: "Text",
+                          margin:0,
+                          //height:22
                         },
-                        {  id: "EMail",
-                           view:"label",
-                           label: "Text"
+                        { id: "EMail",
+                          view: "label",
+                          label: "Text",
+                          margin:0,
+                          height:22
                         }
                       ]
+                    },
+                    {rows:[
+                       { cols:[
+                          { view:"icon", icon:"user", tooltip: "User settings"},
+                          { view:"icon", icon:"sign-out", tooltip: "Logout", on:{'onItemClick': logout} }
+                         ]
+                       },{}
+                     ]
                     }
                   ]
                 },
-                { id: "body",
-                  template: "not yet specified"                
+                { view:"template", template:"some text", type:"section" },
+                { id: "connection",
+                  template: "Connection"
                 },
-                { view:"button", 
-                  value:"Logout",
-                  on:{'onItemClick': logout} 
+                { id: "body",
+                  template: "not yet specified"
                 }
             ]
         };
@@ -285,6 +304,7 @@
             setProfile(JSON.parse(backend.getProfile()), true)   
         }
         
+       
         </script>
     </body> 
 </html>

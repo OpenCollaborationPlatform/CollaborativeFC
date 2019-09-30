@@ -1,5 +1,5 @@
 # ************************************************************************
-# *   Copyright (c) Stefan Troeger (stefantroeger@gmx.net) 2016          *
+# *   Copyright (c) Stefan Troeger (stefantroeger@gmx.net) 2019          *
 # *                                                                      *
 # *   This library is free software; you can redistribute it and/or      *
 # *   modify it under the terms of the GNU Library General Public        *
@@ -19,21 +19,20 @@
 
 import FreeCAD
 
-class _CommandConnect:
+class _CommandCollaboration:
     "the Collaboration command definition"
     def GetResources(self):
         from PySide import QtCore
-        return {'Pixmap': ':/Collaboration/Icons/icon_small.svg',
-                'MenuText': QtCore.QT_TRANSLATE_NOOP("Collab_Connect","Connect to FreeCAD collaboration services"),
-                'ToolTip': QtCore.QT_TRANSLATE_NOOP("Collab_Connect","Establishes a connection to the FreeCAD collaboration server")}
+        return {'Pixmap': ':/Collaboration/Icons/icon.svg',
+                'MenuText': QtCore.QT_TRANSLATE_NOOP("Collab_Connect","Use FreeCAD collaboration network"),
+                'ToolTip': QtCore.QT_TRANSLATE_NOOP("Collab_Connect","Interacts with the FreeCAD collaboration network")}
 
     def IsActive(self):
         return True
 
     def Activated(self):
-        from Interface import Browser
-        Browser.browser.show()
+        pass
 
 if FreeCAD.GuiUp:
     import FreeCADGui
-    FreeCADGui.addCommand('Connect',_CommandConnect())
+    FreeCADGui.addCommand('Collaborate', _CommandCollaboration())

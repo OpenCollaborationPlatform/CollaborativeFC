@@ -1,5 +1,5 @@
 # ************************************************************************
-# *   Copyright (c) Stefan Troeger (stefantroeger@gmx.net) 2016          *
+# *   Copyright (c) Stefan Troeger (stefantroeger@gmx.net) 2019          *
 # *                                                                      *
 # *   This library is free software; you can redistribute it and/or      *
 # *   modify it under the terms of the GNU Library General Public        *
@@ -17,137 +17,24 @@
 # *   Suite 330, Boston, MA  02111-1307, USA                             *
 # ************************************************************************
 
-from twisted.internet import reactor
-from autobahn.twisted.wamp import ApplicationSession
-from autobahn.twisted.websocket import WampWebSocketClientFactory
-from twisted.internet.defer import inlineCallbacks
-from autobahn.wamp.serializer import JsonSerializer
-from autobahn.wamp.types import ComponentConfig
-from autobahn.websocket.util import parse_url
+import asyncio
+from autobahn.asyncio.wamp import ApplicationSession, ApplicationRunner
+from asyncqt import QEventLoop
 from PySide import QtCore
-import signal
-import sys
 
-import FreeCAD, json
+app = QtCore.QCoreApplication.instance()
+loop = QEventLoop(app)
+asyncio.set_event_loop(loop)
 
-class Connection():
+class Connection(ApplicationSession):
 
-    class Session(ApplicationSession):
+    async def onJoin(self, details):
+        print("We have joined, yeahh!")
 
-        def onConnect(self):
-            ui = self.config.extra['ui']
-            self.join(ui.realm, [u'ticket'], ui.authid)
-
-        def onChallenge(self, challenge):
-            if challenge.method == u'ticket':
-                ui = self.config.extra['ui']
-                return ui.ticket
-            else:
-                raise Exception("Invalid authmethod {}".format(challenge.method))
-
-        def onJoin(self, details):
-            print("session joined")
-            print(details)
-
-            ui = self.config.extra['ui']
-            assert isinstance(ui, Connection)
-            ui.session = self
-            ui.onJoin()
-
-        def onClose(self, wasClean):
-            print("leave session")
-            ui = self.config.extra['ui']
-            assert isinstance(ui, Connection)
-            ui.onClose()
-
-    def __init__(self):
- 
-        self.url = u"ws://localhost:9000/ws"
-        self.realm = u"freecad"
-        self.serializers = [JsonSerializer()]
-        self.ssl = None
-        self.proxy = None
-        self.session = None
-
-        self.__isSecure, self.__host, self.__port, resource, path, params = parse_url(self.url)
-
-        # factory for use ApplicationSession
-        extra = dict(ui=self)
-
-        def create():
-            cfg = ComponentConfig(realm=self.realm, extra=extra)
-            try:
-                session = Connection.Session(cfg)
-            except Exception as e:
-                print("Session could not be created")
-
-            return session
-
-        # create a WAMP-over-WebSocket transport client factory
-        self.transport_factory = WampWebSocketClientFactory(create, url=self.url,
-                                                            serializers=self.serializers,
-                                                            proxy=self.proxy)
-        # supress pointless log noise like
-        self.transport_factory.noisy = False
-
-        # build our errror collector to handle errors in the reactor
-        class ErrorCollector(object):
-            exception = None
-
-            def __call__(self, failure):
-                self.exception = failure.value
-                reactor.stop()
-
-        self.connect_error = ErrorCollector()
-
-        # start with a unsecure connection
-        if self.__isSecure:
-            raise "Secure connections are not yet supported"
-
-    def connect(self):
-
-        if self.session:
-            self.disconnect()
-            
-        # get the connection data
-        self.ticket = FreeCAD.ParamGet("User parameter:BaseApp/Preferences/Mod/Collaboration").GetString("JSONWebToken");
-        if(self.ticket):
-            import jwt, time
-            dec = jwt.decode(self.ticket, verify=False)
-            if dec["exp"] < int(time.time()):
-                raise Exception("JSON Web token expired")
-        else:
-            raise Exception("No JSON Web token set")
-        
-        profile = FreeCAD.ParamGet("User parameter:BaseApp/Preferences/Mod/Collaboration").GetString("Profile");
-        if(profile):
-            prof = json.loads(profile)
-            self.authid = prof["user_id"]
-            print self.authid
-        else:
-            raise Exception("Profile does not contain client ID")
-
-        from twisted.internet import reactor
-        from twisted.internet.endpoints import TCP4ClientEndpoint
-        client = TCP4ClientEndpoint(reactor, self.__host, self.__port)
-        d = client.connect(self.transport_factory)
-        d.addErrback(self.connect_error)
-
-    def disconnect(self):
-        if self.session:
-            self.session.disconnect()
- 
-    def isConnected(self):
-        return self.session is not None
-
-    def onJoin(self):
-        print "YeAH YEAH YEAAAAAHHHH"
-
-    def onClose(self):
-        self.session = None
-        print "Ohh ohahahah wehhhhhh"
-
-
-# we provide a global connection object for everyone to use, as it is sensible to have
-# a single connection only
-connection = Connection()
+    def onDisconnect(self):
+        print("We have disconnected")
+    
+    
+runner = ApplicationRunner("ws://localhost:8000/ws", "ocp")
+coro = runner.run(Connection, start_loop=False)
+asyncio.get_event_loop().run_until_complete(coro)
