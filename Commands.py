@@ -19,7 +19,11 @@
 
 import FreeCAD
 
-class _CommandCollaboration:
+class CommandCollaboration:
+    
+    def __init__(self, widget):
+        self.widget = widget
+    
     "the Collaboration command definition"
     def GetResources(self):
         from PySide import QtCore
@@ -31,8 +35,4 @@ class _CommandCollaboration:
         return True
 
     def Activated(self):
-        pass
-
-if FreeCAD.GuiUp:
-    import FreeCADGui
-    FreeCADGui.addCommand('Collaborate', _CommandCollaboration())
+        self.widget.show()

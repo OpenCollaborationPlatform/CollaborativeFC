@@ -17,46 +17,42 @@
 # *   Suite 330, Boston, MA  02111-1307, USA                             *
 # ************************************************************************
 
-from PortMapper import PortMapper
-from Protocol import FileHandlingProtocol
-from Utils import looping_retry
+import FreeCADGui
+from PySide import QtCore, QtGui
+from PySide.QtUiTools import QUiLoader
 
+from Interface.DocumentModel import DocumentModel
 
-import stun
-from log import Logger, FileLogObserver
-from twisted.internet import reactor
-from twisted.python import log, logfile
-
-def startup():
+class UIWidget(QtGui.QFrame):
     
-    PORT = 9000
-    
-    # Define logging
-    logFile = logfile.LogFile.fromFullPath(
-        os.path.join(DATA_FOLDER, "debug.log")
-        rotateLength=15000000,
-        maxRotatedFiles=1)
-    log.addObserver(FileLogObserver(logFile, level=LOGLEVEL).emit)
-    log.addObserver(FileLogObserver(level=LOGLEVEL).emit)
-    logger = Logger(system="OpenBazaard")
+    def __init__(self, dochandler, parent=None):
+        super().__init__(parent)
 
-    # NAT traversal
-    p = PortMapper()
-    p.add_port_mapping(PORT, PORT, "UDP")
-    logger.info("Finding NAT Type...")
-
-    response = looping_retry(stun.get_ip_info, "0.0.0.0", PORT)
+        # We are a popup, make sure we look like it
+        self.setContentsMargins(1,1,1,1)
+        self.setWindowFlags(QtCore.Qt.FramelessWindowHint | QtCore.Qt.Popup)
+        self.setGeometry(0, 0, 375, 500)   
+        self.setFrameShape(QtGui.QFrame.StyledPanel)
+        self.setFrameShadow(QtGui.QFrame.Raised)
         
-    logger.info("%s on %s:%s" % (response[0], response[1], response[2]))
-    ip_address = response[1]
-    port = response[2]
+        loader = QUiLoader()
+        self.ui = loader.load(":/Collaboration/Ui/Widget.ui", self)
+        
+        layout = QtGui.QVBoxLayout()
+        layout.addWidget(self.ui)
+        self.setLayout(layout)
+        
+        #load the document model
+        self.model = DocumentModel(dochandler)
+          
+    def show(self):
+        #try to find the correct position for the popup
+        pos = QtGui.QCursor.pos()
+        widget = QtGui.QApplication.widgetAt(pos)
+        point = widget.rect().bottomLeft()
+        global_point = widget.mapToGlobal(point)
+        self.move(global_point)            
+        super().show()
+        
+     
 
-    if response[0] == "Full Cone":
-        nat_type = FULL_CONE
-    elif response[0] == "Restric NAT":
-        nat_type = RESTRICTED
-    else:
-        nat_type = SYMMETRIC
-
-    protocol = FileHandlingProtocol((ip_address, port), nat_type)
-    looping_retry(reactor.listenUDP, port, protocol)

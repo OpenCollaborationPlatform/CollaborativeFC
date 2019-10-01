@@ -16,23 +16,3 @@
 # *   write to the Free Software Foundation, Inc., 59 Temple Place,      *
 # *   Suite 330, Boston, MA  02111-1307, USA                             *
 # ************************************************************************
-
-import subprocess
-
-ocp = '/home/stefan/Projects/Go/CollaborationNode/CollaborationNode'
-
-#initialize the ocp node!
-
-#1.Always call init. if already done it will simply fail, otherwise it get initialized
-subprocess.call([ocp, 'init'])
-
-#2.Get the connection data
-output = subprocess.check_output([ocp, 'config', 'connection.uri'])
-ocp_uri = output.decode('ascii').replace('\n', "")
-output = subprocess.check_output([ocp, 'config', 'connection.port'])
-ocp_port = int(output.decode('ascii').replace('\n', ""))
-
-#3. See if we are up and running
-output = subprocess.check_output([ocp])
-if len(output.decode('ascii').split('\n')) < 3:
-    subprocess.Popen([ocp, 'start'])

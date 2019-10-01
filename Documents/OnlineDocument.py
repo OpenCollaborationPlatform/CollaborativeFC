@@ -18,7 +18,6 @@
 # ************************************************************************
 
 from Connection import connection
-from twisted.internet.defer import inlineCallbacks
 
 
 class OnlineDocument():
@@ -29,23 +28,6 @@ class OnlineDocument():
         
     def getUid(self):
         return self.document.Uid
-
-    @inlineCallbacks
-    def open(self):
-        # this opens a remote document and loads the remote data into the given local document
-        print("open")
-
-    @inlineCallbacks
-    def create(self):
-        # this creates a new remote document from the local one
-        try:
-            data = dict(Uid=str(self.document.Uid))
-            res = yield connection.session.call(u"fc.documents.create", data)
-            print(res)
-            res = yield connection.session.call(u"fc.documents.{0}.change".format(res), data)
-            print(res)
-        except Exception as e:
-            print("call error: {0}".format(e))
 
     def newObject(self, obj):
         print("prop")

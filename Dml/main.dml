@@ -1,0 +1,16 @@
+
+Import "object.dml"
+
+Data {
+    .id: "Document"
+    
+    Vector {
+        .id: "DocumentObjects"
+        .type: DocumentObject
+    }
+    
+    Vector {
+        .id: "Properties"
+        .type: Raw{}
+    }
+}

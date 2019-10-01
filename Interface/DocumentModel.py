@@ -17,19 +17,40 @@
 # *   Suite 330, Boston, MA  02111-1307, USA                             *
 # ************************************************************************
 
-from twisted.web.server import Site
-from twisted.web.static import File
-from twisted.internet import reactor, endpoints
+from PySide import QtCore, QtGui
 
-class HttpServer(object):
+class DocumentModel(QtCore.QAbstractListModel):
     
-    def __init__(self):
-        import os
-        path = os.path.dirname(os.path.abspath(__file__))
-        self.resource = File(path)
-        self.factory = Site(self.resource)
-        self.endpoint = endpoints.TCP4ServerEndpoint(reactor, 8000)
-        self.endpoint.listen(self.factory)
+    def __init__(self, dochandler):
+        super().__init__()
+        
+        self.dochandler = dochandler
+        dochandler.addUpdateFunc(self.layoutChanged.emit)
 
-#provide singleton for global access        
-server = HttpServer()
+    def data(self, index, role):
+        
+        if role == QtCore.Qt.DisplayRole:
+            
+            docmap = self.dochandler.document[index.row()]
+            if docmap['fcdoc'] != None:
+                return docmap['fcdoc'].Name
+            if docmap['id'] != None:
+                return docmap['id']
+                        
+            return "Unknown name"
+
+        if role == QtCore.Qt.DecorationRole:
+            docmap = self.dochandler.documents[index.row()]
+            if docmap['status'] is 'shared':
+                return QtGui.QColor('green')
+            if docmap['status'] is 'local':
+                return QtGui.QColor('orange')
+            if docmap['status'] is 'node':
+                return QtGui.QColor('yellow')
+            if docmap['status'] is 'invited':
+                return QtGui.QColor('purple')
+            
+            return QtGui.QColor('black')
+
+    def rowCount(self, index):
+        return len(self.dochandler.documents)

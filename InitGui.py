@@ -17,9 +17,21 @@
 # *   Suite 330, Boston, MA  02111-1307, USA                             *
 # ************************************************************************
 
-import subprocess
-import FreeCAD, Collaboration, Commands, Connection
-   
+from Documents import Handler
+from Interface import Widget
+from Connection import OCPConnection
+
+import FreeCAD, Collaboration, Commands
+
+#for now use simple global variables!
+connection = OCPConnection()
+dochandler = Handler.DocumentHandler(connection)
+widget     = Widget.UIWidget(dochandler)
+
+if FreeCAD.GuiUp:
+    import FreeCADGui
+    FreeCADGui.addCommand('Collaborate', Commands.CommandCollaboration(widget))
+    
 # setup the toolbar
 group = FreeCAD.ParamGet("User parameter:BaseApp/Workbench/Global/Toolbar")
 

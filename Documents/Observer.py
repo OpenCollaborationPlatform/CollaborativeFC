@@ -17,43 +17,93 @@
 # *   Suite 330, Boston, MA  02111-1307, USA                             *
 # ************************************************************************
 
-from OnlineDocument import OnlineDocument
-from Connection import connection
-from PySide import QtGui
-
-
 class DocumentObserver():
-    __trackedDocs = dict()
+    
+    def __init__(self, handler):
+        self.handler = handler
 
     def slotCreatedDocument(self, doc):
-
-        if connection.isConnected():
-            msgBox = QtGui.QMessageBox()
-            msgBox.setText("New Document created, shall it be tracked online?")
-            msgBox.setInformativeText("This creates a history based document in your collaboration account?")
-            msgBox.setStandardButtons(QtGui.QMessageBox.Yes | QtGui.QMessageBox.No)
-            msgBox.setDefaultButton(QtGui.QMessageBox.Yes)
-            ret = msgBox.exec_()
-
-            if ret == QtGui.QMessageBox.Yes:
-                self.__trackedDocs[doc.Uid] = OnlineDocument(doc)
-                print "create document online"
-                self.__trackedDocs[doc.Uid].create()
+        print("Observed new document")
+        self.handler.openFCDocument(doc)
+        
 
     def slotDeletedDocument(self, doc):
-        print "well"
+        self.handler.closeFCDocument(doc)
 
     def slotRelabelDocument(self, doc):
-        print "well"
+        pass
 
     def slotCreatedObject(self, obj):
-        if obj.Document.Uid in self.__trackedDocs:
-            self.__trackedDocs[obj.Document.Uid].newObject(obj)
+        pass
 
     def slotDeletedObject(self, obj):
-        if obj.Document.Uid in self.__trackedDocs:
-            self.__trackedDocs[obj.Document.Uid].deletedObject(obj)
+        pass
 
     def slotChangedObject(self, obj, prop):
-        if obj.Document.Uid in self.__trackedDocs:
-            self.__trackedDocs[obj.Document.Uid].changedObject(obj, prop)
+        pass
+
+    def slotCreatedDocument(self, doc):
+        pass
+    
+    def slotDeletedDocument(self, doc):
+        pass
+    
+    def slotRelabelDocument(self, doc):
+        pass
+    
+    def slotActivateDocument(self, doc):
+        pass
+    
+    def slotRecomputedDocument(self, doc):
+        pass
+    
+    def slotUndoDocument(self, doc):
+        pass
+    
+    def slotRedoDocument(self, doc):
+        pass
+    
+    def slotOpenTransaction(self, doc, name):
+        pass
+    
+    def slotCommitTransaction(self, doc):
+        pass
+    
+    def slotAbortTransaction(self, doc):
+        pass
+    
+    def slotBeforeChangeDocument(self, doc, prop):
+        pass
+        
+    def slotChangedDocument(self, doc, prop):
+        pass
+    
+    def slotCreatedObject(self, obj):
+        pass
+    
+    def slotDeletedObject(self, obj):
+        pass
+    
+    def slotChangedObject(self, obj, prop):
+        pass
+    
+    def slotBeforeChangeObject(self, obj, prop):
+        pass
+    
+    def slotRecomputedObject(self, obj):
+        pass
+    
+    def slotAppendDynamicProperty(self, obj, prop):    
+        pass
+    
+    def slotRemoveDynamicProperty(self, obj, prop):   
+        pass
+    
+    def slotChangePropertyEditor(self, obj, prop):
+        pass
+    
+    def slotStartSaveDocument(self, obj, name):
+        pass
+    
+    def slotFinishSaveDocument(self, obj, name):
+        pass
