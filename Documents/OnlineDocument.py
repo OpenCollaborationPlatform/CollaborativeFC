@@ -17,26 +17,25 @@
 # *   Suite 330, Boston, MA  02111-1307, USA                             *
 # ************************************************************************
 
-from Connection import connection
-
-
 class OnlineDocument():
 
-    def __init__(self, doc):
+    def __init__(self, id, doc, connection):
+        self.id = id
         self.document = doc
-        print "new online document created"
+        self.connection = connection
+        print("new online document created")
+    
+    async def asyncLoad(self):
+        pass
+    
+    async def asyncUnload(self):
+        pass
+    
+    async def asyncGetDocumentPeers(self):
+        try:
+            res = await self.connection.session.call(u"ocp.documents.{0}.listPeers".format(self.id))
+            return res.results[0]
         
-    def getUid(self):
-        return self.document.Uid
-
-    def newObject(self, obj):
-        print("prop")
-        print(type(prop))
-
-    def deletedObject(self, obj):
-        print("prop")
-        print(type(prop))
-
-    def changedObject(self, obj, prop):
-        print("prop")
-        print(type(prop))
+        except Exception as e:
+            print("Listing peers error: {0}".format(e))
+            return []

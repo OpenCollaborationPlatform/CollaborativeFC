@@ -17,7 +17,7 @@
 # *   Suite 330, Boston, MA  02111-1307, USA                             *
 # ************************************************************************
 
-import FreeCADGui
+import FreeCADGui, asyncio
 from PySide import QtCore, QtGui
 from PySide.QtUiTools import QUiLoader
 
@@ -27,6 +27,8 @@ class UIWidget(QtGui.QFrame):
     
     def __init__(self, dochandler, parent=None):
         super().__init__(parent)
+
+        self.dochandler = dochandler
 
         # We are a popup, make sure we look like it
         self.setContentsMargins(1,1,1,1)
@@ -44,7 +46,12 @@ class UIWidget(QtGui.QFrame):
         
         #load the document model
         self.model = DocumentModel(dochandler)
-          
+        self.ui.DocumentList.setModel(self.model)
+        self.ui.DocumentList.activated.connect(self.onSelectionChanged)
+                                               
+        #connect the collaborate button
+        self.ui.Collaborate.toggled.connect(self.onShared)
+
     def show(self):
         #try to find the correct position for the popup
         pos = QtGui.QCursor.pos()
@@ -54,5 +61,41 @@ class UIWidget(QtGui.QFrame):
         self.move(global_point)            
         super().show()
         
-     
+    @QtCore.Slot(bool)
+    def onShared(self, colaborate):
+        indexs = self.ui.DocumentList.selectedIndexes()
+        if len(indexs) is 0:
+            return
+        
+        idx = indexs[0].row()
+        docmap = self.dochandler.documents[idx]
+        
+        shared = docmap['status'] == "shared"
+        if shared and collaborate:
+            #we are done.. event thougth this should not have happend
+            return
+        
+        if shared and not colaborate:
+            asyncio.ensure_future(self.dochandler.asyncCloseDoc())
+            return
+            
+        #we need to collaborate!
+        asyncio.ensure_future(self.dochandler.asyncCollaborateOnDoc(docmap))
+            
+        
+        
+    @QtCore.Slot(int)    
+    def onSelectionChanged(self, index):
+        #change the doc info side to the selected doc!
+        docmap = self.dochandler.documents[index.row()]
+        
+        shared = docmap['status'] == "shared"
+        self.ui.Collaborate.setChecked(shared)
+        
+        #if shared:
+        #    pass            
+        #else:
+        #    self.ui.UserList.model.setStringList( QStringList{} )
+        
+            
 

@@ -27,83 +27,83 @@ class DocumentObserver():
         self.handler.openFCDocument(doc)
         
 
-    def slotDeletedDocument(self, doc):
-        self.handler.closeFCDocument(doc)
+    #def slotDeletedDocument(self, doc):
+        #self.handler.closeFCDocument(doc)
 
-    def slotRelabelDocument(self, doc):
-        pass
+    #def slotRelabelDocument(self, doc):
+        #pass
 
-    def slotCreatedObject(self, obj):
-        pass
+    #def slotCreatedObject(self, obj):
+        #pass
 
-    def slotDeletedObject(self, obj):
-        pass
+    #def slotDeletedObject(self, obj):
+        #pass
 
-    def slotChangedObject(self, obj, prop):
-        pass
+    #def slotChangedObject(self, obj, prop):
+        #pass
 
-    def slotCreatedDocument(self, doc):
-        pass
+    #def slotCreatedDocument(self, doc):
+        #pass
     
-    def slotDeletedDocument(self, doc):
-        pass
+    #def slotDeletedDocument(self, doc):
+        #pass
     
-    def slotRelabelDocument(self, doc):
-        pass
+    #def slotRelabelDocument(self, doc):
+        #pass
     
-    def slotActivateDocument(self, doc):
-        pass
+    #def slotActivateDocument(self, doc):
+        #pass
     
-    def slotRecomputedDocument(self, doc):
-        pass
+    #def slotRecomputedDocument(self, doc):
+        #pass
     
-    def slotUndoDocument(self, doc):
-        pass
+    #def slotUndoDocument(self, doc):
+        #pass
     
-    def slotRedoDocument(self, doc):
-        pass
+    #def slotRedoDocument(self, doc):
+        #pass
     
-    def slotOpenTransaction(self, doc, name):
-        pass
+    #def slotOpenTransaction(self, doc, name):
+        #pass
     
-    def slotCommitTransaction(self, doc):
-        pass
+    #def slotCommitTransaction(self, doc):
+        #pass
     
-    def slotAbortTransaction(self, doc):
-        pass
+    #def slotAbortTransaction(self, doc):
+        #pass
     
-    def slotBeforeChangeDocument(self, doc, prop):
-        pass
+    #def slotBeforeChangeDocument(self, doc, prop):
+        #pass
         
-    def slotChangedDocument(self, doc, prop):
-        pass
+    #def slotChangedDocument(self, doc, prop):
+        #pass
     
-    def slotCreatedObject(self, obj):
-        pass
+    #def slotCreatedObject(self, obj):
+        #pass
     
-    def slotDeletedObject(self, obj):
-        pass
+    #def slotDeletedObject(self, obj):
+        #pass
     
-    def slotChangedObject(self, obj, prop):
-        pass
+    #def slotChangedObject(self, obj, prop):
+        #pass
     
-    def slotBeforeChangeObject(self, obj, prop):
-        pass
+    #def slotBeforeChangeObject(self, obj, prop):
+        #pass
     
-    def slotRecomputedObject(self, obj):
-        pass
+    #def slotRecomputedObject(self, obj):
+        #pass
     
-    def slotAppendDynamicProperty(self, obj, prop):    
-        pass
+    #def slotAppendDynamicProperty(self, obj, prop):    
+        #pass
     
-    def slotRemoveDynamicProperty(self, obj, prop):   
-        pass
+    #def slotRemoveDynamicProperty(self, obj, prop):   
+        #pass
     
-    def slotChangePropertyEditor(self, obj, prop):
-        pass
+    #def slotChangePropertyEditor(self, obj, prop):
+        #pass
     
-    def slotStartSaveDocument(self, obj, name):
-        pass
+    #def slotStartSaveDocument(self, obj, name):
+        #pass
     
-    def slotFinishSaveDocument(self, obj, name):
-        pass
+    #def slotFinishSaveDocument(self, obj, name):
+        #pass

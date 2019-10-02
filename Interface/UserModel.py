@@ -19,38 +19,39 @@
 
 from PySide import QtCore, QtGui
 
-class DocumentModel(QtCore.QAbstractListModel):
+class UserModel(QtCore.QAbstractListModel):
     
-    def __init__(self, dochandler):
+    def __init__(self, onlinedoc):
         super().__init__()
         
-        self.dochandler = dochandler
-        dochandler.addUpdateFunc(self.layoutChanged.emit)
+        self.onlinedoc = onlinedoc
+        self.peerlist = []
 
     def data(self, index, role):
-        
-        if role == QtCore.Qt.DisplayRole:
+        pass
+        #if role == QtCore.Qt.DisplayRole:
             
-            docmap = self.dochandler.documents[index.row()]
-            if docmap['fcdoc'] != None:
-                return docmap['fcdoc'].Name
-            if docmap['id'] != None:
-                return docmap['id']
+            #docmap = self.dochandler.documents[index.row()]
+            #if docmap['fcdoc'] != None:
+                #return docmap['fcdoc'].Name
+            #if docmap['id'] != None:
+                #return docmap['id']
                         
-            return "Unknown name"
+            #return "Unknown name"
 
-        if role == QtCore.Qt.DecorationRole:
-            docmap = self.dochandler.documents[index.row()]
-            if docmap['status'] is 'shared':
-                return QtGui.QColor('green')
-            if docmap['status'] is 'local':
-                return QtGui.QColor('orange')
-            if docmap['status'] is 'node':
-                return QtGui.QColor('yellow')
-            if docmap['status'] is 'invited':
-                return QtGui.QColor('purple')
+        #if role == QtCore.Qt.DecorationRole:
+            #docmap = self.dochandler.documents[index.row()]
+            #if docmap['status'] is 'shared':
+                #return QtGui.QColor('green')
+            #if docmap['status'] is 'local':
+                #return QtGui.QColor('orange')
+            #if docmap['status'] is 'node':
+                #return QtGui.QColor('yellow')
+            #if docmap['status'] is 'invited':
+                #return QtGui.QColor('purple')
             
-            return QtGui.QColor('black')
+            #return QtGui.QColor('black')
 
     def rowCount(self, index):
-        return len(self.dochandler.documents)
+        pass
+        #return len(self.dochandler.documents)

@@ -17,8 +17,9 @@
 # *   Suite 330, Boston, MA  02111-1307, USA                             *
 # ************************************************************************
 
-import FreeCAD
-import asyncio
+import FreeCAD, asyncio, os
+from Documents.Observer import DocumentObserver
+from Documents.OnlineDocument import OnlineDocument
 
 class DocumentHandler():
     #data structure that handles all documents for collaboration:
@@ -27,13 +28,14 @@ class DocumentHandler():
     # - the ones open at the node but not yet in FC
     # - the one we share
     
-    def __init__(self, connection):               
+    def __init__(self, connection, collab_path):               
         self.documents = [] #empty list for all our document handling status, each doc is a map: {id, status, onlinedoc, doc}
         self.updatefuncs = []
         self.connection = connection
+        self.collab_path = collab_path
         
         #add the observer 
-        self.observer = self.DocumentObserver(self)
+        self.observer = DocumentObserver(self)
         FreeCAD.addDocumentObserver(self.observer)
         
         #TODO check all local documents available, as this may be startet after the user opened documents in freecad
@@ -51,12 +53,12 @@ class DocumentHandler():
         docmap = {"id": None, "status": "local", "onlinedoc": None, "fcdoc": doc}
         self.documents.append(docmap)
         print("Call update!")
-        self.Update()        
+        self.update()
         
     def addUpdateFunc(self, func):
         self.updatefuncs.append(func)
     
-    def updated():
+    def update(self):
         for f in self.updatefuncs:
             f()
     
@@ -79,10 +81,10 @@ class DocumentHandler():
 
             res = await self.connection.session.call(u"ocp.documents.list")
             for doc in res:
-                docmap = {"id": res, "status": "node", "onlinedoc": None, "fcdoc": None}
+                docmap = {"id": doc, "status": "node", "onlinedoc": None, "fcdoc": None}
                 self.documents.append(docmap)
             
-            self.updated()
+            self.update()
             
         except Exception as e:
             print("Async init error: {0}".format(e))
@@ -96,38 +98,38 @@ class DocumentHandler():
                 await self.connection.session.call(u"ocp.documents.close", docmap['id'])           
         finally:
             self.documents.remove(docmap)
-            self.updated()
+            self.update()
 
        
-    async def asyncCollaborateOnDoc(self, key, val):
+    async def asyncCollaborateOnDoc(self, docmap):
         
         try:
-            docmap = self.getDocMap(key, val)
             status = docmap['status']
             if status is "local":
-                res = await self.connection.session.call(u"ocp.documents.create")
+                dmlpath = os.path.join(self.collab_path, "Dml")
+                res = await self.connection.session.call(u"ocp.documents.create", dmlpath)
                 docmap['id'] = res
-                docmap['onlinedoc'] = OnlineDocument(res, doc)
-                await docmap['onlinedoc'].load()
+                docmap['onlinedoc'] = OnlineDocument(res, docmap['fcdoc'], self.connection)
+                await docmap['onlinedoc'].asyncLoad()
                 
             elif status is 'node':
                 doc = FreeCAD.newDocument()
                 docmap['fcdoc'] = doc
-                docmap['onlinedoc'] = OnlineDoc(docmap['id'], doc)
-                await docmap['onlinedoc'].load() 
+                docmap['onlinedoc'] = OnlineDoc(docmap['id'], doc, self.connection)
+                await docmap['onlinedoc'].asyncLoad() 
                 
             elif status is 'invited':
                 await self.connection.session.call(u"ocp.documents.open", docmap['id'])
                 doc = FreeCAD.newDocument()
                 docmap['fcdoc'] = doc
-                docmap['onlinedoc'] = OnlineDoc(docmap['id'], doc)
-                await docmap['onlinedoc'].startup() 
+                docmap['onlinedoc'] = OnlineDoc(docmap['id'], doc, self.connection)
+                await docmap['onlinedoc'].asyncUnload() 
 
             docmap['status'] = "shared"
-            self.Update()
+            self.update()
             
         except Exception as e:
-            print("call error: {0}".format(e))
+            print("collaborate error: {0}".format(e))
   
             
             
@@ -136,95 +138,3 @@ class DocumentHandler():
     
     async def asyncOnDocumentInvited(self):
         pass
-    
-    
-    class DocumentObserver():
-    
-        def __init__(self, handler):
-            self.handler = handler
-
-        def slotCreatedDocument(self, doc):
-            print("Observed new document")
-            self.handler.openFCDocument(doc)
-            
-
-        def slotDeletedDocument(self, doc):
-            self.handler.closeFCDocument(doc)
-
-        def slotRelabelDocument(self, doc):
-            pass
-
-        def slotCreatedObject(self, obj):
-            pass
-
-        def slotDeletedObject(self, obj):
-            pass
-
-        def slotChangedObject(self, obj, prop):
-            pass
-
-        def slotCreatedDocument(self, doc):
-            pass
-        
-        def slotDeletedDocument(self, doc):
-            pass
-        
-        def slotRelabelDocument(self, doc):
-            pass
-        
-        def slotActivateDocument(self, doc):
-            pass
-        
-        def slotRecomputedDocument(self, doc):
-            pass
-        
-        def slotUndoDocument(self, doc):
-            pass
-        
-        def slotRedoDocument(self, doc):
-            pass
-        
-        def slotOpenTransaction(self, doc, name):
-            pass
-        
-        def slotCommitTransaction(self, doc):
-            pass
-        
-        def slotAbortTransaction(self, doc):
-            pass
-        
-        def slotBeforeChangeDocument(self, doc, prop):
-            pass
-            
-        def slotChangedDocument(self, doc, prop):
-            pass
-        
-        def slotCreatedObject(self, obj):
-            pass
-        
-        def slotDeletedObject(self, obj):
-            pass
-        
-        def slotChangedObject(self, obj, prop):
-            pass
-        
-        def slotBeforeChangeObject(self, obj, prop):
-            pass
-        
-        def slotRecomputedObject(self, obj):
-            pass
-        
-        def slotAppendDynamicProperty(self, obj, prop):    
-            pass
-        
-        def slotRemoveDynamicProperty(self, obj, prop):   
-            pass
-        
-        def slotChangePropertyEditor(self, obj, prop):
-            pass
-        
-        def slotStartSaveDocument(self, obj, name):
-            pass
-        
-        def slotFinishSaveDocument(self, obj, name):
-            pass

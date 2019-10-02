@@ -1,12 +1,12 @@
 
-Import "object.dml"
+import "object.dml"
 
 Data {
     .id: "Document"
     
     Vector {
         .id: "DocumentObjects"
-        .type: DocumentObject
+        .type: DocumentObject{}
     }
     
     Vector {

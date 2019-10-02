@@ -70,13 +70,16 @@
             <property name="text">
              <string>Collaborate</string>
             </property>
+            <property name="checkable">
+             <bool>true</bool>
+            </property>
            </widget>
           </item>
          </layout>
         </widget>
        </item>
        <item>
-        <widget class="QGroupBox" name="groupBox">
+        <widget class="QGroupBox" name="UserGroup">
          <property name="title">
           <string>Users</string>
          </property>
@@ -103,7 +106,7 @@
            </layout>
           </item>
           <item>
-           <widget class="QListView" name="NodeList"/>
+           <widget class="QListView" name="UserList"/>
           </item>
          </layout>
         </widget>
@@ -115,5 +118,22 @@
   </layout>
  </widget>
  <resources/>
- <connections/>
+ <connections>
+  <connection>
+   <sender>Collaborate</sender>
+   <signal>toggled(bool)</signal>
+   <receiver>UserGroup</receiver>
+   <slot>setEnabled(bool)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>268</x>
+     <y>156</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>268</x>
+     <y>316</y>
+    </hint>
+   </hints>
+  </connection>
+ </connections>
 </ui>
