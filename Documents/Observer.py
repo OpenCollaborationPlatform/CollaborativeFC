@@ -27,8 +27,9 @@ class DocumentObserver():
         self.handler.openFCDocument(doc)
         
 
-    #def slotDeletedDocument(self, doc):
-        #self.handler.closeFCDocument(doc)
+    def slotDeletedDocument(self, doc):
+        print("Observer close document")
+        self.handler.closeFCDocument(doc)
 
     #def slotRelabelDocument(self, doc):
         #pass

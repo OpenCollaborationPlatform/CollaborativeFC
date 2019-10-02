@@ -45,7 +45,7 @@ class DocumentHandler():
         
           
     def closeFCDocument(self, doc):
-        asyncio.ensure_future(self.asyncCloseDoc())
+        asyncio.ensure_future(self.asyncCloseDoc(doc))
         
 
     def openFCDocument(self, doc):
@@ -89,15 +89,31 @@ class DocumentHandler():
         except Exception as e:
             print("Async init error: {0}".format(e))
     
+    async def asyncStopCollaborateOnDoc(self, docmap):
+        try:
+            if docmap['status'] is 'shared':
+                await docmap['onlinedoc'].asyncUnload()
+                await self.connection.session.call(u"ocp.documents.close", docmap['id'])
+            
+            docmap['status'] = "local"
+            self.update()
+        
+        except Exception as e:
+            print("Close document id error: {0}".format(e))
+    
     async def asyncCloseDoc(self, doc):
         #try to disconnect before remove
         docmap = self.getDocMap('fcdoc', doc)
+        self.documents.remove(docmap)
         try:
             if docmap['status'] is 'shared':
-                await docmap['onlinedoc'].unload()
-                await self.connection.session.call(u"ocp.documents.close", docmap['id'])           
-        finally:
-            self.documents.remove(docmap)
+                await docmap['onlinedoc'].asyncUnload()
+                await self.connection.session.call(u"ocp.documents.close", docmap['id'])
+        
+        except Exception as e:
+            print("Close document id error: {0}".format(e))
+            
+        finally:            
             self.update()
 
        
@@ -134,7 +150,9 @@ class DocumentHandler():
             
             
     async def asyncOnDocumentOpened(self):
-        pass
+        #TODO add new doc to docmap
+        self.update()
     
     async def asyncOnDocumentInvited(self):
-        pass
+        #TODO add new doc to docmap
+        self.update()

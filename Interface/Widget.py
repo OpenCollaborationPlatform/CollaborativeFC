@@ -62,7 +62,7 @@ class UIWidget(QtGui.QFrame):
         super().show()
         
     @QtCore.Slot(bool)
-    def onShared(self, colaborate):
+    def onShared(self, collaborate):
         indexs = self.ui.DocumentList.selectedIndexes()
         if len(indexs) is 0:
             return
@@ -75,8 +75,8 @@ class UIWidget(QtGui.QFrame):
             #we are done.. event thougth this should not have happend
             return
         
-        if shared and not colaborate:
-            asyncio.ensure_future(self.dochandler.asyncCloseDoc())
+        if shared and not collaborate:
+            asyncio.ensure_future(self.dochandler.asyncStopCollaborateOnDoc(docmap))
             return
             
         #we need to collaborate!
