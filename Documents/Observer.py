@@ -17,6 +17,8 @@
 # *   Suite 330, Boston, MA  02111-1307, USA                             *
 # ************************************************************************
 
+import asyncio
+
 class DocumentObserver():
     
     def __init__(self, handler):
@@ -34,8 +36,12 @@ class DocumentObserver():
     #def slotRelabelDocument(self, doc):
         #pass
 
-    #def slotCreatedObject(self, obj):
-        #pass
+    def slotCreatedObject(self, obj):
+        print("Observer add document object")
+        
+        odoc = self.handler.getOnlineDocument(obj.Document)
+        if odoc is not None:
+            asyncio.ensure_future(odoc.asyncNewObject(obj))
 
     #def slotDeletedObject(self, obj):
         #pass

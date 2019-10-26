@@ -70,6 +70,14 @@ class DocumentHandler():
                 return docmap 
         
         raise Exception('no such document found')
+    
+    def getOnlineDocument(self, fcdoc):
+        #get the online document for a certain freecad document, or None if not available
+        for docmap in self.documents: 
+            if docmap["fcdoc"] == fcdoc:
+                return docmap["onlinedoc"]
+        
+        return None
        
     async def asyncInit(self):
         #get a list of open documents of the node and add them to the list
@@ -126,7 +134,7 @@ class DocumentHandler():
                 res = await self.connection.session.call(u"ocp.documents.create", dmlpath)
                 docmap['id'] = res
                 docmap['onlinedoc'] = OnlineDocument(res, docmap['fcdoc'], self.connection)
-                await docmap['onlinedoc'].asyncLoad()
+                await docmap['onlinedoc'].asyncSetup()
                 
             elif status is 'node':
                 doc = FreeCAD.newDocument()

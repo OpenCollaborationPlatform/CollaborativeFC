@@ -1,9 +1,36 @@
+import "property.dml" as Property
 
 Data {
-    .id: "DocumentObject"
+    .name: "DocumentObject"
     
-    Vector {
-        .id: "Properties"
-        .type: Raw{}
+    Map {
+        .name: "Properties"
+        .key: string
+        .value: Property{}
+    }
+    
+    function AddProperty(name, type, typeid, group, docu) {        
+        prop = this.Properties.New(name)
+        prop.Init(type, typeid, group, docu)
+    }
+    
+    //convienience function to set property value
+    function SetProperty(name, value) {
+        prop = this.Properties.Get(name)
+        prop.SetValue(value)        
+    }
+    
+    //convienience function to get property value
+    function GetProperty(name) {
+        prop = this.Properties.Get(name)
+        return prop.GetValue()
+    }
+    
+    function InList() {
+        
+    }
+    
+    function OutList() {
+        
     }
 }

@@ -1,16 +1,58 @@
-
-import "object.dml"
+import "object.dml" as DocumentObject
+import "property.dml" as Property
 
 Data {
-    .id: "Document"
+    .name: "Document"
     
-    Vector {
-        .id: "DocumentObjects"
-        .type: DocumentObject{}
+    Map {
+        .name: "DocumentObjects"
+        .key: string
+        .value: DocumentObject{}
     }
     
-    Vector {
-        .id: "Properties"
-        .type: Raw{}
+    Map {
+        .name: "Properties"
+        .key: string
+        .value: Property{}
     }
+    
+    Graph {
+        .name: "DAG"
+        .node: string
+        .edge: none
+        .directed: true
+    }
+    
+    function SetProperty(name, value) {        
+        prop = this.Properties.Get(name)
+        prop.SetValue(value)
+    }
+    
+    function GetProperty(name, value) {        
+        prop = this.Properties.Get(name)
+        return prop.GetValue()
+    }
+    
+    //sets the outlist of a document object
+    function SetObjectOutlist(obj, list) {
+        
+    }
+    
+    function GetObjectOutlist(name) {
+        return this.DAG.FromNode(name)
+    }
+    
+    function SetObjectProperty(name, prop, value) {
+        
+        obj = this.DocumentObjects.Get(name)
+        obj.SetProperty(prop, value)
+    }
+    
+    //sets the outlist of a document object
+    function GetObjectProperty(name, prop, value) {
+        
+        obj = this.DocumentObjects.Get(name)
+        return obj.GetProperty(prop)
+    }
+
 }

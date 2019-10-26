@@ -25,7 +25,12 @@ class OnlineDocument():
         self.connection = connection
         print("new online document created")
     
+    async def asyncSetup(self):
+        #loads the freecad doc into the online doc 
+        pass
+    
     async def asyncLoad(self):
+        #loads the online doc into the freecad doc
         pass
     
     async def asyncUnload(self):
@@ -38,4 +43,27 @@ class OnlineDocument():
         
         except Exception as e:
             print("Listing peers error: {0}".format(e))
+            return []
+
+    async def asyncNewObject(self, obj):
+        try:
+            uri = u"ocp.documents.edit.{0}".format(self.id)
+            
+            #create the object
+            objid = await self.connection.session.call(uri + u".methods.Document.DocumentObjects.New", obj.Name)
+
+            #add all the properties
+            for prop in obj.PropertiesList:
+                
+                docu = obj.getDocumentationOfProperty(prop)
+                #emode = obj.getEditorMode(prop)
+                group = obj.getGroupOfProperty(prop)
+                typeid = obj.getTypeIdOfProperty(prop)
+                ptype = '-'.join(obj.getTypeOfProperty(prop))
+                
+                await self.connection.session.call(uri + u".methods.{0}.AddProperty".format(objid), prop, ptype, typeid, group, docu)
+                
+        
+        except Exception as e:
+            print("Adding object error: {0}".format(e))
             return []
