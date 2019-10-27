@@ -17,13 +17,59 @@
 # *   Suite 330, Boston, MA  02111-1307, USA                             *
 # ************************************************************************
 
+import Documents.Property as Property
+from autobahn.wamp.types import RegisterOptions
+from autobahn.wamp.exception import ApplicationError
+
+class DataStore():
+    
+    def __init__(self):
+        self.keyCntr = 0
+        self.data = {}
+    
+    def addData(self, data):
+        key = self.keyCntr
+        self.data[key] = data
+        self.keyCntr += 1
+        return key
+        
+    def getData(self, key):
+        if key not in self.data:
+            return bytearray()
+        
+        data = self.data[key]
+        del self.data[key]
+        return data
+
 class OnlineDocument():
 
     def __init__(self, id, doc, connection):
         self.id = id
         self.document = doc
-        self.connection = connection
+        self.connection = connection 
+        self.objIds = {}
+        self.store = DataStore()
+        
+        #connect the data upload method
+        connection.session.register(self.__dataUpload, 
+                                    u'freecad.{0}.dataUpload'.format(id),  
+                                    RegisterOptions(details_arg='details'))
+        
         print("new online document created")
+    
+    async def __dataUpload(self, key, details=None):
+
+        if details.progress:
+                   
+            data = self.store.getData(key)
+            size = 1024*256 #should be 0.25mb
+            for i in range(0, len(data), size):
+                block = data[i:i+size]
+                await details.progress(bytes(block))
+                
+        else: 
+            return bytes(self.store.getData(key))
+    
     
     async def asyncSetup(self):
         #loads the freecad doc into the online doc 
@@ -51,6 +97,7 @@ class OnlineDocument():
             
             #create the object
             objid = await self.connection.session.call(uri + u".methods.Document.DocumentObjects.New", obj.Name)
+            self.objIds[obj] = objid
 
             #add all the properties
             for prop in obj.PropertiesList:
@@ -62,8 +109,39 @@ class OnlineDocument():
                 ptype = '-'.join(obj.getTypeOfProperty(prop))
                 
                 await self.connection.session.call(uri + u".methods.{0}.AddProperty".format(objid), prop, ptype, typeid, group, docu)
+                print("write object " + obj.Name + " property " + prop +" (" + typeid + ")")
+                await self.asyncWriteProperty(obj, prop)
                 
         
         except Exception as e:
             print("Adding object error: {0}".format(e))
-            return []
+         
+         
+    async def asyncWriteProperty(self, obj, prop):
+       
+        value = Property.convertPropertyToWamp(obj, prop)  
+        uri = u"ocp.documents.edit.{0}".format(self.id)
+        objid = self.objIds[obj]
+        
+        try:
+            if isinstance(value, bytearray):
+                #store the data for the processing!
+                datakey = self.store.addData(value)
+                
+                #than we need the id of the property where we add the data
+                propid = await self.connection.session.call(uri + u".methods.{0}.GetProperty".format(objid), prop)
+                
+                #call "SetBinary" for the property
+                datauri = u'freecad.{0}.dataUpload'.format(self.id)
+                await self.connection.session.call(uri + u".rawdata.{0}.SetByBinary".format(propid), datauri, datakey)
+                
+            else:
+                #simple POD property: just add it!
+                await self.connection.session.call(uri + u".methods.{0}.SetProperty".format(objid), prop, value)
+        
+        except Exception as e:
+            print("Writing property error: {0}".format(e))
+            
+    
+    async def asyncReadProperty(self, obj, prop):
+        pass
