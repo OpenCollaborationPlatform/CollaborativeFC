@@ -1,20 +1,21 @@
-import "object.dml" as DocumentObject
-import "property.dml" as Property
+import "object.dml" as ObjectContainer
+import "property.dml" as PropertyContainer
 
 Data {
     .name: "Document"
     
-    Map {
-        .name: "DocumentObjects"
-        .key: string
-        .value: DocumentObject{}
+    PropertyContainer {
+        .name: "Properties"
     }
     
-    Map {
-        .name: "Properties"
-        .key: string
-        .value: Property{}
+    ObjectContainer {
+        .name: "Objects"
     }
+    
+    ObjectContainer {
+        .name: "ViewProviders"
+    }
+    
     
     Graph {
         .name: "DAG"
@@ -22,17 +23,7 @@ Data {
         .edge: none
         .directed: true
     }
-    
-    function SetProperty(name, value) {        
-        prop = this.Properties.Get(name)
-        prop.SetValue(value)
-    }
-    
-    function GetProperty(name, value) {        
-        prop = this.Properties.Get(name)
-        return prop.GetValue()
-    }
-    
+     
     //sets the outlist of a document object
     function SetObjectOutlist(obj, list) {
         
@@ -54,5 +45,4 @@ Data {
         obj = this.DocumentObjects.Get(name)
         return obj.GetProperty(prop)
     }
-
 }

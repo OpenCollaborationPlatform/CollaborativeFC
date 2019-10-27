@@ -1,36 +1,65 @@
-import "property.dml" as Property
+import "property.dml" as PropertyContainer
 
-Data {
-    .name: "DocumentObject"
+Map {
+    .name: "ObjectContainer"
     
-    Map {
-        .name: "Properties"
-        .key: string
-        .value: Property{}
-    }
+    event onObjectCreated(string)
+    event onObjectRemoved(string)
+    event onChangedObjectProperty(string, string)
     
-    function AddProperty(name, type, typeid, group, docu) {        
-        prop = this.Properties.New(name)
-        prop.Init(type, typeid, group, docu)
-    }
+    function NewObject(name) {
     
-    //convienience function to set property value
-    function SetProperty(name, value) {
-        prop = this.Properties.Get(name)
-        prop.SetValue(value)        
-    }
-    
-    //convienience function to get property value
-    function GetProperty(name) {
-        prop = this.Properties.Get(name)
-        return prop.GetValue()
-    }
-    
-    function InList() {
+        var container = this
+        var obj = container.New(name)
+ 
+        obj.onChangedProperty.RegisterCallback(function(prop) {
+            container.onChangedObjectProperty.Emit(name, prop)
+        })
         
+        container.onObjectCreated.Emit(name)
+        return obj
     }
     
-    function OutList() {
+    function RemoveObject(name) {
         
+        this.Remove(name)
+        this.onObjectRemoved.Emit(name)
+    }
+    
+    function GetObject(name) {
+        
+        return this.Get(name)
+    }
+    
+    .key: string
+    .value: Data {
+        
+        .name: "Object"
+        
+        event onChangedProperty(string)
+        
+        PropertyContainer {
+            .name: "Properties"
+            .onChangedProperty: function(name) {
+                this.parent.onChangedProperty.Emit(name)
+            }
+        }
+        
+        //convinience function to add new properties
+        function NewProperty(name, type, typeid, group, docu) {        
+            this.Properties.NewProperty(name, type, typeid, group, docu)
+        }
+        
+        //convienience function to set property value
+        function SetProperty(name, value) {
+            var prop = this.Properties.Get(name)
+            prop.SetValue(value)        
+        }
+        
+        //convienience function to get property value
+        function GetProperty(name) {
+            var prop = this.Properties.Get(name)
+            return prop.GetValue()
+        }
     }
 }

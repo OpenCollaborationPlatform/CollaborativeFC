@@ -21,6 +21,7 @@ import FreeCAD, asyncio, os
 from Documents.Observer import DocumentObserver
 from Documents.OnlineDocument import OnlineDocument
 
+import uuid
 from autobahn.wamp.types import CallResult
 
 class DocumentHandler():
@@ -35,6 +36,9 @@ class DocumentHandler():
         self.updatefuncs = []
         self.connection = None
         self.collab_path = collab_path
+        self.blockObserver = False
+        self.uuid = uuid.uuid4()
+
         
         #add the observer 
         self.observer = DocumentObserver(self)
@@ -56,6 +60,9 @@ class DocumentHandler():
         if not self.connection:
             return 
         
+        if self.blockObserver:
+            return
+        
         asyncio.ensure_future(self.asyncCloseDoc(doc))
         
 
@@ -63,6 +70,9 @@ class DocumentHandler():
         
         if not self.connection:
             return 
+        
+        if self.blockObserver:
+            return
         
         #If a document was opened in freecad this function makes it known to the Handler. 
         docmap = {"id": None, "status": "local", "onlinedoc": None, "fcdoc": doc}
@@ -101,14 +111,11 @@ class DocumentHandler():
         
         try:
             #we register ourself for some key events
-            print("Start register")
             await self.connection.session.subscribe(self.asyncOnDocumentOpened, u"ocp.documents.opened")
             await self.connection.session.subscribe(self.asyncOnDocumentClosed, u"ocp.documents.closed")
             await self.connection.session.subscribe(self.asyncOnDocumentInvited, u"ocp.documents.invited")
 
-            print("Query documents")
             res = await self.connection.session.call(u"ocp.documents.list")
-            print("Returned {}".format(res))
             if res == None:
                 doclist = []
             elif type(res) == str:
@@ -117,7 +124,6 @@ class DocumentHandler():
                 doclist = res.results
             
             for doc in doclist:
-                print("Add document " + doc)
                 docmap = {"id": doc, "status": "node", "onlinedoc": None, "fcdoc": None}
                 self.documents.append(docmap)
             
@@ -169,20 +175,24 @@ class DocumentHandler():
                 dmlpath = os.path.join(self.collab_path, "Dml")
                 res = await self.connection.session.call(u"ocp.documents.create", dmlpath)
                 docmap['id'] = res
-                docmap['onlinedoc'] = OnlineDocument(res, docmap['fcdoc'], self.connection)
+                docmap['onlinedoc'] = OnlineDocument(res, docmap['fcdoc'], self.connection, self.uuid)
                 await docmap['onlinedoc'].asyncSetup()
                 
             elif status is 'node':
+                self.blockObserver = True
                 doc = FreeCAD.newDocument()
+                self.blockObserver = False
                 docmap['fcdoc'] = doc
-                docmap['onlinedoc'] = OnlineDoc(docmap['id'], doc, self.connection)
+                docmap['onlinedoc'] = OnlineDocument(docmap['id'], doc, self.connection, self.uuid)
                 await docmap['onlinedoc'].asyncLoad() 
                 
             elif status is 'invited':
                 await self.connection.session.call(u"ocp.documents.open", docmap['id'])
+                self.blockObserver = True
                 doc = FreeCAD.newDocument()
+                self.blockObserver = False
                 docmap['fcdoc'] = doc
-                docmap['onlinedoc'] = OnlineDoc(docmap['id'], doc, self.connection)
+                docmap['onlinedoc'] = OnlineDocument(docmap['id'], doc, self.connection, self.uuid)
                 await docmap['onlinedoc'].asyncUnload() 
 
             docmap['status'] = "shared"

@@ -43,17 +43,21 @@ class DataStore():
 
 class OnlineDocument():
 
-    def __init__(self, id, doc, connection):
+    def __init__(self, id, doc, connection, fcuuid):
         self.id = id
         self.document = doc
         self.connection = connection 
         self.objIds = {}
         self.store = DataStore()
+        self.fcUuid = fcuuid
         
-        #connect the data upload method
-        connection.session.register(self.__dataUpload, 
-                                    u'freecad.{0}.dataUpload'.format(id),  
-                                    RegisterOptions(details_arg='details'))
+        try:
+            #connect the data upload method
+            connection.session.register(self.__dataUpload, 
+                                        u'freecad.{0}.{1}.dataUpload'.format(str(self.fcUuid), id),  
+                                        RegisterOptions(details_arg='details'))
+        except Exception as e:
+            print("Online document startup error: {}".format(e))
         
         print("new online document created")
     
@@ -96,7 +100,7 @@ class OnlineDocument():
             uri = u"ocp.documents.edit.{0}".format(self.id)
             
             #create the object
-            objid = await self.connection.session.call(uri + u".methods.Document.DocumentObjects.New", obj.Name)
+            objid = await self.connection.session.call(uri + u".methods.Document.Objects.NewObject", obj.Name)
             self.objIds[obj] = objid
 
             #add all the properties
@@ -108,8 +112,8 @@ class OnlineDocument():
                 typeid = obj.getTypeIdOfProperty(prop)
                 ptype = '-'.join(obj.getTypeOfProperty(prop))
                 
-                await self.connection.session.call(uri + u".methods.{0}.AddProperty".format(objid), prop, ptype, typeid, group, docu)
-                print("write object " + obj.Name + " property " + prop +" (" + typeid + ")")
+                print("add/write object " + obj.Name + " property " + prop +" (" + typeid + ")")
+                await self.connection.session.call(uri + u".methods.{0}.NewProperty".format(objid), prop, ptype, typeid, group, docu)
                 await self.asyncWriteProperty(obj, prop)
                 
         
@@ -132,7 +136,7 @@ class OnlineDocument():
                 propid = await self.connection.session.call(uri + u".methods.{0}.GetProperty".format(objid), prop)
                 
                 #call "SetBinary" for the property
-                datauri = u'freecad.{0}.dataUpload'.format(self.id)
+                datauri = u'freecad.{0}.{1}.dataUpload'.format(str(self.fcUuid), self.id)
                 await self.connection.session.call(uri + u".rawdata.{0}.SetByBinary".format(propid), datauri, datakey)
                 
             else:
