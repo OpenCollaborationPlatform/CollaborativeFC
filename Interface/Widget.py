@@ -28,7 +28,9 @@ class UIWidget(QtGui.QFrame):
     def __init__(self, dochandler, parent=None):
         super().__init__(parent)
 
+        self.connection = None
         self.dochandler = dochandler
+        self.model = DocumentModel(self.dochandler)
 
         # We are a popup, make sure we look like it
         self.setContentsMargins(1,1,1,1)
@@ -43,14 +45,23 @@ class UIWidget(QtGui.QFrame):
         layout = QtGui.QVBoxLayout()
         layout.addWidget(self.ui)
         self.setLayout(layout)
-        
-        #load the document model
-        self.model = DocumentModel(dochandler)
-        self.ui.DocumentList.setModel(self.model)
+    
+        #connect all ui elements
         self.ui.DocumentList.activated.connect(self.onSelectionChanged)
-                                               
-        #connect the collaborate button
         self.ui.Collaborate.toggled.connect(self.onShared)
+
+    def setConnection(self, con):
+        self.connection = con
+        self.ui.DocumentList.setModel(self.model)
+        self.model.layoutChanged.emit
+        
+    def removeConnection(self):
+        self.connection = None
+        self.model = None
+        model = QtGui.QStringListModel()
+        list = QtCore.QStringList()
+        model.setStringList(list)
+        self.ui.DocumentList.setModel(model)
 
     def show(self):
         #try to find the correct position for the popup
@@ -63,6 +74,10 @@ class UIWidget(QtGui.QFrame):
         
     @QtCore.Slot(bool)
     def onShared(self, collaborate):
+        
+        if not self.connection:
+            return
+        
         indexs = self.ui.DocumentList.selectedIndexes()
         if len(indexs) is 0:
             return
@@ -86,6 +101,10 @@ class UIWidget(QtGui.QFrame):
         
     @QtCore.Slot(int)    
     def onSelectionChanged(self, index):
+        
+        if not self.connection:
+            return
+        
         #change the doc info side to the selected doc!
         docmap = self.dochandler.documents[index.row()]
         

@@ -61,18 +61,22 @@ class OCPSession(ApplicationSession):
         self.parent.session = self
 
     async def onJoin(self, details):
+        self.parent.onJoin()
         print("We have joined, yeahh!")
 
     def onDisconnect(self):
+        self.parent.onLeave()
         print("We have disconnected")
 
 #Class to handle all connection matters to the ocp node
+# must be provided all components that need to use this connection
 class OCPConnection():
         
-    def __init__(self):
+    def __init__(self, *argv):
         
         self.node = OCPNode()
         self.session = None 
+        self.components = list(argv)        
         
         #make sure asyncio and qt work together
         app = QtCore.QCoreApplication.instance()
@@ -87,3 +91,13 @@ class OCPConnection():
         self.runner = ApplicationRunner(uri, "ocp", extra={'parent': self})
         coro = self.runner.run(OCPSession, start_loop=False)
         asyncio.get_event_loop().run_until_complete(coro)
+        
+    def onJoin(self):
+        #startup all relevant components
+        for comp in self.components:
+            comp.setConnection(self)
+            
+    def onLeave(self):
+        #startup all relevant components
+        for comp in self.components:
+            comp.removeConnection()

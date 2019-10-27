@@ -24,9 +24,9 @@ from Connection import OCPConnection
 import FreeCAD, Collaboration, Commands
 
 #for now use simple global variables!
-connection = OCPConnection()
-dochandler = Handler.DocumentHandler(connection, Collaboration.path_collaboration)
+dochandler = Handler.DocumentHandler(Collaboration.path_collaboration)
 widget     = Widget.UIWidget(dochandler)
+connection = OCPConnection(dochandler, widget)
 
 if FreeCAD.GuiUp:
     import FreeCADGui

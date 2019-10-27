@@ -21,6 +21,8 @@ import FreeCAD, asyncio, os
 from Documents.Observer import DocumentObserver
 from Documents.OnlineDocument import OnlineDocument
 
+from autobahn.wamp.types import CallResult
+
 class DocumentHandler():
     #data structure that handles all documents for collaboration:
     # - the local ones that are unshared
@@ -28,27 +30,40 @@ class DocumentHandler():
     # - the ones open at the node but not yet in FC
     # - the one we share
     
-    def __init__(self, connection, collab_path):               
+    def __init__(self, collab_path):               
         self.documents = [] #empty list for all our document handling status, each doc is a map: {id, status, onlinedoc, doc}
         self.updatefuncs = []
-        self.connection = connection
+        self.connection = None
         self.collab_path = collab_path
         
         #add the observer 
         self.observer = DocumentObserver(self)
         FreeCAD.addDocumentObserver(self.observer)
+    
+    def setConnection(self, con):
+        self.connection = con
+        #TODO check all local documents available, as this may be startet after the user opened documents in freecad     
         
-        #TODO check all local documents available, as this may be startet after the user opened documents in freecad
-                
         #lets initialize the async stuff!
         asyncio.ensure_future(self.asyncInit())
         
-          
+    def removeConnection(self):
+        self.connection = None
+        self.documents = {}
+       
+
     def closeFCDocument(self, doc):
+        if not self.connection:
+            return 
+        
         asyncio.ensure_future(self.asyncCloseDoc(doc))
         
 
     def openFCDocument(self, doc):
+        
+        if not self.connection:
+            return 
+        
         #If a document was opened in freecad this function makes it known to the Handler. 
         docmap = {"id": None, "status": "local", "onlinedoc": None, "fcdoc": doc}
         self.documents.append(docmap)
@@ -81,14 +96,28 @@ class DocumentHandler():
        
     async def asyncInit(self):
         #get a list of open documents of the node and add them to the list
+        if not self.connection:
+            return 
         
         try:
             #we register ourself for some key events
-            await self.connection.session.register(u"ocp.documents.opened", self.asyncOnDocumentOpened)
-            await self.connection.session.register(u"ocp.documents.invited", self.asyncOnDocumentInvited)
+            print("Start register")
+            await self.connection.session.subscribe(self.asyncOnDocumentOpened, u"ocp.documents.opened")
+            await self.connection.session.subscribe(self.asyncOnDocumentClosed, u"ocp.documents.closed")
+            await self.connection.session.subscribe(self.asyncOnDocumentInvited, u"ocp.documents.invited")
 
+            print("Query documents")
             res = await self.connection.session.call(u"ocp.documents.list")
-            for doc in res:
+            print("Returned {}".format(res))
+            if res == None:
+                doclist = []
+            elif type(res) == str:
+                doclist = [res]
+            elif type(res) == CallResult:
+                doclist = res.results
+            
+            for doc in doclist:
+                print("Add document " + doc)
                 docmap = {"id": doc, "status": "node", "onlinedoc": None, "fcdoc": None}
                 self.documents.append(docmap)
             
@@ -98,6 +127,10 @@ class DocumentHandler():
             print("Async init error: {0}".format(e))
     
     async def asyncStopCollaborateOnDoc(self, docmap):
+        
+        if not self.connection:
+            return 
+        
         try:
             if docmap['status'] is 'shared':
                 await docmap['onlinedoc'].asyncUnload()
@@ -126,6 +159,9 @@ class DocumentHandler():
 
        
     async def asyncCollaborateOnDoc(self, docmap):
+        
+        if not self.connection:
+            return 
         
         try:
             status = docmap['status']
@@ -158,6 +194,10 @@ class DocumentHandler():
             
             
     async def asyncOnDocumentOpened(self):
+        #TODO add new doc to docmap
+        self.update()
+        
+    async def asyncOnDocumentClosed(self):
         #TODO add new doc to docmap
         self.update()
     
