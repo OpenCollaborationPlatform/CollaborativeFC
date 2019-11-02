@@ -26,6 +26,7 @@ def convertPropertyToWamp(obj, prop):
     result = converter(obj, prop)
     return result
 
+
 def convertWampToProperty(obj, prop, value):
     #converts the wamp data in usable form and assigns it to the property
     
@@ -37,17 +38,22 @@ def convertWampToProperty(obj, prop, value):
 def __toFloat(obj, prop):
     return float(obj.getPropertyByName(prop))
 
+
 def __toInt(obj, prop):
     return int(obj.getPropertyByName(prop))
+
 
 def __toBool(obj, prop):
     return bool(obj.getPropertyByName(prop))
 
+
 def __toString(obj, prop):
     return str(obj.getPropertyByName(prop))
 
+
 def __toRaw(obj, prop):
     return obj.dumpPropertyContent(prop, Compression=9)
+
 
 __PropertyToWamp = {
 "App::PropertyFloat": __toFloat,
@@ -70,11 +76,14 @@ __PropertyToWamp = {
 "App::PropertyUUID": __toString
 }
 
+
 def __fromPOD(obj, prop, value):
     setattr(obj, prop, value)
 
+
 def __fromRaw(obj, prop, value):
     return obj.dumpPropertyContent(prop, Compression=9)
+
 
 __PropertyFromWamp = {
 "App::PropertyFloat": __fromPOD,

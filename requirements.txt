@@ -1,2 +1,3 @@
 quamash
-autobahn
+msgpack
+autobahn[serialization]

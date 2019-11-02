@@ -175,7 +175,7 @@ class DocumentHandler():
                 dmlpath = os.path.join(self.collab_path, "Dml")
                 res = await self.connection.session.call(u"ocp.documents.create", dmlpath)
                 docmap['id'] = res
-                docmap['onlinedoc'] = OnlineDocument(res, docmap['fcdoc'], self.connection, self.uuid)
+                docmap['onlinedoc'] = OnlineDocument(res, docmap['fcdoc'], self.observer, self.connection, self.uuid)
                 await docmap['onlinedoc'].asyncSetup()
                 
             elif status is 'node':
@@ -183,7 +183,7 @@ class DocumentHandler():
                 doc = FreeCAD.newDocument()
                 self.blockObserver = False
                 docmap['fcdoc'] = doc
-                docmap['onlinedoc'] = OnlineDocument(docmap['id'], doc, self.connection, self.uuid)
+                docmap['onlinedoc'] = OnlineDocument(docmap['id'], doc, self.observer, self.connection, self.uuid)
                 await docmap['onlinedoc'].asyncLoad() 
                 
             elif status is 'invited':
@@ -192,7 +192,7 @@ class DocumentHandler():
                 doc = FreeCAD.newDocument()
                 self.blockObserver = False
                 docmap['fcdoc'] = doc
-                docmap['onlinedoc'] = OnlineDocument(docmap['id'], doc, self.connection, self.uuid)
+                docmap['onlinedoc'] = OnlineDocument(docmap['id'], doc, self.observer, self.connection, self.uuid)
                 await docmap['onlinedoc'].asyncUnload() 
 
             docmap['status'] = "shared"

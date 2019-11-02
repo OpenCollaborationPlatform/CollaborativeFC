@@ -20,6 +20,7 @@
 
 import asyncio, subprocess
 from autobahn.asyncio.wamp import ApplicationSession, ApplicationRunner
+from autobahn.wamp.serializer import MsgPackSerializer
 from asyncqt import QEventLoop
 from PySide import QtCore
 
@@ -88,7 +89,8 @@ class OCPConnection():
         
         #make the connection!
         uri = "ws://" + self.node.uri() + ":" + self.node.port() + "/ws"
-        self.runner = ApplicationRunner(uri, "ocp", extra={'parent': self})
+        msgpack = MsgPackSerializer()
+        self.runner = ApplicationRunner(uri, "ocp", extra={'parent': self}, serializers=[msgpack])
         coro = self.runner.run(OCPSession, start_loop=False)
         asyncio.get_event_loop().run_until_complete(coro)
         

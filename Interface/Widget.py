@@ -58,9 +58,8 @@ class UIWidget(QtGui.QFrame):
     def removeConnection(self):
         self.connection = None
         self.model = None
-        model = QtGui.QStringListModel()
-        list = QtCore.QStringList()
-        model.setStringList(list)
+        model = QtCore.QStringListModel()
+        model.setStringList([])
         self.ui.DocumentList.setModel(model)
 
     def show(self):

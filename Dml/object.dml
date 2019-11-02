@@ -3,20 +3,21 @@ import "property.dml" as PropertyContainer
 Map {
     .name: "ObjectContainer"
     
-    event onObjectCreated(string)
-    event onObjectRemoved(string)
-    event onChangedObjectProperty(string, string)
+    event onObjectCreated(string, string)           //name + typeid
+    event onObjectRemoved(string)                   //name
+    event onChangedObjectProperty(string, string)   //obj name, property name
     
-    function NewObject(name) {
+    function NewObject(name, typeid) {
     
         var container = this
         var obj = container.New(name)
+        obj.typeid = typeid
  
         obj.onChangedProperty.RegisterCallback(function(prop) {
             container.onChangedObjectProperty.Emit(name, prop)
         })
         
-        container.onObjectCreated.Emit(name)
+        container.onObjectCreated.Emit(name, typeid)
         return obj
     }
     
@@ -26,7 +27,7 @@ Map {
         this.onObjectRemoved.Emit(name)
     }
     
-    function GetObject(name) {
+    const function GetObject(name) {
         
         return this.Get(name)
     }
@@ -35,6 +36,8 @@ Map {
     .value: Data {
         
         .name: "Object"
+        
+        property string typeid
         
         event onChangedProperty(string)
         
@@ -47,7 +50,7 @@ Map {
         
         //convinience function to add new properties
         function NewProperty(name, type, typeid, group, docu) {        
-            this.Properties.NewProperty(name, type, typeid, group, docu)
+            return this.Properties.NewProperty(name, type, typeid, group, docu)
         }
         
         //convienience function to set property value
@@ -57,7 +60,7 @@ Map {
         }
         
         //convienience function to get property value
-        function GetProperty(name) {
+        const function GetProperty(name) {
             var prop = this.Properties.Get(name)
             return prop.GetValue()
         }

@@ -3,7 +3,7 @@ import "property.dml" as PropertyContainer
 
 Data {
     .name: "Document"
-    
+
     PropertyContainer {
         .name: "Properties"
     }
@@ -16,7 +16,7 @@ Data {
         .name: "ViewProviders"
     }
     
-    
+    /*
     Graph {
         .name: "DAG"
         .node: string
@@ -31,18 +31,5 @@ Data {
     
     function GetObjectOutlist(name) {
         return this.DAG.FromNode(name)
-    }
-    
-    function SetObjectProperty(name, prop, value) {
-        
-        obj = this.DocumentObjects.Get(name)
-        obj.SetProperty(prop, value)
-    }
-    
-    //sets the outlist of a document object
-    function GetObjectProperty(name, prop, value) {
-        
-        obj = this.DocumentObjects.Get(name)
-        return obj.GetProperty(prop)
-    }
+    }*/
 }

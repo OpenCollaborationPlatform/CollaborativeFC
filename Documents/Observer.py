@@ -22,45 +22,84 @@ import asyncio
 class DocumentObserver():
     
     def __init__(self, handler):
+        
         self.handler = handler
+        self.inactive = []
+
+    def activateFor(self, doc):
+       
+        while doc in self.inactive:
+           self.inactive.remove(doc)
+        
+        
+    def deactivateFor(self, doc):
+        
+        self.inactive.append(doc)
+        
+        
+    def isDeactivatedFor(self, doc):
+        
+        if doc in self.inactive:
+            return True 
+        
+        return False
+
 
     def slotCreatedDocument(self, doc):
+        
+        if self.isDeactivatedFor(doc):
+            return
+        
         print("Observed new document")
         self.handler.openFCDocument(doc)
         
 
     def slotDeletedDocument(self, doc):
+        
+        if self.isDeactivatedFor(doc):
+            return
+        
         print("Observer close document")
         self.handler.closeFCDocument(doc)
 
+
     #def slotRelabelDocument(self, doc):
         #pass
+
 
     def slotCreatedObject(self, obj):
-        print("Observer add document object")
         
-        odoc = self.handler.getOnlineDocument(obj.Document)
-        if odoc is not None:
-            asyncio.ensure_future(odoc.asyncNewObject(obj))
+        doc = obj.Document
+        if self.isDeactivatedFor(doc):
+            return
+        
+        print("Observer add document object")  
+        odoc = self.handler.getOnlineDocument(doc)
+        odoc.newObject(obj)
 
-    #def slotDeletedObject(self, obj):
-        #pass
 
-    #def slotChangedObject(self, obj, prop):
-        #pass
+    def slotDeletedObject(self, obj):
+        
+        doc = obj.Document
+        if self.isDeactivatedFor(doc):
+            return
+        
+        print("Observer remove document object")        
+        odoc = self.handler.getOnlineDocument(doc)
+        odoc.removeObject(obj)
 
-    #def slotCreatedDocument(self, doc):
-        #pass
-    
-    #def slotDeletedDocument(self, doc):
-        #pass
-    
-    #def slotRelabelDocument(self, doc):
-        #pass
-    
-    #def slotActivateDocument(self, doc):
-        #pass
-    
+
+    def slotChangedObject(self, obj, prop):
+        
+        doc = obj.Document
+        if self.isDeactivatedFor(doc):
+            return
+        
+        print("Observer changed document object ( ", obj.Name, ", ", prop, " )")        
+        odoc = self.handler.getOnlineDocument(doc)
+        odoc.changeObject(obj, prop)
+
+
     #def slotRecomputedDocument(self, doc):
         #pass
     
