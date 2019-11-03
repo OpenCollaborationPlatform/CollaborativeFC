@@ -3,11 +3,13 @@ import "property.dml" as PropertyContainer
 Map {
     .name: "ObjectContainer"
     
-    event onObjectCreated(string, string)           //name + typeid
-    event onObjectRemoved(string)                   //name
-    event onObjectPropertyChanged(string, string)   //obj name, property name
-    event onObjectDynamicPropertyCreated(string, string)   //obj name, property name
-    event onObjectDynamicPropertyRemoved(string, string)   //obj name, property name
+    event onCreated(string, string)                   //name + typeid
+    event onRemoved(string)                           //name
+    event onPropChanged(string, string)               //obj name, property name
+    event onDynamicPropertyCreated(string, string)    //obj name, property name
+    event onDynamicPropertyRemoved(string, string)    //obj name, property name
+    event onExtensionCreated(string, string)          //obj name, extension name
+    event onExtensionRemoved(string, string)          //obj name, extension name
     
     function NewObject(name, typeid) {
     
@@ -20,23 +22,29 @@ Map {
         
         obj.typeid = typeid
         obj.onChangedProperty.RegisterCallback(function(prop) {
-            container.onObjectPropertyChanged.Emit(name, prop)
+            container.onPropChanged.Emit(name, prop)
         })
         obj.onCreatedDynamicProperty.RegisterCallback(function(prop) {
-            container.onObjectDynamicPropertyCreated.Emit(name, prop)
+            container.onDynamicPropertyCreated.Emit(name, prop)
         })
         obj.onRemovedDynamicProperty.RegisterCallback(function(prop) {
-            container.onObjectDynamicPropertyRemoved(name, prop)
+            container.onDynamicPropertyRemoved.Emit(name, prop)
+        })
+        obj.onCreatedExtension.RegisterCallback(function(ext) {
+            container.onExtensionCreated.Emit(name, ext)
+        })
+        obj.onRemovedExtension.RegisterCallback(function(ext) {
+            container.onExtensionRemoved.Emit(name, ext)
         })
         
-        container.onObjectCreated.Emit(name, typeid)
+        container.onCreated.Emit(name, typeid)
         return obj
     }
     
     function RemoveObject(name) {
         
         this.Remove(name)
-        this.onObjectRemoved.Emit(name)
+        this.onRemoved.Emit(name)
     }   
     
     .key: string
@@ -49,21 +57,60 @@ Map {
         event onChangedProperty(string)
         event onCreatedDynamicProperty(string)
         event onRemovedDynamicProperty(string)
+        event onCreatedExtension(string)
+        event onRemovedExtension(string)
         
         PropertyContainer {
             .name: "Properties"
             
-            .onChangedProperty: function(name) {
+            .onChanged: function(name) {
                 this.parent.onChangedProperty.Emit(name)
             }
             
-            .onCreatedDynamicProperty: function(name) {
+            .onCreatedDynamic: function(name) {
                 this.parent.onCreatedDynamicProperty.Emit(name)
             }
             
-            .onRemovedDynamicProperty: function(name) {
+            .onRemovedDynamic: function(name) {
                 this.parent.onRemovedDynamicProperty.Emit(name)
             }
-        } 
+        }
+        
+        Vector {
+            .name: "Extensions"
+            .type: string
+            
+            .onNewEntry: function(idx) {                
+                var ext = this.Get(idx)
+                this.parent.onCreatedExtension.Emit(ext)
+            }
+            
+            .onDeleteEntry: function(idx) {                
+                var ext = this.Get(idx)
+                this.parent.onRemovedExtension.Emit(ext)
+            }
+            
+            const function Has(name) {
+             
+                var length = this.Length()
+                for (i=0; i < length; i++) {
+                    if (this.Get(i) == name) {
+                        return true
+                    }
+                }
+                return false
+            }
+            
+            function RemoveByName(name) {
+             
+                for (i=0; i < this.Length(); i++) {
+                    if (this.Get(i) == name) {
+                        this.Remove(i)
+                        return
+                    }
+                }
+                throw "Cannot remove extension: not available"
+            }
+        }
     }
 }

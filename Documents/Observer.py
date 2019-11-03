@@ -96,11 +96,15 @@ class DocumentObserver():
         doc = obj.Document
         if self.isDeactivatedFor(doc):
             return
+          
         
         print("Observer changed document object ( ", obj.Name, ", ", prop, " )")        
         odoc = self.handler.getOnlineDocument(doc)
-        if odoc:
-            odoc.changeObject(obj, prop)
+        if not odoc:
+            return
+            
+        #finally call change object!    
+        odoc.changeObject(obj, prop)
 
 
     def slotAppendDynamicProperty(self, obj, prop):    

@@ -96,7 +96,40 @@ class OnlineObject():
         
         except Exception as e:
             print("Finalizing setup failed: ", e)
-     
+    
+    
+    async def __updateExtensions(self):
+        #we need to check if the correct set of extensions is known and change it if not
+        #as we do not have a correct event for adding/removing extensions this is the only way
+        
+        try:
+            uri = u"ocp.documents.edit.{0}".format(self.docId)
+
+            extensions = ["App::GroupExtensionPython", "App::GeoFeatureGroupExtensionPython", "App::OriginGroupExtensionPython"]
+            availExt = []
+            for ext in extensions:
+                if self.obj.hasExtension(ext):
+                    availExt.append(ext)
+            
+            tasks = []
+            calluri = uri + u".call.Document.Objects.{0}.Extensions.GetAll".format(self.obj.Name)
+            knownExt = await self.connection.session.call(calluri)
+            remExt = set(knownExt) - set(availExt)
+            for ext in remExt:
+                calluri = uri + u".call.Document.Objects.{0}.Extensions.RemoveByName".format(self.obj.Name)
+                tasks.append(self.connection.session.call(calluri, ext))
+            
+            addExt = set(availExt) - set(knownExt)
+            for ext in addExt:
+                calluri = uri + u".call.Document.Objects.{0}.Extensions.Append".format(self.obj.Name)
+                tasks.append(self.connection.session.call(calluri, ext))
+            
+            if len(tasks) > 0:
+                await asyncio.wait(tasks)
+        
+        except Exception as e:
+            print("UpdateExtensions failed: ", e)
+            
      
     async def __asyncRemove(self, name):
         try:
@@ -174,7 +207,10 @@ class OnlineObject():
             
             if self.requriesSetup:
                 await self.__asyncFinalizeSetup(changed)
-                
+            
+            #handle the extensions
+            await self.__updateExtensions()
+            
             #after recompute all changes are commited          
             tasks = []
             for prop in changed:

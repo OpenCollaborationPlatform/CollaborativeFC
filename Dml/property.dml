@@ -2,9 +2,9 @@ Map {
     .name: "PropertyContainer"
     
     //custom event that is triggered on a property change
-    event onChangedProperty(string)
-    event onCreatedDynamicProperty(string)
-    event onRemovedDynamicProperty(string)
+    event onChanged(string)
+    event onCreatedDynamic(string)
+    event onRemovedDynamic(string)
     
     //creates a new property and sets it up correctly. No new property event emitted
     function SetupProperty(name, type, typeID, group, documentation) {
@@ -18,7 +18,7 @@ Map {
         
         prop.Init(type, typeID, group, documentation)    
         prop.onChanged.RegisterCallback(function() {
-            container.onChangedProperty.Emit(name)
+            container.onChanged.Emit(name)
         })
         
         return prop
@@ -32,13 +32,13 @@ Map {
         
         //setup and inform!
         prop = this.SetupProperty(name, type, typeID, group, documentation)
-        this.onCreatedDynamicProperty.Emit(name)
+        this.onCreatedDynamic.Emit(name)
         return prop
     }
     
     function RemoveDynamicProperty(name) {
         container.Remove(name)
-        this.onRemovedDynamicProperty(name)
+        this.onRemovedDynamic(name)
     }
     
     .key: string
