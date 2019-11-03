@@ -38,17 +38,20 @@ class AsyncRunner():
         self.setupTasks = []
         self.allTasks = []
     
+    
     async def __run(self, awaitable, ctx):
             async with ctx:
                 await awaitable                
-                
+         
+         
     def __removeTask(self, task):
         while task in self.setupTasks:
             self.setupTasks.remove(task)
             
         while task in self.allTasks:
             self.allTasks.remove(task)
-                
+           
+           
     def runAsyncAsSetup(self, awaitable):
         
         ctx = TaskContext(self.setupTasks.copy())
@@ -57,12 +60,23 @@ class AsyncRunner():
         self.setupTasks.append(t)
         self.allTasks.append(t)
         
+        
+    def runAsyncAsParallelSetup(self, awaitable):
+        
+        ctx = TaskContext([])
+        t = asyncio.ensure_future(self.__run(awaitable, ctx))
+        t.add_done_callback(self.__removeTask)
+        self.setupTasks.append(t)
+        self.allTasks.append(t)
+        
+        
     def runAsync(self, awaitable):
         
         ctx = TaskContext(self.setupTasks.copy())
         t = asyncio.ensure_future(self.__run(awaitable, ctx))
         t.add_done_callback(self.__removeTask)
         self.allTasks.append(t)
+        
         
     def runAsyncAsCloseout(self, awaitable):
         

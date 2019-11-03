@@ -18,8 +18,10 @@
 # ************************************************************************
 
 import FreeCAD, asyncio, os
-from Documents.Observer import DocumentObserver
-from Documents.OnlineDocument import OnlineDocument
+
+from Documents.Dataservice      import DataService
+from Documents.Observer         import DocumentObserver
+from Documents.OnlineDocument   import OnlineDocument
 
 import uuid
 from autobahn.wamp.types import CallResult
@@ -38,6 +40,7 @@ class DocumentHandler():
         self.collab_path = collab_path
         self.blockObserver = False
         self.uuid = uuid.uuid4()
+        self.dataservice = None
 
         
         #add the observer 
@@ -46,6 +49,7 @@ class DocumentHandler():
     
     def setConnection(self, con):
         self.connection = con
+        self.dataservice = DataService(self.uuid, con)
         #TODO check all local documents available, as this may be startet after the user opened documents in freecad     
         
         #lets initialize the async stuff!
@@ -53,6 +57,7 @@ class DocumentHandler():
         
     def removeConnection(self):
         self.connection = None
+        self.dataservice = None
         self.documents = {}
        
 
@@ -175,7 +180,7 @@ class DocumentHandler():
                 dmlpath = os.path.join(self.collab_path, "Dml")
                 res = await self.connection.session.call(u"ocp.documents.create", dmlpath)
                 docmap['id'] = res
-                docmap['onlinedoc'] = OnlineDocument(res, docmap['fcdoc'], self.observer, self.connection, self.uuid)
+                docmap['onlinedoc'] = OnlineDocument(res, docmap['fcdoc'], self.observer, self.connection, self.dataservice)
                 await docmap['onlinedoc'].asyncSetup()
                 
             elif status is 'node':
@@ -183,7 +188,7 @@ class DocumentHandler():
                 doc = FreeCAD.newDocument()
                 self.blockObserver = False
                 docmap['fcdoc'] = doc
-                docmap['onlinedoc'] = OnlineDocument(docmap['id'], doc, self.observer, self.connection, self.uuid)
+                docmap['onlinedoc'] = OnlineDocument(docmap['id'], doc, self.observer, self.connection, self.dataservice)
                 await docmap['onlinedoc'].asyncLoad() 
                 
             elif status is 'invited':
@@ -192,7 +197,7 @@ class DocumentHandler():
                 doc = FreeCAD.newDocument()
                 self.blockObserver = False
                 docmap['fcdoc'] = doc
-                docmap['onlinedoc'] = OnlineDocument(docmap['id'], doc, self.observer, self.connection, self.uuid)
+                docmap['onlinedoc'] = OnlineDocument(docmap['id'], doc, self.observer, self.connection, self.dataservice)
                 await docmap['onlinedoc'].asyncUnload() 
 
             docmap['status'] = "shared"

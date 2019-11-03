@@ -5,16 +5,28 @@ Map {
     
     event onObjectCreated(string, string)           //name + typeid
     event onObjectRemoved(string)                   //name
-    event onChangedObjectProperty(string, string)   //obj name, property name
+    event onObjectPropertyChanged(string, string)   //obj name, property name
+    event onObjectDynamicPropertyCreated(string, string)   //obj name, property name
+    event onObjectDynamicPropertyRemoved(string, string)   //obj name, property name
     
     function NewObject(name, typeid) {
     
+        if (this.Has(name)) {
+            throw "Name already taken"
+        }        
+        
         var container = this
         var obj = container.New(name)
+        
         obj.typeid = typeid
- 
         obj.onChangedProperty.RegisterCallback(function(prop) {
-            container.onChangedObjectProperty.Emit(name, prop)
+            container.onObjectPropertyChanged.Emit(name, prop)
+        })
+        obj.onCreatedDynamicProperty.RegisterCallback(function(prop) {
+            container.onObjectDynamicPropertyCreated.Emit(name, prop)
+        })
+        obj.onRemovedDynamicProperty.RegisterCallback(function(prop) {
+            container.onObjectDynamicPropertyRemoved(name, prop)
         })
         
         container.onObjectCreated.Emit(name, typeid)
@@ -25,12 +37,7 @@ Map {
         
         this.Remove(name)
         this.onObjectRemoved.Emit(name)
-    }
-    
-    const function GetObject(name) {
-        
-        return this.Get(name)
-    }
+    }   
     
     .key: string
     .value: Data {
@@ -40,29 +47,23 @@ Map {
         property string typeid
         
         event onChangedProperty(string)
+        event onCreatedDynamicProperty(string)
+        event onRemovedDynamicProperty(string)
         
         PropertyContainer {
             .name: "Properties"
+            
             .onChangedProperty: function(name) {
                 this.parent.onChangedProperty.Emit(name)
             }
-        }
-        
-        //convinience function to add new properties
-        function NewProperty(name, type, typeid, group, docu) {        
-            return this.Properties.NewProperty(name, type, typeid, group, docu)
-        }
-        
-        //convienience function to set property value
-        function SetProperty(name, value) {
-            var prop = this.Properties.Get(name)
-            prop.SetValue(value)        
-        }
-        
-        //convienience function to get property value
-        const function GetProperty(name) {
-            var prop = this.Properties.Get(name)
-            return prop.GetValue()
-        }
+            
+            .onCreatedDynamicProperty: function(name) {
+                this.parent.onCreatedDynamicProperty.Emit(name)
+            }
+            
+            .onRemovedDynamicProperty: function(name) {
+                this.parent.onRemovedDynamicProperty.Emit(name)
+            }
+        } 
     }
 }

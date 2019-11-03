@@ -73,9 +73,10 @@ class DocumentObserver():
         if self.isDeactivatedFor(doc):
             return
         
-        print("Observer add document object")  
+        print("Observer add document object ", obj.Name)  
         odoc = self.handler.getOnlineDocument(doc)
-        odoc.newObject(obj)
+        if odoc:
+            odoc.newObject(obj)
 
 
     def slotDeletedObject(self, obj):
@@ -84,9 +85,10 @@ class DocumentObserver():
         if self.isDeactivatedFor(doc):
             return
         
-        print("Observer remove document object")        
+        print("Observer remove document object ", obj.Name)        
         odoc = self.handler.getOnlineDocument(doc)
-        odoc.removeObject(obj)
+        if odoc:
+            odoc.removeObject(obj)
 
 
     def slotChangedObject(self, obj, prop):
@@ -97,9 +99,49 @@ class DocumentObserver():
         
         print("Observer changed document object ( ", obj.Name, ", ", prop, " )")        
         odoc = self.handler.getOnlineDocument(doc)
-        odoc.changeObject(obj, prop)
+        if odoc:
+            odoc.changeObject(obj, prop)
 
 
+    def slotAppendDynamicProperty(self, obj, prop):    
+        
+        doc = obj.Document
+        if self.isDeactivatedFor(doc):
+            return
+        
+        if obj.isDerivedFrom("App::DocumentObject"):
+            print("Observer new dyn property ( ", obj.Name, ", ", prop, " )")
+            
+        odoc = self.handler.getOnlineDocument(doc)
+        if odoc and obj.isDerivedFrom("App::DocumentObject"):
+            odoc.newDynamicProperty(obj, prop)
+    
+    
+    def slotRemoveDynamicProperty(self, obj, prop):   
+        
+        doc = obj.Document
+        if self.isDeactivatedFor(doc):
+            return
+        
+        if obj.isDerivedFrom("App::DocumentObject"):
+            print("Observer remove dyn property ( ", obj.Name, ", ", prop, " )")
+            
+        odoc = self.handler.getOnlineDocument(doc)
+        if odoc and obj.isDerivedFrom("App::DocumentObject"):
+            odoc.removeDynamicProperty(obj, prop)
+
+
+    def slotRecomputedObject(self, obj):
+        print("Observer recomputed object ", obj.Name)
+        
+        doc = obj.Document
+        if self.isDeactivatedFor(doc):
+            return
+        
+        odoc = self.handler.getOnlineDocument(doc)
+        if odoc:
+            odoc.recomputObject(obj)
+        
     #def slotRecomputedDocument(self, doc):
         #pass
     
@@ -134,15 +176,6 @@ class DocumentObserver():
         #pass
     
     #def slotBeforeChangeObject(self, obj, prop):
-        #pass
-    
-    #def slotRecomputedObject(self, obj):
-        #pass
-    
-    #def slotAppendDynamicProperty(self, obj, prop):    
-        #pass
-    
-    #def slotRemoveDynamicProperty(self, obj, prop):   
         #pass
     
     #def slotChangePropertyEditor(self, obj, prop):

@@ -1,0 +1,189 @@
+Map {
+    .name: "PropertyContainer"
+    
+    //custom event that is triggered on a property change
+    event onChangedProperty(string)
+    event onCreatedDynamicProperty(string)
+    event onRemovedDynamicProperty(string)
+    
+    //creates a new property and sets it up correctly. No new property event emitted
+    function SetupProperty(name, type, typeID, group, documentation) {
+    
+        if (this.Has(name)) {
+            throw "Property already exists"
+        }
+        
+        var container = this
+        var prop = this.New(name)
+        
+        prop.Init(type, typeID, group, documentation)    
+        prop.onChanged.RegisterCallback(function() {
+            container.onChangedProperty.Emit(name)
+        })
+        
+        return prop
+    }
+    
+    function CreateDynamicProperty(name, type, typeID, group, documentation) {
+        
+        if (this.Has(name)) {
+            throw "Property already exists"
+        }
+        
+        //setup and inform!
+        prop = this.SetupProperty(name, type, typeID, group, documentation)
+        this.onCreatedDynamicProperty.Emit(name)
+        return prop
+    }
+    
+    function RemoveDynamicProperty(name) {
+        container.Remove(name)
+        this.onRemovedDynamicProperty(name)
+    }
+    
+    .key: string
+    .value: Data {
+        
+        .name: "Property"
+
+        //FreeCAD infos
+        property string propertyType
+        property string typeid
+        property string group
+        property string documentation
+        
+        event onChanged()
+        
+        Variant {
+            .name: "PropertyData"
+            
+            .onValueChanged: function() {
+                if (this.parent.typeid != "") {
+                    this.parent.onChanged.Emit()
+                }
+            }
+        }
+        
+        function Init(type, typeID, group, documentation) {          
+
+            switch(typeID) {
+                case "App::PropertyLink":
+                case "App::PropertyLinkChild":
+                case "App::PropertyLinkGlobal":
+                    this.PropertyData.type = DataType("string")
+                    break           
+                
+                case "App::PropertyFloat":
+                case "App::PropertyPrecision":
+                case "App::PropertyQuantity":
+                case "App::PropertyAngle":
+                case "App::PropertyDistance":
+                case "App::PropertyLength":
+                case "App::PropertyArea":
+                case "App::PropertyVolume":
+                case "App::PropertySpeed":
+                case "App::PropertyAcceleration":
+                case "App::PropertyForce":
+                case "App::PropertyPressure":
+                    this.PropertyData.type = DataType("float")
+                    break
+                    
+                case "App::PropertyInteger":
+                case "App::PropertyPercent":
+                    this.PropertyData.type = DataType("int")
+                    break
+                    
+                case "App::PropertyBool":
+                    this.PropertyData.type = DataType("bool")
+                    break
+                    
+                case "App::PropertyPath":
+                case "App::PropertyString":
+                case "App::PropertyUUID":
+                    this.PropertyData.type = DataType("string")
+                    break  
+                    
+                default:
+                    var prop = this
+                    prop.PropertyData.type = DataType("Raw{}")
+                    var raw = prop.PropertyData.GetValue()
+                    raw.onDataChanged.RegisterCallback(function(cid) {
+                        prop.onChanged.Emit()
+                    })
+            }
+            
+            //do this after assigning the variant as we use this as indicator for 
+            //finished initialization
+            this.propertyType = type
+            this.typeid = typeID
+            this.group = group
+            this.documentation = documentation
+        }
+        
+        function SetValue(value) {
+            this.PropertyData.SetValue(value)
+        }
+        
+        const function GetValue() {
+            return this.PropertyData.GetValue()
+        }
+        
+        const function IsBinary() {
+            return !this.PropertyData.type.IsPOD()
+        }
+        
+        const function GetInfo() {
+            var dict = {
+                "type": this.propertyType, 
+                "id": this.typeid,
+                "group": this.group,
+                "docu": this.documentation
+            }
+
+            return dict
+        }
+    }
+}
+
+/* Remaining default Properties (excluding modules and gui):
+App::PropertyLists
+App::PropertyBoolList
+App::PropertyFloatList
+App::PropertyFloatConstraint
+App::PropertyQuantityConstraint
+App::PropertyIntegerConstraint
+App::PropertyEnumeration
+App::PropertyIntegerList
+App::PropertyIntegerSet
+App::PropertyMap
+App::PropertyFont
+App::PropertyStringList
+App::PropertyLinkList
+App::PropertyLinkListChild
+App::PropertyLinkListGlobal
+App::PropertyLinkSub
+App::PropertyLinkSubChild
+App::PropertyLinkSubGlobal
+App::PropertyLinkSubList
+App::PropertyLinkSubListChild
+App::PropertyLinkSubListGlobal
+App::PropertyMatrix
+App::PropertyVector
+App::PropertyVectorDistance
+App::PropertyPosition
+App::PropertyDirection
+App::PropertyVectorList
+App::PropertyPlacement
+App::PropertyPlacementList
+App::PropertyPlacementLink
+App::PropertyGeometry
+App::PropertyComplexGeoData
+App::PropertyColor
+App::PropertyColorList
+App::PropertyMaterial
+App::PropertyMaterialList
+App::PropertyFile
+App::PropertyFileIncluded
+App::PropertyPythonObject
+App::PropertyExpressionEngine
+*/
