@@ -17,10 +17,10 @@
 # *   Suite 330, Boston, MA  02111-1307, USA                             *
 # ************************************************************************
 
-import FreeCAD, asyncio, os
+import FreeCAD, FreeCADGui, asyncio, os
 
 from Documents.Dataservice      import DataService
-from Documents.Observer         import DocumentObserver
+from Documents.Observer         import DocumentObserver, GUIDocumentObserver
 from Documents.OnlineDocument   import OnlineDocument
 
 import uuid
@@ -45,7 +45,9 @@ class DocumentHandler():
         
         #add the observer 
         self.observer = DocumentObserver(self)
+        self.guiObserver = GUIDocumentObserver(self)
         FreeCAD.addDocumentObserver(self.observer)
+        FreeCADGui.addDocumentObserver(self.guiObserver)
     
     def setConnection(self, con):
         self.connection = con
@@ -102,12 +104,26 @@ class DocumentHandler():
         raise Exception('no such document found')
     
     def getOnlineDocument(self, fcdoc):
+        
+        #check if it is a GuiDocument 
+        if hasattr(fcdoc, "ActiveView"):
+            fcdoc = fcdoc.Document
+        
         #get the online document for a certain freecad document, or None if not available
         for docmap in self.documents: 
             if docmap["fcdoc"] == fcdoc:
                 return docmap["onlinedoc"]
         
         return None
+    
+    def hasOnlineViewProvider(self, vp):
+        
+        for docmap in self.documents: 
+            odoc = docmap["onlinedoc"]
+            if odoc and odoc.hasViewProvider(vp):
+                return True
+        
+        return False
        
     async def asyncInit(self):
         #get a list of open documents of the node and add them to the list

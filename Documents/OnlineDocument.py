@@ -20,7 +20,7 @@
 import asyncio
 import Documents.Property as Property
 from Documents.OnlineObserver import OnlineObserver
-from Documents.OnlineObject import OnlineObject
+from Documents.OnlineObject import OnlineObject, OnlineViewProvider
 from autobahn.wamp.exception import ApplicationError
 
 class OnlineDocument():
@@ -33,6 +33,7 @@ class OnlineDocument():
         self.data = dataservice
         self.onlineObs = OnlineObserver(observer, self)
         self.objects = {}
+        self.viewproviders = {}
         
         print("new online document created")
     
@@ -81,6 +82,55 @@ class OnlineDocument():
         
         oobj = self.objects[obj.Name]
         oobj.recompute()
+    
+    
+    def hasViewProvider(self, vp):
+        #we are not allowed to access the vp, as it ould be that 
+        #it was not fully created yet and than freecad crashes
+        ovps = self.viewproviders.values()
+        for ovp in ovps:
+            if ovp.obj is vp:
+                return True
+        
+        return False
+    
+    
+    def newViewProvider(self, vp):
+        #create the async runner for that object
+        ovp = OnlineViewProvider(vp, self)
+        self.viewproviders[vp.Object.Name] = ovp
+        ovp.setup()
+     
+     
+    def removeViewProvider(self, vp):
+        #create the async runner for that object
+        ovp = self.viewproviders[vp.Object.Name]
+        del(self.viewproviders[vp.Object.Name])
+        ovp.remove()
+        
+        
+    def changeViewProvider(self, vp, prop):
+        if vp.Object.Name not in self.viewproviders:
+            return
+        
+        ovp = self.viewproviders[vp.Object.Name]
+        ovp.changeProperty(prop)
+    
+    
+    def newViewProviderDynamicProperty(self, vp, prop):
+        if vp.Object.Name not in self.viewproviders:
+            return
+        
+        ovp = self.viewproviders[vp.Object.Name]
+        ovp.createDynamicProperty(prop)
+        
+        
+    def removeViewProviderDynamicProperty(self, vp, prop):
+        if vp.Object.Name not in self.viewproviders:
+            return
+        
+        ovp = self.viewproviders[vp.Object.Name]
+        ovp.removeDynamicProperty(prop)
         
 
     async def asyncSetup(self):

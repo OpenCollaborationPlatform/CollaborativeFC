@@ -170,15 +170,6 @@ class DocumentObserver():
     #def slotChangedDocument(self, doc, prop):
         #pass
     
-    #def slotCreatedObject(self, obj):
-        #pass
-    
-    #def slotDeletedObject(self, obj):
-        #pass
-    
-    #def slotChangedObject(self, obj, prop):
-        #pass
-    
     #def slotBeforeChangeObject(self, obj, prop):
         #pass
     
@@ -190,3 +181,89 @@ class DocumentObserver():
     
     #def slotFinishSaveDocument(self, obj, name):
         #pass
+
+
+class GUIDocumentObserver():
+    
+    def __init__(self, handler):
+        
+        self.handler = handler
+        self.inactive = []
+
+
+    def activateFor(self, doc):
+       
+        while doc in self.inactive:
+           self.inactive.remove(doc)
+        
+        
+    def deactivateFor(self, doc):
+        
+        self.inactive.append(doc)
+        
+        
+    def isDeactivatedFor(self, doc):
+        
+        if doc in self.inactive:
+            return True 
+        
+        return False
+       
+    def slotCreatedDocument(self, doc):
+        pass
+      
+    def slotDeletedDocument(self, doc):
+        pass
+      
+    def slotRelabelDocument(self, doc):
+        pass
+      
+    def slotRenameDocument(self, doc):
+        pass
+      
+    def slotActivateDocument(self, doc):
+        pass
+      
+    def slotCreatedObject(self, vp):
+        
+        doc = vp.Document
+        if self.isDeactivatedFor(doc):
+            return
+        
+        print("Observer add viewprovider object ", vp.Object.Name)  
+        odoc = self.handler.getOnlineDocument(doc)
+        if odoc:
+            odoc.newViewProvider(vp)
+            
+
+    def slotDeletedObject(self, obj):
+        print("Object deleted")
+        pass
+        #if obj.Object is not None:
+        #    print("viewprovider removed for object ", obj.Object.Name)
+
+    def slotChangedObject(self, vp, prop):
+        
+        #we need to check if any document has this vp, as accessing it before 
+        #creation crashes freecad
+        print("changed vp called")
+        if not self.handler.hasOnlineViewProvider(vp):
+            return
+        
+        doc = vp.Document
+        if self.isDeactivatedFor(doc):
+            return
+
+        print("Observer changed viewprovider ( ", vp, ", ", prop, " )")
+        odoc = self.handler.getOnlineDocument(doc)
+        if not odoc:
+            return
+            
+        #finally call change object!    
+        odoc.changeViewProvider(vp, prop)
+      
+    def slotInEdit(self, obj):
+        pass
+    
+    def slotResetEdit(self, obj):
+        pass

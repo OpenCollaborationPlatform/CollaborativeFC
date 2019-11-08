@@ -52,4 +52,4 @@ class DataService():
                 details.progress(bytes(block))
                 
         else: 
-            return bytes(self.store.getData(key))
+            return bytes(self.getData(key))

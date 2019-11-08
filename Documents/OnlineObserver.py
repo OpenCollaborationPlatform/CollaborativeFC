@@ -28,25 +28,29 @@ class OnlineObserver():
         self.docObserver = observer
         self.onlineDoc = odoc
         
-        #setup all events we listen on!    
-        uri = u"ocp.documents.edit.{0}.events.".format(odoc.id)
-        odoc.connection.session.subscribe(self.__newObject, uri+"Document.Objects.onCreated")
-        odoc.connection.session.subscribe(self.__removeObject, uri+"Document.Objects.onRemoved")
-        odoc.connection.session.subscribe(self.__changeObject, uri+"Document.Objects.onPropChanged")
-        odoc.connection.session.subscribe(self.__createObjectDynProperty, uri+"Document.Objects.onDynamicPropertyCreated")
-        odoc.connection.session.subscribe(self.__removeObjectDynProperty, uri+"Document.Objects.onDynamicPropertyRemoved")
-        odoc.connection.session.subscribe(self.__createObjextExtension, uri+"Document.Objects.onExtensionCreated")
-        odoc.connection.session.subscribe(self.__removeObjextExtension, uri+"Document.Objects.onExtensionRemoved")
-        
-        odoc.connection.session.subscribe(self.__newViewProvider, uri+"Document.ViewProviders.onCreated")
-        odoc.connection.session.subscribe(self.__removeViewProvider, uri+"Document.ViewProviders.onRemoved")
-        odoc.connection.session.subscribe(self.__changeViewProvider, uri+"Document.ViewProviders.onPropChanged")
-        odoc.connection.session.subscribe(self.__createViewProviderDynProperty, uri+"Document.ViewProviders.onDynamicPropertyCreated")
-        odoc.connection.session.subscribe(self.__removeViewProviderDynProperty, uri+"Document.ViewProviders.onDynamicPropertyRemoved")
-        odoc.connection.session.subscribe(self.__createViewProviderExtension, uri+"Document.ViewProvider.onExtensionCreated")
-        odoc.connection.session.subscribe(self.__removeViewProviderExtension, uri+"Document.ViewProvider.onExtensionRemoved")
-        
-        odoc.connection.session.subscribe(self.__changeDocProperty, uri+"Document.Properties.onChangedProperty")
+        try:
+            #setup all events we listen on!    
+            uri = u"ocp.documents.edit.{0}.events.".format(odoc.id)
+            odoc.connection.session.subscribe(self.__newObject, uri+"Document.Objects.onCreated")
+            odoc.connection.session.subscribe(self.__removeObject, uri+"Document.Objects.onRemoved")
+            odoc.connection.session.subscribe(self.__changeObject, uri+"Document.Objects.onPropChanged")
+            odoc.connection.session.subscribe(self.__createObjectDynProperty, uri+"Document.Objects.onDynamicPropertyCreated")
+            odoc.connection.session.subscribe(self.__removeObjectDynProperty, uri+"Document.Objects.onDynamicPropertyRemoved")
+            odoc.connection.session.subscribe(self.__createObjextExtension, uri+"Document.Objects.onExtensionCreated")
+            odoc.connection.session.subscribe(self.__removeObjextExtension, uri+"Document.Objects.onExtensionRemoved")
+            
+            odoc.connection.session.subscribe(self.__newViewProvider, uri+"Document.ViewProviders.onCreated")
+            odoc.connection.session.subscribe(self.__removeViewProvider, uri+"Document.ViewProviders.onRemoved")
+            odoc.connection.session.subscribe(self.__changeViewProvider, uri+"Document.ViewProviders.onPropChanged")
+            odoc.connection.session.subscribe(self.__createViewProviderDynProperty, uri+"Document.ViewProviders.onDynamicPropertyCreated")
+            odoc.connection.session.subscribe(self.__removeViewProviderDynProperty, uri+"Document.ViewProviders.onDynamicPropertyRemoved")
+            odoc.connection.session.subscribe(self.__createViewProviderExtension, uri+"Document.ViewProvider.onExtensionCreated")
+            odoc.connection.session.subscribe(self.__removeViewProviderExtension, uri+"Document.ViewProvider.onExtensionRemoved")
+            
+            odoc.connection.session.subscribe(self.__changeDocProperty, uri+"Document.Properties.onChangedProperty")
+            
+        except Exception as e:
+            print("Setup of online observer failed: ", e)
         
         
     async def __newObject(self, name, typeID):
@@ -55,7 +59,7 @@ class OnlineObserver():
             self.docObserver.deactivateFor(self.onlineDoc.document)
             obj = self.onlineDoc.document.addObject(typeID, name)
             
-            oobj = OnlineObject(obj, self)
+            oobj = OnlineObject(obj, self.onlineDoc)
             self.onlineDoc.objects[obj.Name] = oobj
             obj.purgeTouched()
             
