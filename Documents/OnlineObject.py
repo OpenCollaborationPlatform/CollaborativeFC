@@ -250,9 +250,15 @@ class OnlineViewProvider(FreeCADOnlineObject):
     def __init__(self, obj, onlinedoc):        
         super().__init__(obj.Object.Name, onlinedoc, "ViewProviders")
         self.obj = obj
+        self.proxydata = bytearray()   #as FreeCAD 0.18 does not forward viewprovider proxy changes we need a way to identify changes
           
         
     def setup(self):
+        
+        #part of the FC 0.18 no proxy change event workaround
+        if hasattr(self.obj, 'Proxy'):
+            self.proxydata = self.obj.dumpPropertyContent('Proxy')
+        
         #collect all property values and infos
         values = {}
         infos = {}
@@ -271,13 +277,25 @@ class OnlineViewProvider(FreeCADOnlineObject):
         info = Property.createPropertyInfo(self.obj, prop)        
         self.runner.runAsyncAsIntermediateSetup(self._asyncCreateProperty(True, prop, info))
     
+    
     def removeDynamicProperty(self, prop):
         self.runner.runAsyncAsIntermediateSetup(self._asyncRemoveProperty(prop))
     
     
     def changeProperty(self, prop):
+        
+        #work around missing extension callbacks
         if prop == "ExtensionProxy":
             self.runner.runAsyncAsSetup(self._updateExtensions(self.obj))
         
+        #work around missing proxy callback. This may add to some delay, as proxy change is ony forwarded 
+        #when annother property changes afterwards, however, at least the order of changes is keept
+        if hasattr(self.obj, 'Proxy'):
+            proxydata = self.obj.dumpPropertyContent('Proxy')
+            if not proxydata == self.proxydata:
+                self.proxydata = proxydata
+                self.runner.runAsync(self._asyncWriteProperty('Proxy', proxydata))
+        
+        print("change view provider property ", prop)
         value = Property.convertPropertyToWamp(self.obj, prop)
         self.runner.runAsync(self._asyncWriteProperty(prop, value))

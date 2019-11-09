@@ -42,8 +42,8 @@ class OnlineObserver():
             odoc.connection.session.subscribe(self.__changeViewProvider, uri+"Document.ViewProviders.onPropChanged")
             odoc.connection.session.subscribe(self.__createViewProviderDynProperty, uri+"Document.ViewProviders.onDynamicPropertyCreated")
             odoc.connection.session.subscribe(self.__removeViewProviderDynProperty, uri+"Document.ViewProviders.onDynamicPropertyRemoved")
-            odoc.connection.session.subscribe(self.__createViewProviderExtension, uri+"Document.ViewProvider.onExtensionCreated")
-            odoc.connection.session.subscribe(self.__removeViewProviderExtension, uri+"Document.ViewProvider.onExtensionRemoved")
+            odoc.connection.session.subscribe(self.__createViewProviderExtension, uri+"Document.ViewProviders.onExtensionCreated")
+            odoc.connection.session.subscribe(self.__removeViewProviderExtension, uri+"Document.ViewProviders.onExtensionRemoved")
             
             odoc.connection.session.subscribe(self.__changeDocProperty, uri+"Document.Properties.onChangedProperty")
             
@@ -220,11 +220,10 @@ class OnlineObserver():
                     dat.progress(val)
                 
                 #set it for the property
-                self.docObserver.deactivateFor(self.onlineDoc.document)                
+                self.docObserver.deactivateFor(self.onlineDoc.document)   
                 obj.restorePropertyContent(prop, dat.data)
                 
             else:
-                val = await self.onlineDoc.connection.session.call(uri + "{0}.Properties.{1}.GetValue".format(name, prop))
                 self.docObserver.deactivateFor(self.onlineDoc.document)
                 setattr(obj, prop, val)
 

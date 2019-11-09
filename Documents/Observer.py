@@ -269,6 +269,8 @@ class GUIDocumentObserver():
 
     def slotChangedObject(self, vp, prop):
         
+        print("Observer changed viewprovider ", prop)
+        
         #we need to check if any document has this vp, as accessing it before 
         #creation crashes freecad
         if not self.handler.hasOnlineViewProvider(vp):
@@ -278,7 +280,6 @@ class GUIDocumentObserver():
         if self.isDeactivatedFor(doc):
             return
 
-        print("Observer changed viewprovider ", prop)
         odoc = self.handler.getOnlineDocument(doc)
         if not odoc:
             return
