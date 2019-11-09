@@ -36,6 +36,7 @@ class AsyncRunner():
     
     def __init__(self):
         self.setupTasks = []
+        self.intermediateSetupTasks = []
         self.allTasks = []
     
     
@@ -50,6 +51,9 @@ class AsyncRunner():
             
         while task in self.allTasks:
             self.allTasks.remove(task)
+            
+        while task in self.intermediateSetupTasks:
+            self.intermediateSetupTasks.remove(task)
            
            
     def runAsyncAsSetup(self, awaitable):
@@ -61,18 +65,18 @@ class AsyncRunner():
         self.allTasks.append(t)
         
         
-    def runAsyncAsParallelSetup(self, awaitable):
+    def runAsyncAsIntermediateSetup(self, awaitable):
         
-        ctx = TaskContext([])
+        ctx = TaskContext(self.setupTasks.copy())
         t = asyncio.ensure_future(self.__run(awaitable, ctx))
         t.add_done_callback(self.__removeTask)
-        self.setupTasks.append(t)
+        self.intermediateSetupTasks.append(t)
         self.allTasks.append(t)
         
         
     def runAsync(self, awaitable):
         
-        ctx = TaskContext(self.setupTasks.copy())
+        ctx = TaskContext(self.setupTasks.copy() + self.intermediateSetupTasks.copy())
         t = asyncio.ensure_future(self.__run(awaitable, ctx))
         t.add_done_callback(self.__removeTask)
         self.allTasks.append(t)

@@ -3,7 +3,7 @@ Map {
     
     //custom event that is triggered on a property change
     event onChanged(string)
-    event onCreatedDynamic(string)
+    event onCreatedDynamic(string, string, string, string, string)
     event onRemovedDynamic(string)
     
     //creates a new property and sets it up correctly. No new property event emitted
@@ -32,7 +32,7 @@ Map {
         
         //setup and inform!
         prop = this.SetupProperty(name, type, typeID, group, documentation)
-        this.onCreatedDynamic.Emit(name)
+        this.onCreatedDynamic.Emit(name, type, typeID, group, documentation)
         return prop
     }
     

@@ -39,8 +39,6 @@ class OnlineObserver():
             odoc.connection.session.subscribe(self.__createObjextExtension, uri+"Document.Objects.onExtensionCreated")
             odoc.connection.session.subscribe(self.__removeObjextExtension, uri+"Document.Objects.onExtensionRemoved")
             
-            odoc.connection.session.subscribe(self.__newViewProvider, uri+"Document.ViewProviders.onCreated")
-            odoc.connection.session.subscribe(self.__removeViewProvider, uri+"Document.ViewProviders.onRemoved")
             odoc.connection.session.subscribe(self.__changeViewProvider, uri+"Document.ViewProviders.onPropChanged")
             odoc.connection.session.subscribe(self.__createViewProviderDynProperty, uri+"Document.ViewProviders.onDynamicPropertyCreated")
             odoc.connection.session.subscribe(self.__removeViewProviderDynProperty, uri+"Document.ViewProviders.onDynamicPropertyRemoved")
@@ -89,17 +87,121 @@ class OnlineObserver():
         if obj is None:
             return
         
+        await self.__readProperty(obj, name, prop)
+ 
+ 
+    async def __createObjectDynProperty(self, name, prop, ptype, typeID, group, documentation):
+        obj = self.onlineDoc.document.getObject(name)
+        if obj is None:
+            print("Should add dyn property for not existing object")
+            return
+        
+        await self.__createDynProperty(obj, name, prop, ptype, typeID, group, documentation)
+    
+    
+    async def __removeObjectDynProperty(self, name, prop):
+        
+        obj = self.onlineDoc.document.getObject(name)
+        if obj is None:
+            print("Should remove dyn property for not existing object")
+            return
+        
+        await self.__removeDynProperty(obj, prop)
+
+    
+    async def __createObjextExtension(self, name, ext):
+        
+        obj = self.onlineDoc.document.getObject(name)
+        if obj is None:
+            print("Should add extension for not existing object")
+            return
+        
+        await self.__createExtension(obj, ext)
+    
+    
+    async def __removeObjextExtension(self, name, ext):
+        
+        obj = self.onlineDoc.document.getObject(name)
+        if obj is None:
+            print("Should remove extension for not existing object")
+            return
+        
+        await self.__removeExtension(obj, ext)
+    
+        
+    async def __changeViewProvider(self, name, prop):
+        
+        print("OnlineObserver Viewprovider changed: ", prop)
+        obj = self.onlineDoc.document.getObject(name)
+        if obj is None:
+            return
+        
+        await self.__readProperty(obj.ViewObject, name, prop)
+        
+    
+    async def __createViewProviderDynProperty(self, name, prop, ptype, typeID, group, documentation):
+        
+        print("OnlineObserver Viewprovider dyn prop added: ", prop)
+        obj = self.onlineDoc.document.getObject(name)
+        if obj is None:
+            print("Should add dyn property for not existing viewprovider")
+            return
+        
+        await self.__createDynProperty(obj.ViewObject, name, prop, ptype, typeID, group, documentation)
+    
+    
+    async def __removeViewProviderDynProperty(self, name, prop):
+        
+        obj = self.onlineDoc.document.getObject(name)
+        if obj is None:
+            print("Should remove dyn property for not existing viewprovider")
+            return
+        
+        await self.__removeDynProperty(obj.ViewObject, prop)
+    
+    
+
+    async def __createViewProviderExtension(self, name, ext):
+        
+        print("OnlineObserver Viewprovider extension added: ", ext)
+        obj = self.onlineDoc.document.getObject(name)
+        if obj is None:
+            print("Should create extension for not existing viewprovider")
+            return
+        
+        await self.__createExtension(obj.ViewObject, ext)
+    
+    
+    async def __removeViewProviderExtension(self, name, ext):
+        
+        obj = self.onlineDoc.document.getObject(name)
+        if obj is None:
+            print("Should remove extension for not existing object")
+            return
+        
+        await self.__removeExtension(obj.ViewObject, ext)
+
+
+    async def __changeDocProperty(self, name):
+        print("Cahnged document property event")
+        
+
+    async def __readProperty(self, obj, name, prop):
+        
         try:      
-            uri = u"ocp.documents.edit.{0}.call.".format(self.onlineDoc.id)
+            if obj.isDerivedFrom("App::DocumentObject"):
+                group = "Objects"
+            else:
+                group = "ViewProviders"
+                
+            uri = u"ocp.documents.edit.{0}.call.Document.{1}.".format(self.onlineDoc.id, group)
             
-            calluri = uri + "Document.Objects.{0}.Properties.{1}.IsBinary".format(name, prop)
+            calluri = uri + "{0}.Properties.{1}.IsBinary".format(name, prop)
             binary = await self.onlineDoc.connection.session.call(calluri)
             
-            calluri = uri + "Document.Objects.{0}.Properties.{1}.GetValue".format(name, prop)
+            calluri = uri + "{0}.Properties.{1}.GetValue".format(name, prop)
             val = await self.onlineDoc.connection.session.call(calluri)
-            
-            print("Change object " + name + " prop " + prop)
-            
+                       
             if binary:
                 
                 class Data():
@@ -122,48 +224,43 @@ class OnlineObserver():
                 obj.restorePropertyContent(prop, dat.data)
                 
             else:
-                val = await self.onlineDoc.connection.session.call(uri + "Document.Objects.{0}.Properties.{1}.GetValue".format(name, prop))
+                val = await self.onlineDoc.connection.session.call(uri + "{0}.Properties.{1}.GetValue".format(name, prop))
                 self.docObserver.deactivateFor(self.onlineDoc.document)
                 setattr(obj, prop, val)
 
         except Exception as e:
-            print("Online callback change object error: ", e)
+            print("Read property error: ", e)
 
         finally:
             self.docObserver.activateFor(self.onlineDoc.document)
-            obj.purgeTouched()
- 
- 
-    async def __createObjectDynProperty(self, name, prop):
-        obj = self.onlineDoc.document.getObject(name)
-        if obj is None:
-            print("Should add dyn property for not existing object")
+            if hasattr(obj, "purgeTouched"):
+                obj.purgeTouched()
+            
+    
+    async def __createDynProperty(self, obj, name, prop, ptype, typeID, group, documentation):
+        
+        if hasattr(obj, prop):
             return
         
-        try:      
-            uri = u"ocp.documents.edit.{0}.call.".format(self.onlineDoc.id)
-            calluri = uri + "Document.Objects.{0}.Properties.{1}.GetInfo".format(name, prop)
-            info = await self.onlineDoc.connection.session.call(calluri)
-            
+        try:                 
             self.docObserver.deactivateFor(self.onlineDoc.document)
-            obj.addProperty(info["id"], prop, info["group"], info["docu"])
+            obj.addProperty(typeID, prop, group, documentation)
             
         except Exception as e:
             print("Dyn property adding callback failed: ", e)
             
         finally:
             self.docObserver.activateFor(self.onlineDoc.document)
-            obj.purgeTouched()
+            if hasattr(obj, "purgeTouched"):
+                obj.purgeTouched()
     
     
-    async def __removeObjectDynProperty(self, name, prop):
+    async def __removeDynProperty(self, obj, prop):
         
-        obj = self.onlineDoc.document.getObject(name)
-        if obj is None:
-            print("Should remove dyn property for not existing object")
+        if not hasattr(obj, prop):
             return
         
-        try:      
+        try:                   
             self.docObserver.deactivateFor(self.onlineDoc.document)
             obj.removeProperty(prop)
             
@@ -172,15 +269,11 @@ class OnlineObserver():
             
         finally:
             self.docObserver.activateFor(self.onlineDoc.document)
-            obj.purgeTouched()
-
+            if hasattr(obj, "purgeTouched"):
+                obj.purgeTouched()
+            
     
-    async def __createObjextExtension(self, name, ext):
-        
-        obj = self.onlineDoc.document.getObject(name)
-        if obj is None:
-            print("Should add extension for not existing object")
-            return
+    async def __createExtension(self, obj, ext):
         
         if obj.hasExtension(ext):
             return
@@ -194,16 +287,12 @@ class OnlineObserver():
             
         finally:
             self.docObserver.activateFor(self.onlineDoc.document)
-            obj.purgeTouched()
+            if hasattr(obj, "purgeTouched"):
+                obj.purgeTouched()
     
     
-    async def __removeObjextExtension(self, name, ext):
-        
-        obj = self.onlineDoc.document.getObject(name)
-        if obj is None:
-            print("Should remove extension for not existing object")
-            return
-        
+    async def __removeExtension(self, obj, ext):
+              
         if not obj.hasExtension(ext):
             return
         
@@ -216,36 +305,5 @@ class OnlineObserver():
             
         finally:
             self.docObserver.activateFor(self.onlineDoc.document)
-            obj.purgeTouched()
-    
- 
-    async def __newViewProvider(self, name):
-        print("New vp event received")
-    
-    
-    async def __removeViewProvider(self, name):
-        print("Removed vp event received")
-        
-        
-    async def __changeViewProvider(self, name, prop):
-        print("Changed vp event received")
-        
-    
-    async def __createViewProviderDynProperty(self, name, prop):
-        pass
-    
-    
-    async def __removeViewProviderDynProperty(self, name, prop):
-        pass
-    
-    
-    async def __changeDocProperty(self, name):
-        print("Cahnged vp property event")
-
-
-    async def __createViewProviderExtension(self, name, ext):
-        pass
-    
-    
-    async def __removeViewProviderExtension(self, name, ext):
-        pass
+            if hasattr(obj, "purgeTouched"):
+                obj.purgeTouched()

@@ -18,6 +18,15 @@
 # ************************************************************************
 #
 
+def createPropertyInfo(obj, prop):
+    info = {}
+    info["docu"] = obj.getDocumentationOfProperty(prop)
+    info["group"] = obj.getGroupOfProperty(prop)
+    info["typeid"] = obj.getTypeIdOfProperty(prop)
+    info["ptype"] = '-'.join(obj.getTypeOfProperty(prop))
+    
+    return info
+
 def convertPropertyToWamp(obj, prop):
     #converts the property to a wamp usable form
     

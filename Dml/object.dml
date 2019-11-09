@@ -3,13 +3,13 @@ import "property.dml" as PropertyContainer
 Map {
     .name: "ObjectContainer"
     
-    event onCreated(string, string)                   //name + typeid
-    event onRemoved(string)                           //name
-    event onPropChanged(string, string)               //obj name, property name
-    event onDynamicPropertyCreated(string, string)    //obj name, property name
-    event onDynamicPropertyRemoved(string, string)    //obj name, property name
-    event onExtensionCreated(string, string)          //obj name, extension name
-    event onExtensionRemoved(string, string)          //obj name, extension name
+    event onCreated(string, string)                                                 //name + typeid
+    event onRemoved(string)                                                         //name
+    event onPropChanged(string, string)                                             //obj name, property name
+    event onDynamicPropertyCreated(string, string, string, string, string, string)  //obj name, property name, type, typeid, group, documentation
+    event onDynamicPropertyRemoved(string, string)                                  //obj name, property name
+    event onExtensionCreated(string, string)                                        //obj name, extension name
+    event onExtensionRemoved(string, string)                                        //obj name, extension name
     
     function NewObject(name, typeid) {
     
@@ -24,8 +24,8 @@ Map {
         obj.onChangedProperty.RegisterCallback(function(prop) {
             container.onPropChanged.Emit(name, prop)
         })
-        obj.onCreatedDynamicProperty.RegisterCallback(function(prop) {
-            container.onDynamicPropertyCreated.Emit(name, prop)
+        obj.onCreatedDynamicProperty.RegisterCallback(function(prop, type, typeID, group, documentation) {
+            container.onDynamicPropertyCreated.Emit(name, prop, type, typeID, group, documentation)
         })
         obj.onRemovedDynamicProperty.RegisterCallback(function(prop) {
             container.onDynamicPropertyRemoved.Emit(name, prop)
@@ -55,7 +55,7 @@ Map {
         property string typeid
         
         event onChangedProperty(string)
-        event onCreatedDynamicProperty(string)
+        event onCreatedDynamicProperty(string, string, string, string, string)
         event onRemovedDynamicProperty(string)
         event onCreatedExtension(string)
         event onRemovedExtension(string)
@@ -67,8 +67,8 @@ Map {
                 this.parent.onChangedProperty.Emit(name)
             }
             
-            .onCreatedDynamic: function(name) {
-                this.parent.onCreatedDynamicProperty.Emit(name)
+            .onCreatedDynamic: function(prop, type, typeID, group, documentation) {
+                this.parent.onCreatedDynamicProperty.Emit(prop, type, typeID, group, documentation)
             }
             
             .onRemovedDynamic: function(name) {

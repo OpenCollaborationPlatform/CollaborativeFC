@@ -20,7 +20,7 @@
 import FreeCAD, FreeCADGui, asyncio, os
 
 from Documents.Dataservice      import DataService
-from Documents.Observer         import DocumentObserver, GUIDocumentObserver
+from Documents.Observer         import DocumentObserver, GUIDocumentObserver, ObserverManager
 from Documents.OnlineDocument   import OnlineDocument
 
 import uuid
@@ -191,12 +191,13 @@ class DocumentHandler():
             return 
         
         try:
+            obs = ObserverManager(self.guiObserver, self.observer)
             status = docmap['status']
             if status is "local":
                 dmlpath = os.path.join(self.collab_path, "Dml")
                 res = await self.connection.session.call(u"ocp.documents.create", dmlpath)
                 docmap['id'] = res
-                docmap['onlinedoc'] = OnlineDocument(res, docmap['fcdoc'], self.observer, self.connection, self.dataservice)
+                docmap['onlinedoc'] = OnlineDocument(res, docmap['fcdoc'], obs, self.connection, self.dataservice)
                 await docmap['onlinedoc'].asyncSetup()
                 
             elif status is 'node':
@@ -204,7 +205,7 @@ class DocumentHandler():
                 doc = FreeCAD.newDocument()
                 self.blockObserver = False
                 docmap['fcdoc'] = doc
-                docmap['onlinedoc'] = OnlineDocument(docmap['id'], doc, self.observer, self.connection, self.dataservice)
+                docmap['onlinedoc'] = OnlineDocument(docmap['id'], doc, obs, self.connection, self.dataservice)
                 await docmap['onlinedoc'].asyncLoad() 
                 
             elif status is 'invited':
@@ -213,7 +214,7 @@ class DocumentHandler():
                 doc = FreeCAD.newDocument()
                 self.blockObserver = False
                 docmap['fcdoc'] = doc
-                docmap['onlinedoc'] = OnlineDocument(docmap['id'], doc, self.observer, self.connection, self.dataservice)
+                docmap['onlinedoc'] = OnlineDocument(docmap['id'], doc, obs, self.connection, self.dataservice)
                 await docmap['onlinedoc'].asyncUnload() 
 
             docmap['status'] = "shared"

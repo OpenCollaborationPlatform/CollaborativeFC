@@ -18,6 +18,22 @@
 # ************************************************************************
 
 import asyncio
+import FreeCADGui
+
+class ObserverManager():
+    
+    def __init__(self, uiobs, obs):
+        self.obs = obs 
+        self.uiobs = uiobs 
+        
+    def activateFor(self, doc):       
+        self.obs.activateFor(doc)
+        self.uiobs.activateFor(FreeCADGui.getDocument(doc.Name))        
+        
+    def deactivateFor(self, doc):
+        self.obs.deactivateFor(doc)
+        self.uiobs.deactivateFor(FreeCADGui.getDocument(doc.Name))  
+    
 
 class DocumentObserver():
     
@@ -117,9 +133,13 @@ class DocumentObserver():
             print("Observer new dyn property ( ", obj.Name, ", ", prop, " )")
             
         odoc = self.handler.getOnlineDocument(doc)
-        if odoc and obj.isDerivedFrom("App::DocumentObject"):
+        if not odoc:
+            return
+        if obj.isDerivedFrom("App::DocumentObject"):
             odoc.newDynamicProperty(obj, prop)
-    
+        else:
+            odoc.newViewProviderDynamicProperty(obj, prop)
+            
     
     def slotRemoveDynamicProperty(self, obj, prop):   
         
@@ -131,8 +151,13 @@ class DocumentObserver():
             print("Observer remove dyn property ( ", obj.Name, ", ", prop, " )")
             
         odoc = self.handler.getOnlineDocument(doc)
-        if odoc and obj.isDerivedFrom("App::DocumentObject"):
+        if not odoc:
+            return
+        
+        if obj.isDerivedFrom("App::DocumentObject"):
             odoc.removeDynamicProperty(obj, prop)
+        else:
+            odoc.removeViewProviderDynamicProperty(obj, prop)
 
 
     def slotRecomputedObject(self, obj):
@@ -237,7 +262,7 @@ class GUIDocumentObserver():
             
 
     def slotDeletedObject(self, obj):
-        print("Object deleted")
+        print("Viewprovider deleted")
         pass
         #if obj.Object is not None:
         #    print("viewprovider removed for object ", obj.Object.Name)
@@ -246,7 +271,6 @@ class GUIDocumentObserver():
         
         #we need to check if any document has this vp, as accessing it before 
         #creation crashes freecad
-        print("changed vp called")
         if not self.handler.hasOnlineViewProvider(vp):
             return
         
@@ -254,7 +278,7 @@ class GUIDocumentObserver():
         if self.isDeactivatedFor(doc):
             return
 
-        print("Observer changed viewprovider ( ", vp, ", ", prop, " )")
+        print("Observer changed viewprovider ", prop)
         odoc = self.handler.getOnlineDocument(doc)
         if not odoc:
             return
