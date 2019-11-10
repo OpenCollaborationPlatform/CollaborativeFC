@@ -212,7 +212,16 @@ class OnlineObject(FreeCADOnlineObject):
     
     
     def changeProperty(self, prop):
-        self.changed.add(prop)
+        
+        #if this change touched the object, we are able to wait for the revompute. Otherwise 
+        #no recompute will be triggered and hence the change would not be forwarded. That happens 
+        #f.e. with App::Parts group property on drag n drop. So let's check for it.
+        if "Up-to-date" in self.obj.State:
+            value = Property.convertPropertyToWamp(self.obj, prop)
+            self.runner.runAsync(self._asyncWriteProperty(prop, value))
+            
+        else:
+            self.changed.add(prop)
     
     
     def recompute(self):

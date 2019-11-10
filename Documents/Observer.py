@@ -123,7 +123,7 @@ class DocumentObserver(ObserverBase):
             return
           
         
-        #print("Observer changed document object ( ", obj.Name, ", ", prop, " )")        
+        #print("Observer changed document object ( ", obj.Name, ", ", prop, " ) into state ", obj.State)
         odoc = self.handler.getOnlineDocument(doc)
         if not odoc:
             return
@@ -168,6 +168,7 @@ class DocumentObserver(ObserverBase):
 
 
     def slotRecomputedObject(self, obj):
+        
         #print("Observer recomputed object ", obj.Name)
         
         doc = obj.Document
