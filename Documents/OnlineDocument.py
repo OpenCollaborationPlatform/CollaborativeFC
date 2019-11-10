@@ -36,9 +36,20 @@ class OnlineDocument():
         self.viewproviders = {}
         
         print("new online document created")
-    
+ 
+  
+    def shouldExcludeTypeId(self, typeid):
+        #we do not add App origins, lines and planes, as they are only Autocreated from parts and bodies
+        if typeid in ["App::Origin", "App::Line", "App::Plane"]:
+                return True
+            
+        return False
     
     def newObject(self, obj):
+        
+        if self.shouldExcludeTypeId(obj.TypeId):
+            return
+        
         #create the async runner for that object
         oobj = OnlineObject(obj, self)
         self.objects[obj.Name] = oobj
@@ -46,6 +57,10 @@ class OnlineDocument():
      
      
     def removeObject(self, obj):
+        
+        if self.shouldExcludeTypeId(obj.TypeId):
+            return
+        
         #create the async runner for that object
         oobj = self.objects[obj.Name]
         del(self.objects[obj.Name])
@@ -53,6 +68,10 @@ class OnlineDocument():
         
         
     def changeObject(self, obj, prop):
+        
+        if self.shouldExcludeTypeId(obj.TypeId):
+            return
+        
         if obj.Name not in self.objects:
             return
         
@@ -61,6 +80,10 @@ class OnlineDocument():
     
     
     def newDynamicProperty(self, obj, prop):
+        
+        if self.shouldExcludeTypeId(obj.TypeId):
+            return
+        
         if obj.Name not in self.objects:
             return
         
@@ -69,6 +92,10 @@ class OnlineDocument():
         
         
     def removeDynamicProperty(self, obj, prop):
+        
+        if self.shouldExcludeTypeId(obj.TypeId):
+            return
+        
         if obj.Name not in self.objects:
             return
         
@@ -77,6 +104,10 @@ class OnlineDocument():
 
 
     def recomputObject(self, obj):
+        
+        if self.shouldExcludeTypeId(obj.TypeId):
+            return
+        
         if obj.Name not in self.objects:
             return
         
@@ -96,6 +127,10 @@ class OnlineDocument():
     
     
     def newViewProvider(self, vp):
+        
+        if self.shouldExcludeTypeId(vp.Object.TypeId):
+            return
+        
         #create the async runner for that object
         ovp = OnlineViewProvider(vp, self)
         self.viewproviders[vp.Object.Name] = ovp
@@ -103,6 +138,10 @@ class OnlineDocument():
      
      
     def removeViewProvider(self, vp):
+        
+        if self.shouldExcludeTypeId(vp.Object.TypeId):
+            return
+        
         #create the async runner for that object
         ovp = self.viewproviders[vp.Object.Name]
         del(self.viewproviders[vp.Object.Name])
@@ -110,6 +149,10 @@ class OnlineDocument():
         
         
     def changeViewProvider(self, vp, prop):
+        
+        if self.shouldExcludeTypeId(vp.Object.TypeId):
+            return
+        
         if vp.Object.Name not in self.viewproviders:
             return
         
@@ -118,6 +161,10 @@ class OnlineDocument():
     
     
     def newViewProviderDynamicProperty(self, vp, prop):
+        
+        if self.shouldExcludeTypeId(vp.Object.TypeId):
+            return
+        
         if vp.Object.Name not in self.viewproviders:
             return
         
@@ -126,6 +173,10 @@ class OnlineDocument():
         
         
     def removeViewProviderDynamicProperty(self, vp, prop):
+        
+        if self.shouldExcludeTypeId(vp.Object.TypeId):
+            return
+        
         if vp.Object.Name not in self.viewproviders:
             return
         

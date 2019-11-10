@@ -53,12 +53,27 @@ class OnlineObserver():
         
     async def __newObject(self, name, typeID):
         try:
-            print("New object " + name + " of type " + typeID)
+            #maybe the object exists already (e.g. auto created by annother added object like App::Part Origin)
+            if hasattr(self.onlineDoc.document, name):
+                return
+            
+            #we do not add App origins, lines and planes, as they are only Autocreated from parts and bodie
+            #hence they will be created later then the parent is added
+            if typeID in ["App::Origin", "App::Line", "App::Plane"]:
+                return
+                       
+            #add the object we want
             self.docObserver.deactivateFor(self.onlineDoc.document)
             obj = self.onlineDoc.document.addObject(typeID, name)
-            
             oobj = OnlineObject(obj, self.onlineDoc)
             self.onlineDoc.objects[obj.Name] = oobj
+            
+            #remove the objects we did not want and were created automatically!
+            delObjs = self.docObserver.getInactiveCreatedDocObjects(self.onlineDoc.document)
+            delObjs.remove(name)
+            for remove in delObjs:
+                self.onlineDoc.document.removeObject(remove)
+            
             obj.purgeTouched()
             
         except Exception as e:
@@ -131,7 +146,6 @@ class OnlineObserver():
         
     async def __changeViewProvider(self, name, prop):
         
-        print("OnlineObserver Viewprovider changed: ", prop)
         obj = self.onlineDoc.document.getObject(name)
         if obj is None:
             return
@@ -141,7 +155,6 @@ class OnlineObserver():
     
     async def __createViewProviderDynProperty(self, name, prop, ptype, typeID, group, documentation):
         
-        print("OnlineObserver Viewprovider dyn prop added: ", prop)
         obj = self.onlineDoc.document.getObject(name)
         if obj is None:
             print("Should add dyn property for not existing viewprovider")
@@ -163,7 +176,6 @@ class OnlineObserver():
 
     async def __createViewProviderExtension(self, name, ext):
         
-        print("OnlineObserver Viewprovider extension added: ", ext)
         obj = self.onlineDoc.document.getObject(name)
         if obj is None:
             print("Should create extension for not existing viewprovider")

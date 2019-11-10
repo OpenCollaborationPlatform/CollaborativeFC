@@ -26,27 +26,30 @@ class ObserverManager():
         self.obs = obs 
         self.uiobs = uiobs 
         
+        
     def activateFor(self, doc):       
         self.obs.activateFor(doc)
         self.uiobs.activateFor(FreeCADGui.getDocument(doc.Name))        
+        
         
     def deactivateFor(self, doc):
         self.obs.deactivateFor(doc)
         self.uiobs.deactivateFor(FreeCADGui.getDocument(doc.Name))  
     
-
-class DocumentObserver():
+    
+class ObserverBase():
     
     def __init__(self, handler):
         
         self.handler = handler
         self.inactive = []
 
+
     def activateFor(self, doc):
        
         while doc in self.inactive:
            self.inactive.remove(doc)
-        
+                
         
     def deactivateFor(self, doc):
         
@@ -59,14 +62,20 @@ class DocumentObserver():
             return True 
         
         return False
+    
+    
 
-
+class DocumentObserver(ObserverBase):
+    
+    def __init__(self, handler):
+        super().__init__(handler)
+        
     def slotCreatedDocument(self, doc):
         
         if self.isDeactivatedFor(doc):
             return
         
-        print("Observed new document")
+        #print("Observed new document")
         self.handler.openFCDocument(doc)
         
 
@@ -75,7 +84,7 @@ class DocumentObserver():
         if self.isDeactivatedFor(doc):
             return
         
-        print("Observer close document")
+        #print("Observer close document")
         self.handler.closeFCDocument(doc)
 
 
@@ -89,7 +98,7 @@ class DocumentObserver():
         if self.isDeactivatedFor(doc):
             return
         
-        print("Observer add document object ", obj.Name)  
+        #print("Observer add document object ", obj.Name)  
         odoc = self.handler.getOnlineDocument(doc)
         if odoc:
             odoc.newObject(obj)
@@ -101,7 +110,7 @@ class DocumentObserver():
         if self.isDeactivatedFor(doc):
             return
         
-        print("Observer remove document object ", obj.Name)        
+        #print("Observer remove document object ", obj.Name)        
         odoc = self.handler.getOnlineDocument(doc)
         if odoc:
             odoc.removeObject(obj)
@@ -114,7 +123,7 @@ class DocumentObserver():
             return
           
         
-        print("Observer changed document object ( ", obj.Name, ", ", prop, " )")        
+        #print("Observer changed document object ( ", obj.Name, ", ", prop, " )")        
         odoc = self.handler.getOnlineDocument(doc)
         if not odoc:
             return
@@ -129,8 +138,7 @@ class DocumentObserver():
         if self.isDeactivatedFor(doc):
             return
         
-        if obj.isDerivedFrom("App::DocumentObject"):
-            print("Observer new dyn property ( ", obj.Name, ", ", prop, " )")
+        #print("Observer new dyn property ( ", obj.Name, ", ", prop, " )")
             
         odoc = self.handler.getOnlineDocument(doc)
         if not odoc:
@@ -147,8 +155,7 @@ class DocumentObserver():
         if self.isDeactivatedFor(doc):
             return
         
-        if obj.isDerivedFrom("App::DocumentObject"):
-            print("Observer remove dyn property ( ", obj.Name, ", ", prop, " )")
+        #print("Observer remove dyn property ( ", obj.Name, ", ", prop, " )")
             
         odoc = self.handler.getOnlineDocument(doc)
         if not odoc:
@@ -161,7 +168,7 @@ class DocumentObserver():
 
 
     def slotRecomputedObject(self, obj):
-        print("Observer recomputed object ", obj.Name)
+        #print("Observer recomputed object ", obj.Name)
         
         doc = obj.Document
         if self.isDeactivatedFor(doc):
@@ -208,31 +215,11 @@ class DocumentObserver():
         #pass
 
 
-class GUIDocumentObserver():
+class GUIDocumentObserver(ObserverBase):
     
     def __init__(self, handler):
-        
-        self.handler = handler
-        self.inactive = []
-
-
-    def activateFor(self, doc):
-       
-        while doc in self.inactive:
-           self.inactive.remove(doc)
-        
-        
-    def deactivateFor(self, doc):
-        
-        self.inactive.append(doc)
-        
-        
-    def isDeactivatedFor(self, doc):
-        
-        if doc in self.inactive:
-            return True 
-        
-        return False
+        super().__init__(handler)
+ 
        
     def slotCreatedDocument(self, doc):
         pass
@@ -255,21 +242,21 @@ class GUIDocumentObserver():
         if self.isDeactivatedFor(doc):
             return
         
-        print("Observer add viewprovider object ", vp.Object.Name)  
+        #print("Observer add viewprovider object ", vp.Object.Name)  
         odoc = self.handler.getOnlineDocument(doc)
         if odoc:
             odoc.newViewProvider(vp)
             
 
     def slotDeletedObject(self, obj):
-        print("Viewprovider deleted")
+        #print("Viewprovider deleted")
         pass
         #if obj.Object is not None:
         #    print("viewprovider removed for object ", obj.Object.Name)
 
     def slotChangedObject(self, vp, prop):
         
-        print("Observer changed viewprovider ", prop)
+        #print("Observer changed viewprovider ", prop)
         
         #we need to check if any document has this vp, as accessing it before 
         #creation crashes freecad

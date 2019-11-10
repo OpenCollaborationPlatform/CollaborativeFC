@@ -31,6 +31,7 @@ class FreeCADOnlineObject():
         self.name           = name
         self.objGroup       = objGroup 
 
+
     async def _asyncSetup(self, typeid, values, infos):
         #creates the object in the ocp node
     
@@ -83,6 +84,7 @@ class FreeCADOnlineObject():
         
     async def _asyncWriteProperty(self, prop, value):
         
+        print("Write ", prop, " property ", prop)
         try:
             #value = Property.convertPropertyToWamp(self.obj, prop)
             uri = u"ocp.documents.edit.{0}".format(self.docId)
