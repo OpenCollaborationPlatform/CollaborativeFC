@@ -35,12 +35,14 @@ class OnlineObserver():
             odoc.connection.session.subscribe(self.__removeObject, uri+"Document.Objects.onRemoved")
             odoc.connection.session.subscribe(self.__changeObject, uri+"Document.Objects.onPropChanged")
             odoc.connection.session.subscribe(self.__createObjectDynProperty, uri+"Document.Objects.onDynamicPropertyCreated")
+            odoc.connection.session.subscribe(self.__createObjectDynProperties, uri+"Document.Objects.onDynamicPropertiesCreated")
             odoc.connection.session.subscribe(self.__removeObjectDynProperty, uri+"Document.Objects.onDynamicPropertyRemoved")
             odoc.connection.session.subscribe(self.__createObjextExtension, uri+"Document.Objects.onExtensionCreated")
             odoc.connection.session.subscribe(self.__removeObjextExtension, uri+"Document.Objects.onExtensionRemoved")
             
             odoc.connection.session.subscribe(self.__changeViewProvider, uri+"Document.ViewProviders.onPropChanged")
-            odoc.connection.session.subscribe(self.__createViewProviderDynProperty, uri+"Document.ViewProviders.onDynamicPropertyCreated")
+            odoc.connection.session.subscribe(self.__createViewProviderDynProperty,   uri+"Document.ViewProviders.onDynamicPropertyCreated")
+            odoc.connection.session.subscribe(self.__createViewProviderDynProperties, uri+"Document.ViewProviders.onDynamicPropertiesCreated")
             odoc.connection.session.subscribe(self.__removeViewProviderDynProperty, uri+"Document.ViewProviders.onDynamicPropertyRemoved")
             odoc.connection.session.subscribe(self.__createViewProviderExtension, uri+"Document.ViewProviders.onExtensionCreated")
             odoc.connection.session.subscribe(self.__removeViewProviderExtension, uri+"Document.ViewProviders.onExtensionRemoved")
@@ -67,12 +69,6 @@ class OnlineObserver():
             obj = self.onlineDoc.document.addObject(typeID, name)
             oobj = OnlineObject(obj, self.onlineDoc)
             self.onlineDoc.objects[obj.Name] = oobj
-            
-            #remove the objects we did not want and were created automatically!
-            delObjs = self.docObserver.getInactiveCreatedDocObjects(self.onlineDoc.document)
-            delObjs.remove(name)
-            for remove in delObjs:
-                self.onlineDoc.document.removeObject(remove)
             
             obj.purgeTouched()
             
@@ -105,13 +101,26 @@ class OnlineObserver():
         await self.__readProperty(obj, name, prop)
  
  
-    async def __createObjectDynProperty(self, name, prop, ptype, typeID, group, documentation):
+    def __createObjectDynProperty(self, name, prop, ptype, typeID, group, documentation):
         obj = self.onlineDoc.document.getObject(name)
         if obj is None:
             print("Should add dyn property for not existing object")
             return
         
-        await self.__createDynProperty(obj, name, prop, ptype, typeID, group, documentation)
+        self.__createDynProperty(obj, prop, ptype, typeID, group, documentation)
+        
+    
+    def __createObjectDynProperties(self, name, props, infos):
+        print("Event create properties ", props)
+        obj = self.onlineDoc.document.getObject(name)
+        if obj is None:
+            print("Should add dyn property for not existing object")
+            return
+        
+        for i in range(0, len(props)):
+            info = infos[i]
+            self.__createDynProperty(obj, props[i], info["ptype"], info["typeid"], info["group"], info["docu"])
+        
     
     
     async def __removeObjectDynProperty(self, name, prop):
@@ -153,15 +162,27 @@ class OnlineObserver():
         await self.__readProperty(obj.ViewObject, name, prop)
         
     
-    async def __createViewProviderDynProperty(self, name, prop, ptype, typeID, group, documentation):
+    def __createViewProviderDynProperty(self, name, prop, ptype, typeID, group, documentation):
         
         obj = self.onlineDoc.document.getObject(name)
         if obj is None:
             print("Should add dyn property for not existing viewprovider")
             return
         
-        await self.__createDynProperty(obj.ViewObject, name, prop, ptype, typeID, group, documentation)
+        self.__createDynProperty(obj.ViewObject, prop, ptype, typeID, group, documentation)
     
+    
+    def __createViewProviderDynProperties(self, name, props, infos):
+        print("Event create viewprovider properties ", props)
+        obj = self.onlineDoc.document.getObject(name)
+        if obj is None:
+            print("Should add dyn properties for not existing viewprovider")
+            return
+        
+        for i in range(0, len(props)):
+            info = infos[i]
+            self.__createDynProperty(obj.ViewObject, props[i], info["ptype"], info["typeid"], info["group"], info["docu"])
+            
     
     async def __removeViewProviderDynProperty(self, name, prop):
         
@@ -248,7 +269,7 @@ class OnlineObserver():
                 obj.purgeTouched()
             
     
-    async def __createDynProperty(self, obj, name, prop, ptype, typeID, group, documentation):
+    def __createDynProperty(self, obj, prop, ptype, typeID, group, documentation):
         
         if hasattr(obj, prop):
             return

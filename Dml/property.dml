@@ -2,9 +2,10 @@ Map {
     .name: "PropertyContainer"
     
     //custom event that is triggered on a property change
-    event onChanged(string)
-    event onCreatedDynamic(string, string, string, string, string)
-    event onRemovedDynamic(string)
+    event onChanged
+    event onCreatedDynamic
+    event onMultiCreatedDynamic
+    event onRemovedDynamic
     
     //creates a new property and sets it up correctly. No new property event emitted
     function SetupProperty(name, type, typeID, group, documentation) {
@@ -36,6 +37,23 @@ Map {
         return prop
     }
     
+    function CreateDynamicProperties(names, infos) {
+        
+        for (i=0; i<names.length; i++) {
+            
+            var name = names[i]
+            if (this.Has(name)) {
+                throw "Property " + name + " already exists"
+            }
+            
+            //setup
+            info = infos[i]
+            this.SetupProperty(names[i], info["ptype"], info["typeid"], info["group"], info["docu"])
+        }
+        //inform
+        this.onMultiCreatedDynamic.Emit(names, infos)
+    }
+    
     function RemoveDynamicProperty(name) {
         container.Remove(name)
         this.onRemovedDynamic(name)
@@ -52,7 +70,7 @@ Map {
         property string group
         property string documentation
         
-        event onChanged()
+        event onChanged
         
         Variant {
             .name: "PropertyData"

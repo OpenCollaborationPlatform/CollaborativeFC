@@ -30,6 +30,7 @@ class FreeCADOnlineObject():
         self.runner         = AsyncRunner()
         self.name           = name
         self.objGroup       = objGroup 
+        self.dynPropCache   = {}
 
 
     async def _asyncSetup(self, typeid, values, infos):
@@ -55,7 +56,7 @@ class FreeCADOnlineObject():
         except Exception as e:
             print("Setup error: {0}".format(e))
            
-            
+    
     async def _asyncCreateProperty(self, dyn, prop, info):
         try:            
             if dyn:
@@ -81,6 +82,33 @@ class FreeCADOnlineObject():
         except Exception as e:
             print("Remove property ", prop, " of object ", self.name, " failed: ", e)
         
+    
+    def addDynamicPropertyCreation(self, prop, info):
+        #add property with info to the cache. 
+        self.dynPropCache[prop] = info
+        
+        #if there was no entry before we start a cache processing. If there is something in the cache already
+        #we are sure processing was already startet
+        if len(self.dynPropCache) == 1:
+            #add it to the dyn property creation cache. If it is the first entry we also start the 
+            self.runner.runAsyncAsIntermediateSetup(self._asyncCreateDynamicPropertiesFromCache())
+        
+        
+    async def _asyncCreateDynamicPropertiesFromCache(self):
+        
+        if len(self.dynPropCache) == 0:
+            return
+        
+        props = self.dynPropCache.copy()
+        self.dynPropCache.clear()
+        
+        if len(props) == 1:
+            await self._asyncCreateProperty(True, props.keys()[0], props.values()[0])
+        else:
+            print("Create batched dynamic properties: ", props.keys())
+            uri = u"ocp.documents.edit.{0}.call.Document.{1}.{2}.Properties.CreateDynamicProperties".format(self.docId, self.objGroup, self.name)
+            await self.connection.session.call(uri, list(props.keys()), list(props.values()))
+            
         
     async def _asyncWriteProperty(self, prop, value):
         
@@ -202,9 +230,8 @@ class OnlineObject(FreeCADOnlineObject):
         
     
     def createDynamicProperty(self, prop):
-        info = Property.createPropertyInfo(self.obj, prop)            
-        self.runner.runAsync(self._asyncCreateProperty(True, prop, info))
-        self.changed.add(prop)
+        info = Property.createPropertyInfo(self.obj, prop)        
+        self.addDynamicPropertyCreation(prop, info)
     
     
     def removeDynamicProperty(self, prop):
@@ -286,7 +313,7 @@ class OnlineViewProvider(FreeCADOnlineObject):
     
     def createDynamicProperty(self, prop):
         info = Property.createPropertyInfo(self.obj, prop)        
-        self.runner.runAsyncAsIntermediateSetup(self._asyncCreateProperty(True, prop, info))
+        self.addDynamicPropertyCreation(prop, info)
     
     
     def removeDynamicProperty(self, prop):
