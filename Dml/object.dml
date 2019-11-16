@@ -12,6 +12,8 @@ Map {
     event onExtensionCreated            //obj name, extension name
     event onExtensionRemoved            //obj name, extension name
     
+    event onObjectRecomputed            //obj name
+    
     function NewObject(name, typeid) {
     
         if (this.Has(name)) {
@@ -40,6 +42,9 @@ Map {
         obj.onRemovedExtension.RegisterCallback(function(ext) {
             container.onExtensionRemoved.Emit(name, ext)
         })
+        obj.onRecomputed.RegisterCallback(function() {
+            container.onObjectRecomputed.Emit(name)
+        })
         
         container.onCreated.Emit(name, typeid)
         return obj
@@ -58,12 +63,16 @@ Map {
         
         property string typeid
         
+        //events for communication
         event onChangedProperty
         event onCreatedDynamicProperty
         event onCreatedDynamicProperties
         event onRemovedDynamicProperty
         event onCreatedExtension
         event onRemovedExtension
+        
+        //handling
+        event onRecomputed
         
         PropertyContainer {
             .name: "Properties"

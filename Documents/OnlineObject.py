@@ -278,6 +278,9 @@ class OnlineObject(FreeCADOnlineObject):
             
             if len(tasks) > 0:
                 await asyncio.wait(tasks)
+                
+            uri = u"ocp.documents.edit.{0}.call.Document.Objects.{1}.onRecomputed".format(self.docId, self.name)
+            await self.connection.session.call(uri)
         
         except Exception as e:
             print("Recompute exception: ", e)

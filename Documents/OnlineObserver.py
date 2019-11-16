@@ -39,6 +39,7 @@ class OnlineObserver():
             odoc.connection.session.subscribe(self.__removeObjectDynProperty, uri+"Document.Objects.onDynamicPropertyRemoved")
             odoc.connection.session.subscribe(self.__createObjextExtension, uri+"Document.Objects.onExtensionCreated")
             odoc.connection.session.subscribe(self.__removeObjextExtension, uri+"Document.Objects.onExtensionRemoved")
+            odoc.connection.session.subscribe(self.__objectRecomputed, uri+"Document.Objects.onObjectRecomputed")
             
             odoc.connection.session.subscribe(self.__changeViewProvider, uri+"Document.ViewProviders.onPropChanged")
             odoc.connection.session.subscribe(self.__createViewProviderDynProperty,   uri+"Document.ViewProviders.onDynamicPropertyCreated")
@@ -152,6 +153,21 @@ class OnlineObserver():
         
         await self.__removeExtension(obj, ext)
     
+    
+    def __objectRecomputed(self, name):
+        
+        obj = self.onlineDoc.document.getObject(name)
+        if obj is None:
+            print("Recomputed object does not exist")
+            return
+        
+        #we try to fix some known problems
+        print("object Recomputed was called")
+        if obj.isDerivedFrom("Sketcher::SketchObject"):
+            #we need to reassign geometry to fix the invalid sketch
+            print("geometry is assigned")
+            obj.Geometry = obj.Geometry
+            
         
     async def __changeViewProvider(self, name, prop):
         
@@ -261,7 +277,7 @@ class OnlineObserver():
                 setattr(obj, prop, val)
 
         except Exception as e:
-            print("Read property error: ", e)
+            print("Read property ", prop, "error: ", e)
 
         finally:
             self.docObserver.activateFor(self.onlineDoc.document)
