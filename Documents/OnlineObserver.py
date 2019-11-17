@@ -104,7 +104,7 @@ class OnlineObserver():
         if obj is None:
             return
         
-        self.logger.debug("Object: Change {0} property {0}".format(name, prop))
+        self.logger.debug("Object: Change {0} property {1}".format(name, prop))
         await self.__readProperty(obj, name, prop)
  
  
@@ -172,7 +172,7 @@ class OnlineObserver():
             self.logger.error("Recomputed object {0} does not exist".format(name))
             return
         
-        self.logger.debug("Object: Recompute {1} finished".format(name))
+        self.logger.debug("Object: Recompute {0} finished".format(name))
         
         #we try to fix some known problems
         if obj.isDerivedFrom("Sketcher::SketchObject"):
@@ -186,7 +186,7 @@ class OnlineObserver():
         if obj is None:
             return
         
-        self.logger.debug("ViewProvider: Change {0} property {0}".format(name, prop))
+        self.logger.debug("ViewProvider: Change {0} property {1}".format(name, prop))
         await self.__readProperty(obj.ViewObject, name, prop)
         
     

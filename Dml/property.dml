@@ -64,6 +64,20 @@ Map {
         this.onRemovedDynamic(name)
     }
     
+    function SetValues(props, values) {
+    
+        for (i=0; i<props.length; i++) {
+            
+            var prop = props[i]
+            if (!this.Has(prop)) {
+                throw "Property " + prop + " does not exist"
+            }
+            
+            var obj = this.Get(prop)
+            obj.SetValue(values[i])
+        }
+    }
+    
     .key: string
     .value: Data {
         

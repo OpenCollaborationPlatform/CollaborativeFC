@@ -48,9 +48,20 @@ class FreeCADOnlineObject():
             await self.connection.session.call(uri, list(values.keys()), list(infos.values()))
             
             #write the props if requried
+            batchprops = []
+            batchvalues = []
             tasks = []
             for prop in values:
-                tasks.append(self._asyncWriteProperty(prop, values[prop]))
+                #if byte array we need individual handling, but everything else can be batched
+                if isinstance(values[prop], bytearray):
+                    tasks.append(self._asyncWriteProperty(prop, values[prop]))
+                else:
+                    batchprops.append(prop)
+                    batchvalues.append(values[prop])
+            
+            if len(batchprops) > 0:
+                tasks.append(self._asyncBatchWriteProperties(batchprops, batchvalues))
+                             
             if len(tasks) > 0:
                 await asyncio.wait(tasks)
         
@@ -144,6 +155,17 @@ class FreeCADOnlineObject():
         except Exception as e:
             self.logger.error("Writing property error: {0}".format(e))
    
+   
+    async def _asyncBatchWriteProperties(self, props, values):
+        
+        try:
+            self.logger.debug("Write batch properties {0}".format(props))
+            uri = u"ocp.documents.edit.{0}.call.Document.{1}.{2}.Properties.SetValues".format(self.docId, self.objGroup, self.name)
+            await self.connection.session.call(uri, props, values)
+            
+        except Exception as e:
+            self.logger.error("Writing property batch error: {0}".format(e))
+            
        
     async def _updateExtensions(self, obj):
         #we need to check if the correct set of extensions is known and change it if not
@@ -236,7 +258,7 @@ class OnlineObject(FreeCADOnlineObject):
     
     
     def remove(self):
-        self.runner.runAsyncAsCloseout(self._asyncRemove(self.obj.Name))
+        self.runner.runAsyncAsCloseout(self._asyncRemove())
         
     
     def createDynamicProperty(self, prop):
@@ -284,9 +306,19 @@ class OnlineObject(FreeCADOnlineObject):
                 await self._updateExtensions(self.obj)
             
             #after recompute all changes are commited          
+            batchprops = []
+            batchvalues = []
             tasks = []
             for prop in values:
-                tasks.append(self._asyncWriteProperty(prop, values[prop]))
+                #if byte array we need individual handling, but everything else can be batched
+                if isinstance(values[prop], bytearray):
+                    tasks.append(self._asyncWriteProperty(prop, values[prop]))
+                else:
+                    batchprops.append(prop)
+                    batchvalues.append(values[prop])
+            
+            if len(batchprops) > 0:
+                tasks.append(self._asyncBatchWriteProperties(batchprops, batchvalues))
             
             if len(tasks) > 0:
                 await asyncio.wait(tasks)
@@ -323,7 +355,7 @@ class OnlineViewProvider(FreeCADOnlineObject):
     
     
     def remove(self):
-        self.runner.runAsyncAsCloseout(self._asyncRemove(self.obj.Name))
+        self.runner.runAsyncAsCloseout(self._asyncRemove())
         
     
     def createDynamicProperty(self, prop):
