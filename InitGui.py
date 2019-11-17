@@ -17,11 +17,16 @@
 # *   Suite 330, Boston, MA  02111-1307, USA                             *
 # ************************************************************************
 
+import logging
 from Documents import Handler
 from Interface import Widget
 from Connection import OCPConnection
-
 import FreeCAD, Collaboration, Commands
+
+#handle basic logging first
+logging.basicConfig(level=logging.DEBUG, format="[%(levelname)8s] %(name)25s:   %(message)s")
+logging.getLogger('asyncqt').setLevel(logging.WARNING)
+
 
 #for now use simple global variables!
 dochandler = Handler.DocumentHandler(Collaboration.path_collaboration)

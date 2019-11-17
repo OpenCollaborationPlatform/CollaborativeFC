@@ -17,7 +17,7 @@
 # *   Suite 330, Boston, MA  02111-1307, USA                             *
 # ************************************************************************
 
-import FreeCAD
+import FreeCAD, logging
 from Documents.OnlineObject import OnlineObject
 from autobahn.wamp.types    import CallOptions
 
@@ -27,6 +27,7 @@ class OnlineObserver():
       
         self.docObserver = observer
         self.onlineDoc = odoc
+        self.logger = logging.getLogger("Online observer " + odoc.id[-5:])
         
         try:
             #setup all events we listen on!    
@@ -51,11 +52,13 @@ class OnlineObserver():
             odoc.connection.session.subscribe(self.__changeDocProperty, uri+"Document.Properties.onChangedProperty")
             
         except Exception as e:
-            print("Setup of online observer failed: ", e)
+            self.logger.error("Setup failed: ", e)
         
         
-    async def __newObject(self, name, typeID):
+    def __newObject(self, name, typeID):
         try:
+            self.logger.debug("Object: New {0} ({1})".format(name, typeID))
+            
             #maybe the object exists already (e.g. auto created by annother added object like App::Part Origin)
             if hasattr(self.onlineDoc.document, name):
                 return
@@ -74,20 +77,22 @@ class OnlineObserver():
             obj.purgeTouched()
             
         except Exception as e:
-            print("Add object online callback failed: ", e)
+            self.logger.error("Add object online callback failed: {0}".format(e))
             
         finally:           
             self.docObserver.activateFor(self.onlineDoc.document)
     
     
-    async def __removeObject(self, name):
+    def __removeObject(self, name):
         try:
+            self.logger.debug("Object: Remove {0}".format(name))
+            
             self.docObserver.deactivateFor(self.onlineDoc.document)
             self.onlineDoc.document.removeObject(name)
             del(self.onlineDoc[name])
             
         except Exception as e:
-            print("Remove object online callback failed: ", e)
+            self.logger.error("Remove object online callback failed: {0}".format(e))
             
         finally:           
             self.docObserver.activateFor(self.onlineDoc.document)
@@ -99,73 +104,79 @@ class OnlineObserver():
         if obj is None:
             return
         
+        self.logger.debug("Object: Change {0} property {0}".format(name, prop))
         await self.__readProperty(obj, name, prop)
  
  
     def __createObjectDynProperty(self, name, prop, ptype, typeID, group, documentation):
         obj = self.onlineDoc.document.getObject(name)
         if obj is None:
-            print("Should add dyn property for not existing object")
+            self.logger.error("Should add dynamic property {0} for not existing object {1}".format(prop, name))
             return
         
+        self.logger.debug("Object: Create dynamic property in {0}: {1}".format(name, prop))
         self.__createDynProperty(obj, prop, ptype, typeID, group, documentation)
         
     
     def __createObjectDynProperties(self, name, props, infos):
-        print("Event create properties ", props)
+
         obj = self.onlineDoc.document.getObject(name)
         if obj is None:
-            print("Should add dyn property for not existing object")
+            self.logger.error("Should add dynamic properties for not existing object {1}: {0}".format(props, name))
             return
         
+        self.logger.debug("Object: Create dynamic properties in {0}: {1}".format(name, props))
         for i in range(0, len(props)):
             info = infos[i]
             self.__createDynProperty(obj, props[i], info["ptype"], info["typeid"], info["group"], info["docu"])
         
     
     
-    async def __removeObjectDynProperty(self, name, prop):
+    def __removeObjectDynProperty(self, name, prop):
         
         obj = self.onlineDoc.document.getObject(name)
         if obj is None:
-            print("Should remove dyn property for not existing object")
+            self.logger.error("Should remove dyn property {0} for not existing object {1}".format(prop, name))
             return
         
-        await self.__removeDynProperty(obj, prop)
+        self.logger.debug("Object: Remove dynamic property {0} in {1}".format(prop, name))
+        self.__removeDynProperty(obj, prop)
 
     
-    async def __createObjextExtension(self, name, ext):
+    def __createObjextExtension(self, name, ext):
         
         obj = self.onlineDoc.document.getObject(name)
         if obj is None:
-            print("Should add extension for not existing object")
+            self.logger.error("Should add extension for not existing object")
             return
         
-        await self.__createExtension(obj, ext)
+        self.logger.debug("Object: Add extension {0} to {1}".format(ext, name))
+        self.__createExtension(obj, ext)
     
     
-    async def __removeObjextExtension(self, name, ext):
+    def __removeObjextExtension(self, name, ext):
         
         obj = self.onlineDoc.document.getObject(name)
         if obj is None:
-            print("Should remove extension for not existing object")
+            self.logger.error("Should remove extension {0} for not existing object {1}".format(ext, name))
             return
         
-        await self.__removeExtension(obj, ext)
+        self.logger.debug("Object: Remove extension {0} from {1}".format(ext, name))
+        self.__removeExtension(obj, ext)
     
     
     def __objectRecomputed(self, name):
         
         obj = self.onlineDoc.document.getObject(name)
         if obj is None:
-            print("Recomputed object does not exist")
+            self.logger.error("Recomputed object {0} does not exist".format(name))
             return
         
+        self.logger.debug("Object: Recompute {1} finished".format(name))
+        
         #we try to fix some known problems
-        print("object Recomputed was called")
         if obj.isDerivedFrom("Sketcher::SketchObject"):
             #we need to reassign geometry to fix the invalid sketch
-            print("geometry is assigned")
             obj.Geometry = obj.Geometry
             
         
@@ -175,6 +186,7 @@ class OnlineObserver():
         if obj is None:
             return
         
+        self.logger.debug("ViewProvider: Change {0} property {0}".format(name, prop))
         await self.__readProperty(obj.ViewObject, name, prop)
         
     
@@ -182,56 +194,62 @@ class OnlineObserver():
         
         obj = self.onlineDoc.document.getObject(name)
         if obj is None:
-            print("Should add dyn property for not existing viewprovider")
+            self.logger.error("Should add dynamic property {0} for not existing viewprovider {1}".format(prop, name))
             return
         
+        self.logger.debug("ViewProvider: Change {0} property {0}".format(name, prop))
         self.__createDynProperty(obj.ViewObject, prop, ptype, typeID, group, documentation)
     
     
     def __createViewProviderDynProperties(self, name, props, infos):
-        print("Event create viewprovider properties ", props)
+
         obj = self.onlineDoc.document.getObject(name)
         if obj is None:
-            print("Should add dyn properties for not existing viewprovider")
+            self.logger.error("Should add dyn properties for not existing viewprovider {0}: {1}".format(name, props))
             return
+        
+        self.logger.debug("ViewProvider: Add dynamic properties to {0}: {1}".format(name, props))
         
         for i in range(0, len(props)):
             info = infos[i]
             self.__createDynProperty(obj.ViewObject, props[i], info["ptype"], info["typeid"], info["group"], info["docu"])
             
     
-    async def __removeViewProviderDynProperty(self, name, prop):
+    def __removeViewProviderDynProperty(self, name, prop):
         
         obj = self.onlineDoc.document.getObject(name)
         if obj is None:
-            print("Should remove dyn property for not existing viewprovider")
+            self.logger.error("Should remove dynamic property {0} for not existing viewprovider {1}".format(prop, name))
             return
         
-        await self.__removeDynProperty(obj.ViewObject, prop)
+        self.logger.debug("ViewProvider: Remove dynamic property {0} from {1}".format(prop, name))
+        self.__removeDynProperty(obj.ViewObject, prop)
     
     
 
-    async def __createViewProviderExtension(self, name, ext):
+    def __createViewProviderExtension(self, name, ext):
         
         obj = self.onlineDoc.document.getObject(name)
         if obj is None:
-            print("Should create extension for not existing viewprovider")
+            self.logger.error("Should create extension {0} for not existing viewprovider {1}".format(ext, name))
             return
         
-        await self.__createExtension(obj.ViewObject, ext)
+        self.logger.debug("ViewProvider: Create extension {0} in {1}".format(ext, name))
+        self.__createExtension(obj.ViewObject, ext)
     
     
-    async def __removeViewProviderExtension(self, name, ext):
+    def __removeViewProviderExtension(self, name, ext):
         
         obj = self.onlineDoc.document.getObject(name)
         if obj is None:
-            print("Should remove extension for not existing object")
+            self.logger.error("Should remove extension {0} for not existing object {1}".format(ext, name))
             return
         
-        await self.__removeExtension(obj.ViewObject, ext)
+        self.logger.debug("ViewProvider: Remove extension {0} in {1}".format(ext, name))
+        self.__removeExtension(obj.ViewObject, ext)
 
 
-    async def __changeDocProperty(self, name):
+    def __changeDocProperty(self, name):
         print("Cahnged document property event")
         
 
@@ -277,7 +295,7 @@ class OnlineObserver():
                 setattr(obj, prop, val)
 
         except Exception as e:
-            print("Read property ", prop, "error: ", e)
+            self.logger.error("Read property {0} error: {1}".format(prop, e))
 
         finally:
             self.docObserver.activateFor(self.onlineDoc.document)
@@ -295,7 +313,7 @@ class OnlineObserver():
             obj.addProperty(typeID, prop, group, documentation)
             
         except Exception as e:
-            print("Dyn property adding callback failed: ", e)
+            self.logger.error("Dynamic property adding failed: {0}".format(e))
             
         finally:
             self.docObserver.activateFor(self.onlineDoc.document)
@@ -303,7 +321,7 @@ class OnlineObserver():
                 obj.purgeTouched()
     
     
-    async def __removeDynProperty(self, obj, prop):
+    def __removeDynProperty(self, obj, prop):
         
         if not hasattr(obj, prop):
             return
@@ -321,7 +339,7 @@ class OnlineObserver():
                 obj.purgeTouched()
             
     
-    async def __createExtension(self, obj, ext):
+    def __createExtension(self, obj, ext):
         
         if obj.hasExtension(ext):
             return
@@ -339,7 +357,7 @@ class OnlineObserver():
                 obj.purgeTouched()
     
     
-    async def __removeExtension(self, obj, ext):
+    def __removeExtension(self, obj, ext):
               
         if not obj.hasExtension(ext):
             return

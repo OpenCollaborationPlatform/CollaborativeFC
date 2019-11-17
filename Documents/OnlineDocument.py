@@ -17,7 +17,7 @@
 # *   Suite 330, Boston, MA  02111-1307, USA                             *
 # ************************************************************************
 
-import asyncio
+import asyncio, logging
 import Documents.Property as Property
 from Documents.OnlineObserver import OnlineObserver
 from Documents.OnlineObject import OnlineObject, OnlineViewProvider
@@ -34,8 +34,9 @@ class OnlineDocument():
         self.onlineObs = OnlineObserver(observer, self)
         self.objects = {}
         self.viewproviders = {}
+        self.logger = logging.getLogger("Document " + id[-5:])
         
-        print("new online document created")
+        self.logger.debug("Created")
  
   
     def shouldExcludeTypeId(self, typeid):
@@ -49,6 +50,8 @@ class OnlineDocument():
         
         if self.shouldExcludeTypeId(obj.TypeId):
             return
+        
+        self.logger.debug("New object {0}".format(obj.Name))
         
         #create the async runner for that object
         oobj = OnlineObject(obj, self)
@@ -201,6 +204,6 @@ class OnlineDocument():
             return res.results[0]
         
         except Exception as e:
-            print("Listing peers error: {0}".format(e))
+            self.logger.error("Getting peers error: {0}".format(e))
             return []      
  

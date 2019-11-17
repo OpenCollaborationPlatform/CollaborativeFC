@@ -25,6 +25,21 @@ Map {
         return prop
     }
     
+    function SetupProperties(names, infos) {
+    
+        for (i=0; i<names.length; i++) {
+            
+            var name = names[i]
+            if (this.Has(name)) {
+                throw "Property " + name + " already exists"
+            }
+            
+            //setup
+            var info = infos[i]
+            this.SetupProperty(names[i], info["ptype"], info["typeid"], info["group"], info["docu"])
+        }
+    }
+    
     function CreateDynamicProperty(name, type, typeID, group, documentation) {
         
         if (this.Has(name)) {
@@ -39,18 +54,8 @@ Map {
     
     function CreateDynamicProperties(names, infos) {
         
-        for (i=0; i<names.length; i++) {
-            
-            var name = names[i]
-            if (this.Has(name)) {
-                throw "Property " + name + " already exists"
-            }
-            
-            //setup
-            info = infos[i]
-            this.SetupProperty(names[i], info["ptype"], info["typeid"], info["group"], info["docu"])
-        }
-        //inform
+        //setup and inform
+        this.SetupProperties(names, infos)
         this.onMultiCreatedDynamic.Emit(names, infos)
     }
     
