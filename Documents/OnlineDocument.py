@@ -119,8 +119,6 @@ class OnlineDocument():
     
     
     def hasViewProvider(self, vp):
-        #we are not allowed to access the vp, as it ould be that 
-        #it was not fully created yet and than freecad crashes
         ovps = self.viewproviders.values()
         for ovp in ovps:
             if ovp.obj is vp:
@@ -134,7 +132,7 @@ class OnlineDocument():
         if self.shouldExcludeTypeId(vp.Object.TypeId):
             return
         
-        #create the async runner for that object
+        #create the online view provider for that object
         ovp = OnlineViewProvider(vp, self)
         self.viewproviders[vp.Object.Name] = ovp
         ovp.setup()

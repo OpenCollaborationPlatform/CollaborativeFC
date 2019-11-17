@@ -142,6 +142,8 @@ class FreeCADOnlineObject():
                 #than we need the id of the property where we add the data
                 calluri = uri + u".call.Document.{0}.{1}.Properties.{2}.GetValue".format( self.objGroup, self.name, prop)
                 propid = await self.connection.session.call(calluri)
+                if propid == None or propid == "":
+                    raise Exception("Property {0} does return valid binary data ID".format(prop))
                 
                 #call "SetBinary" for the property
                 await self.connection.session.call(uri + u".rawdata.{0}.SetByBinary".format(propid), self.data.uri, datakey)
@@ -153,7 +155,7 @@ class FreeCADOnlineObject():
                 await self.connection.session.call(uri, value)
         
         except Exception as e:
-            self.logger.error("Writing property error: {0}".format(e))
+            self.logger.error("Writing property error ({1}, {2}): {0}".format(e, self.name, prop))
    
    
     async def _asyncBatchWriteProperties(self, props, values):
@@ -381,6 +383,5 @@ class OnlineViewProvider(FreeCADOnlineObject):
                 self.proxydata = proxydata
                 self.runner.runAsync(self._asyncWriteProperty('Proxy', proxydata))
         
-        print("change view provider property ", prop)
         value = Property.convertPropertyToWamp(self.obj, prop)
         self.runner.runAsync(self._asyncWriteProperty(prop, value))

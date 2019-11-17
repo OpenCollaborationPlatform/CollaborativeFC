@@ -243,22 +243,17 @@ class GUIDocumentObserver(ObserverBase):
         if self.isDeactivatedFor(doc):
             return
         
-        #print("Observer add viewprovider object ", vp.Object.Name)  
         odoc = self.handler.getOnlineDocument(doc)
         if odoc:
             odoc.newViewProvider(vp)
             
 
     def slotDeletedObject(self, obj):
-        #print("Viewprovider deleted")
         pass
-        #if obj.Object is not None:
-        #    print("viewprovider removed for object ", obj.Object.Name)
-
+ 
+ 
     def slotChangedObject(self, vp, prop):
-        
-        #print("Observer changed viewprovider ", prop)
-        
+               
         #we need to check if any document has this vp, as accessing it before 
         #creation crashes freecad
         if not self.handler.hasOnlineViewProvider(vp):

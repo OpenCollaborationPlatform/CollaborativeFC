@@ -18,6 +18,7 @@
 # ************************************************************************
 
 import FreeCAD, logging
+import Documents.Property as Property
 from Documents.OnlineObject import OnlineObject
 from autobahn.wamp.types    import CallOptions
 
@@ -288,11 +289,11 @@ class OnlineObserver():
                 
                 #set it for the property
                 self.docObserver.deactivateFor(self.onlineDoc.document)   
-                obj.restorePropertyContent(prop, dat.data)
+                Property.convertWampToProperty(obj, prop, dat.data)
                 
             else:
                 self.docObserver.deactivateFor(self.onlineDoc.document)
-                setattr(obj, prop, val)
+                Property.convertWampToProperty(obj, prop, val)
 
         except Exception as e:
             self.logger.error("Read property {0} error: {1}".format(prop, e))

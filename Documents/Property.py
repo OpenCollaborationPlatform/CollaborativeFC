@@ -40,7 +40,7 @@ def convertWampToProperty(obj, prop, value):
     #converts the wamp data in usable form and assigns it to the property
     
     typeId = obj.getTypeIdOfProperty(prop)
-    converter = __PropertyFromWamp.get(typeId, __toRaw)
+    converter = __PropertyFromWamp.get(typeId, __fromRaw)
     converter(obj, prop, value)
 
 
@@ -61,8 +61,14 @@ def __toString(obj, prop):
 
 
 def __toRaw(obj, prop):
-    return obj.dumpPropertyContent(prop, Compression=9)
+   return obj.dumpPropertyContent(prop, Compression=9)
 
+def __linkToString(obj, prop):
+    linked = getattr(obj, prop)
+    if not linked:
+        return ""
+    
+    return linked.Name
 
 __PropertyToWamp = {
 "App::PropertyFloat": __toFloat,
@@ -82,7 +88,10 @@ __PropertyToWamp = {
 "App::PropertyBool": __toBool,
 "App::PropertyPath": __toString,
 "App::PropertyString": __toString,
-"App::PropertyUUID": __toString
+"App::PropertyUUID": __toString,
+"App::PropertyLink": __linkToString,
+"App::PropertyLinkChild": __linkToString,
+"App::PropertyLinkGlobal": __linkToString
 }
 
 
@@ -93,6 +102,14 @@ def __fromPOD(obj, prop, value):
 def __fromRaw(obj, prop, value):
     return obj.dumpPropertyContent(prop, Compression=9)
 
+def __fromLinkString(obj, prop, value):
+    if value == "":
+        setattr(obj, prop, None)
+        return
+    
+    doc = obj.Document 
+    linked = doc.getObject(value)
+    setattr(obj, prop, linked)
 
 __PropertyFromWamp = {
 "App::PropertyFloat": __fromPOD,
@@ -112,5 +129,8 @@ __PropertyFromWamp = {
 "App::PropertyBool": __fromPOD,
 "App::PropertyPath": __fromPOD,
 "App::PropertyString": __fromPOD,
-"App::PropertyUUID": __fromPOD
+"App::PropertyUUID": __fromPOD,
+"App::PropertyLink": __fromLinkString,
+"App::PropertyLinkChild": __fromLinkString,
+"App::PropertyLinkGlobal": __fromLinkString
 }
