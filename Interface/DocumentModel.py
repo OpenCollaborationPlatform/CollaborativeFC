@@ -41,13 +41,13 @@ class DocumentModel(QtCore.QAbstractListModel):
 
         if role == QtCore.Qt.DecorationRole:
             docmap = self.dochandler.documents[index.row()]
-            if docmap['status'] is 'shared':
+            if docmap['status'] == 'shared':
                 return QtGui.QColor('green')
-            if docmap['status'] is 'local':
+            if docmap['status'] == 'local':
                 return QtGui.QColor('orange')
-            if docmap['status'] is 'node':
+            if docmap['status'] == 'node':
                 return QtGui.QColor('yellow')
-            if docmap['status'] is 'invited':
+            if docmap['status'] == 'invited':
                 return QtGui.QColor('purple')
             
             return QtGui.QColor('black')

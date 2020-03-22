@@ -78,7 +78,7 @@ class UIWidget(QtGui.QFrame):
             return
         
         indexs = self.ui.DocumentList.selectedIndexes()
-        if len(indexs) is 0:
+        if len(indexs) == 0:
             return
         
         idx = indexs[0].row()

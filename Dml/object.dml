@@ -111,7 +111,7 @@ Map {
             const function Has(name) {
              
                 var length = this.Length()
-                for (i=0; i < length; i++) {
+                for (var i=0; i < length; i++) {
                     if (this.Get(i) == name) {
                         return true
                     }
@@ -121,7 +121,7 @@ Map {
             
             function RemoveByName(name) {
              
-                for (i=0; i < this.Length(); i++) {
+                for (var i=0; i < this.Length(); i++) {
                     if (this.Get(i) == name) {
                         this.Remove(i)
                         return
@@ -129,6 +129,18 @@ Map {
                 }
                 throw "Cannot remove extension: not available"
             }
+            
+
+            //we take part in transactions
+            Transaction {
+                .name: "transaction"
+            }
+        }
+        
+        Transaction {
+            .name: "transaction"
+
+            .onParticipation: function() {this.parent.result.value += "p1"}
         }
     }
 }

@@ -2,10 +2,10 @@ Map {
     .name: "PropertyContainer"
     
     //custom event that is triggered on a property change
-    event onChanged
     event onCreatedDynamic
     event onMultiCreatedDynamic
-    event onRemovedDynamic
+    event onRemovedDynamic 
+    event onChanged
     
     //creates a new property and sets it up correctly. No new property event emitted
     function SetupProperty(name, type, typeID, group, documentation) {
@@ -66,7 +66,7 @@ Map {
     
     function SetValues(props, values) {
     
-        for (i=0; i<props.length; i++) {
+        for (var i=0; i<props.length; i++) {
             
             var prop = props[i]
             if (!this.Has(prop)) {
@@ -97,6 +97,36 @@ Map {
             .onValueChanged: function() {
                 if (this.parent.typeid != "") {
                     this.parent.onChanged.Emit()
+                }
+            }
+            
+            //by default the property type is binary
+            .type:  Raw {
+                        .name: "raw"
+                        
+                        const property object prop: Property
+                        
+                        .onDataChanged: function(cid) {
+                            this.prop.onChanged.Emit()
+                        }
+                        
+                        Transaction {
+                            .name: "trans"
+                            
+                            .onParticipation: function() {
+                                Transaction.Add(this.prop)
+                            }
+                        }
+                    }
+                    
+            Transaction {
+                .name: "trans"
+                
+                //when added to transaction the Raw object needs to be added too
+                .onParticipation: function() {                    
+                    if (this.parent.type.IsComplex()) {
+                        Transaction.Add(this.parent.type)
+                    }
                 }
             }
         }
@@ -139,14 +169,6 @@ Map {
                 case "App::PropertyUUID":
                     this.PropertyData.type = DataType("string")
                     break  
-                    
-                default:
-                    var prop = this
-                    prop.PropertyData.type = DataType("Raw{}")
-                    var raw = prop.PropertyData.GetValue()
-                    raw.onDataChanged.RegisterCallback(function(cid) {
-                        prop.onChanged.Emit()
-                    })
             }
             
             //do this after assigning the variant as we use this as indicator for 
@@ -178,6 +200,36 @@ Map {
             }
 
             return dict
+        }
+        
+        Transaction {
+            .name: "trans"
+            
+            //when added to transaction the data object needs to be added too
+            .onParticipation: function() {                    
+                Transaction.Add(this.parent.PropertyData)
+            }
+        }
+    }
+    
+    //we take part in transactions
+    Transaction {
+        .name: "transaction"
+      
+        //make sure all properties are added to the same transaction as this container
+        function DependendObjects() {
+            
+            var keys = this.parent.Keys()
+            var result = []
+            for(var i=0; i<keys.length; i++) {
+                var prop = this.parent.Get(keys[i])
+                result.push(prop)
+                
+                if (prop.IsBinary()) {
+                    result.push(prop.GetValue())
+                }                
+            }
+            return result
         }
     }
 }

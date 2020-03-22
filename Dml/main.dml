@@ -14,22 +14,82 @@ Data {
     
     ObjectContainer {
         .name: "ViewProviders"
-    }
+    }    
     
-    /*
     Graph {
         .name: "DAG"
         .node: string
         .edge: none
         .directed: true
-    }
-     
-    //sets the outlist of a document object
-    function SetObjectOutlist(obj, list) {
         
+        //sets the FreeCAD outlist of a document object
+        function SetObjectOutList(obj, list) {
+            
+            //the FreeCAD outlist gives us the graph children. For dependencies the object depends
+            //on the out list objects. Hence in our graph we add edges from outlist object to obj.
+            
+            //remove all edges that are currently there but not in the list
+            var edges = this.ToNode(obj)
+            var remove = this.subtract(edges, list)
+            for(var i=0; i<remove.length; i++) {
+                this.RemoveEdgeBetween(remove[i], obj)
+            }
+            
+            //add all edges that are in the list but not available
+            var add = this.subtract(list, edges)
+            for(var i=0; i<add.length; i++) {
+                this.AddEdgeBetween(add[i], obj)
+            }
+        }
+        
+        //returns all objects, that depend on the given one
+        function GetDependentObjects(obj) {
+            
+            //we traverse the graph ourself, as not all objects in the graph are relevant
+            //for the dependencies, like Groups or Parts
+            var reachable = this.FromNode(obj)
+            var dependend = []
+            for(var i=0; i<reachable.length; i++) {
+                var type = this.parent.Objects.Get(reachable[i]).typeid
+                if (type == "App::Group" ||
+                    type == "App::Part") {
+                    continue
+                }
+                dependend.push(reachable[i])
+            }
+            
+            //now get all dependencies of the dependencies
+            result = dependend.slice()
+            for(var i=0; i<dependend.length; i++) {
+                var deps = this.GetDependentObjects(dependend[i])
+                result.concat(deps)
+            }
+            
+            return result
+        }
+        
+        //gets the FreeCAD outlist of a document object
+        function GetObjectOutlist(name) {
+            return this.ToNode(name)
+        }
+        
+        //gets the FreeCAD inlist of a document object
+        function GetObjectInlist(name) {
+            return this.FromNode(name)
+        }
+        
+        //helper function: return the first array without elements from the second
+        function subtract(base, remove) {
+
+            for( var i=base.length - 1; i>=0; i--){
+                
+                for( var j=0; j<remove.length; j++){
+                    
+                    if(base[i] && (base[i] === remove[j])){
+                        base.splice(i, 1);
+                    }
+                }
+            }
+        }
     }
-    
-    function GetObjectOutlist(name) {
-        return this.DAG.FromNode(name)
-    }*/
 }

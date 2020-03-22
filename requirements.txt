@@ -1,3 +1,4 @@
 quamash
 msgpack
 autobahn[serialization]
+asyncqt

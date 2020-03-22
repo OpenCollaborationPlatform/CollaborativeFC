@@ -159,7 +159,7 @@ class DocumentHandler():
             return 
         
         try:
-            if docmap['status'] is 'shared':
+            if docmap['status'] == 'shared':
                 await docmap['onlinedoc'].asyncUnload()
                 await self.connection.session.call(u"ocp.documents.close", docmap['id'])
             
@@ -174,7 +174,7 @@ class DocumentHandler():
         docmap = self.getDocMap('fcdoc', doc)
         self.documents.remove(docmap)
         try:
-            if docmap['status'] is 'shared':
+            if docmap['status'] == 'shared':
                 await docmap['onlinedoc'].asyncUnload()
                 await self.connection.session.call(u"ocp.documents.close", docmap['id'])
         
@@ -193,14 +193,14 @@ class DocumentHandler():
         try:
             obs = ObserverManager(self.guiObserver, self.observer)
             status = docmap['status']
-            if status is "local":
+            if status == "local":
                 dmlpath = os.path.join(self.collab_path, "Dml")
                 res = await self.connection.session.call(u"ocp.documents.create", dmlpath)
                 docmap['id'] = res
                 docmap['onlinedoc'] = OnlineDocument(res, docmap['fcdoc'], obs, self.connection, self.dataservice)
                 await docmap['onlinedoc'].asyncSetup()
                 
-            elif status is 'node':
+            elif status == 'node':
                 self.blockObserver = True
                 doc = FreeCAD.newDocument()
                 self.blockObserver = False
@@ -208,7 +208,7 @@ class DocumentHandler():
                 docmap['onlinedoc'] = OnlineDocument(docmap['id'], doc, obs, self.connection, self.dataservice)
                 await docmap['onlinedoc'].asyncLoad() 
                 
-            elif status is 'invited':
+            elif status == 'invited':
                 await self.connection.session.call(u"ocp.documents.open", docmap['id'])
                 self.blockObserver = True
                 doc = FreeCAD.newDocument()

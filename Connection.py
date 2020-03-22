@@ -18,7 +18,7 @@
 # ************************************************************************
 
 
-import asyncio, subprocess
+import asyncio, subprocess, os
 from autobahn.asyncio.wamp import ApplicationSession, ApplicationRunner
 from autobahn.wamp.serializer import MsgPackSerializer
 from asyncqt import QEventLoop
@@ -28,24 +28,61 @@ from PySide import QtCore
 class OCPNode():
     
     def __init__(self):
-        #initialize the ocp node!
         self.ocp = '/home/stefan/Projects/Go/CollaborationNode/CollaborationNode'
+        self.test = False
+        
+        #for testing we need to connect to a dedicated node       
+        if os.getenv('OCP_TEST_RUN', "0") == "1":
+            #we are in testing mode! check out the required node to connect to
+            self.test = True
+            self.conf = os.getenv("OCP_TEST_NODE_CONFIG", "none")
+            
+            if self.conf == "none":
+                raise("Testmode is set, but no config file name provided")
 
     def init(self):
+
+        if self.test:
+            #no initialisation needed in test run!
+            print("Test mode: no initialization required")
+            return
+            
         subprocess.call([self.ocp, 'init'])
 
+
     def port(self):
-        output = subprocess.check_output([self.ocp, 'config', 'connection.port'])
+        
+        args = [self.ocp, 'config', 'connection.port']
+        if self.test:
+            args.append("--config")
+            args.append(self.conf)
+            
+        output = subprocess.check_output(args)
         port = output.decode('ascii').replace('\n', "") 
         return port
+    
       
     def uri(self):
-        output = subprocess.check_output([self.ocp, 'config', 'connection.uri'])
+        
+        args = [self.ocp, 'config', 'connection.uri']
+        if self.test:
+            args.append("--config")
+            args.append(self.conf)
+            
+        output = subprocess.check_output(args)
         uri = output.decode('ascii').replace('\n', "") 
         return uri 
     
+    
     def start(self):
-        output = subprocess.check_output([self.ocp])
+        
+        if self.test:
+            #in test mode we do not start our own node!
+            print("Test mode: no own node startup!")
+            return
+        
+        args = [self.ocp]
+        output = subprocess.check_output(args)
         if len(output.decode('ascii').split('\n')) < 3:
             subprocess.Popen([self.ocp, 'start'])
             
