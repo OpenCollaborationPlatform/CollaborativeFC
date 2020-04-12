@@ -34,6 +34,7 @@ class OCPNode():
         #for testing we need to connect to a dedicated node       
         if os.getenv('OCP_TEST_RUN', "0") == "1":
             #we are in testing mode! check out the required node to connect to
+            print("OCP test mode detected")
             self.test = True
             self.conf = os.getenv("OCP_TEST_NODE_CONFIG", "none")
             
@@ -52,7 +53,7 @@ class OCPNode():
 
     def port(self):
         
-        args = [self.ocp, 'config', 'connection.port']
+        args = [self.ocp, 'config', '-o', 'connection.port']
         if self.test:
             args.append("--config")
             args.append(self.conf)
@@ -64,7 +65,7 @@ class OCPNode():
       
     def uri(self):
         
-        args = [self.ocp, 'config', 'connection.uri']
+        args = [self.ocp, 'config', '-o', 'connection.uri']
         if self.test:
             args.append("--config")
             args.append(self.conf)
@@ -105,6 +106,22 @@ class OCPSession(ApplicationSession):
     def onDisconnect(self):
         self.parent.onLeave()
         print("We have disconnected")
+        
+        
+#The wamp session for the connection to the OCP node
+class OCPTestSession(ApplicationSession):
+
+    def __init__(self, cfg):
+        super().__init__(cfg)
+
+
+    async def onJoin(self, details):
+        print("Connection to test server established")
+
+
+    def onDisconnect(self):
+        print("Connection to test server lost")
+        
 
 #Class to handle all connection matters to the ocp node
 # must be provided all components that need to use this connection
@@ -125,11 +142,22 @@ class OCPConnection():
         self.node.setup()
         
         #make the connection!
-        uri = "ws://" + self.node.uri() + ":" + self.node.port() + "/ws"
-        msgpack = MsgPackSerializer()
-        self.runner = ApplicationRunner(uri, "ocp", extra={'parent': self}, serializers=[msgpack])
-        coro = self.runner.run(OCPSession, start_loop=False)
-        asyncio.get_event_loop().run_until_complete(coro)
+        try:
+            uri = "ws://" + self.node.uri() + ":" + self.node.port() + "/ws"
+            msgpack = MsgPackSerializer()
+            self.runner = ApplicationRunner(uri, "ocp", extra={'parent': self}, serializers=[msgpack])
+            coro = self.runner.run(OCPSession, start_loop=False)
+            asyncio.get_event_loop().run_until_complete(coro)
+            
+            if os.getenv('OCP_TEST_RUN', "0") == "1":
+                uri = os.getenv('OCP_TEST_SERVER_URI', '')
+                self.runner = ApplicationRunner(uri, "ocptest")
+                coro = self.runner.run(OCPTestSession, start_loop=False)
+                asyncio.get_event_loop().run_until_complete(coro)
+            
+        except Exception as e:
+            print("Unable to connect to OCP network: " + str(e))
+
         
     def onJoin(self):
         #startup all relevant components
