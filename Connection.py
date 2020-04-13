@@ -18,8 +18,8 @@
 # ************************************************************************
 
 
-import asyncio, subprocess, os
-from autobahn.asyncio.wamp import ApplicationSession, ApplicationRunner
+import asyncio, txaio, subprocess, os
+from autobahn.asyncio.component import Component
 from autobahn.wamp.serializer import MsgPackSerializer
 from asyncqt import QEventLoop
 from PySide import QtCore
@@ -41,87 +41,101 @@ class OCPNode():
             if self.conf == "none":
                 raise("Testmode is set, but no config file name provided")
 
-    def init(self):
+    async def init(self):
 
         if self.test:
             #no initialisation needed in test run!
             print("Test mode: no initialization required")
             return
-            
-        subprocess.call([self.ocp, 'init'])
-
-
-    def port(self):
         
-        args = [self.ocp, 'config', '-o', 'connection.port']
-        if self.test:
-            args.append("--config")
-            args.append(self.conf)
+        #check if init is required
+        process = await asyncio.create_subprocess_shell(self.ocp, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+        out, err = await process.communicate()
+        
+        if not out:
+            raise Exception("Unable to call OCP network")
+        
+        if "OCP directory not configured" in out.decode():
+        
+            process = await asyncio.create_subprocess_shell(self.ocp + ' init', stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+            out, err = await process.communicate()
+        
+            if not out:
+                raise Exception("Unable to call OCP network")
+        
+            if err and err.decode() != "":
+                raise Exception("Unable to initialize OCP node:", err.decode())
             
-        output = subprocess.check_output(args)
-        port = output.decode('ascii').replace('\n', "") 
-        return port
+            if "Node directory was initialized" not in out.decode():
+                raise Exception("Unable to initialize OCP node:", out.decode())
+
+
+    async def port(self):
+        
+        args = self.ocp + ' config -o connection.port'
+        if self.test:
+            args += " --config " + self.conf
+         
+        process = await asyncio.create_subprocess_shell(args, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+        out, err = await process.communicate()
+        
+        if not out:
+            raise Exception("Unable to call OCP network")
+        
+        if err and err.decode() != "":
+            raise Exception("Unable to get Port from OCP node:", err.decode())
+        
+        if "No node is currently running" in out.decode():
+            raise Exception("No node running: cannot read port")
+
+        return out.decode().rstrip()
     
       
-    def uri(self):
+    async def uri(self):
         
-        args = [self.ocp, 'config', '-o', 'connection.uri']
+        args = self.ocp + ' config -o connection.uri'
         if self.test:
-            args.append("--config")
-            args.append(self.conf)
+            args += " --config " + self.conf
             
-        output = subprocess.check_output(args)
-        uri = output.decode('ascii').replace('\n', "") 
-        return uri 
+        process = await asyncio.create_subprocess_shell(args, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+        out, err = await process.communicate()
+        
+        if not out:
+            raise Exception("Unable to call OCP network")
+        
+        if err and err.decode() != "":
+            raise Exception("Unable to get URI from OCP node:", err.decode())
+        
+        if "No node is currently running" in out.decode():
+            raise Exception("No node running: cannot read port")
+                            
+        return out.decode().rstrip()
     
     
-    def start(self):
+    async def start(self):
         
         if self.test:
             #in test mode we do not start our own node!
             print("Test mode: no own node startup!")
             return
         
-        args = [self.ocp]
-        output = subprocess.check_output(args)
-        if len(output.decode('ascii').split('\n')) < 3:
-            subprocess.Popen([self.ocp, 'start'])
+        process = await asyncio.create_subprocess_shell(self.ocp, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+        out, err = await process.communicate()
+        
+        if not out:
+            raise Exception("Unable to call OCP network")
+        
+        if err and err.decode() != "":
+            raise Exception("Unable to start OCP node:", err.decode())
+        
+        if "No node is currently running" in out.decode():
+            await asyncio.create_subprocess_shell(self.ocp, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
             
-    def setup(self):
-        self.init()
-        self.start()
 
-#The wamp session for the connection to the OCP node
-class OCPSession(ApplicationSession):
-
-    def __init__(self, cfg):
-        super().__init__(cfg)
-        self.parent = cfg.extra['parent']
-        self.parent.session = self
-
-    async def onJoin(self, details):
-        self.parent.onJoin()
-        print("We have joined, yeahh!")
-
-    def onDisconnect(self):
-        self.parent.onLeave()
-        print("We have disconnected")
-        
-        
-#The wamp session for the connection to the OCP node
-class OCPTestSession(ApplicationSession):
-
-    def __init__(self, cfg):
-        super().__init__(cfg)
-
-
-    async def onJoin(self, details):
-        print("Connection to test server established")
-
-
-    def onDisconnect(self):
-        print("Connection to test server lost")
-        
+    async def setup(self):
+        await self.init()
+        await self.start()
+      
 
 #Class to handle all connection matters to the ocp node
 # must be provided all components that need to use this connection
@@ -136,35 +150,57 @@ class OCPConnection():
         #make sure asyncio and qt work together
         app = QtCore.QCoreApplication.instance()
         loop = QEventLoop(app)
-        asyncio.set_event_loop(loop)
-        
+        txaio.config.loop = loop
+        asyncio.set_event_loop(loop)       
+        asyncio.ensure_future(self._startup())
+   
+   
+    async def _startup(self):
+
         #setup the node
-        self.node.setup()
+        await self.node.setup()
+        print("Node setup done!")
         
-        #make the connection!
-        try:
-            uri = "ws://" + self.node.uri() + ":" + self.node.port() + "/ws"
-            msgpack = MsgPackSerializer()
-            self.runner = ApplicationRunner(uri, "ocp", extra={'parent': self}, serializers=[msgpack])
-            coro = self.runner.run(OCPSession, start_loop=False)
-            asyncio.get_event_loop().run_until_complete(coro)
+        #make the OCP node connection!            
+        uri = "ws://" + await self.node.uri() + ":" + await self.node.port() + "/ws"          
+        self.wamp = Component(transports=uri, realm = "ocp")
+        self.wamp.on('join', self.onJoin)
+        self.wamp.on('leave', self.onLeave)
+
+        coros = [self.wamp.start()]
             
-            if os.getenv('OCP_TEST_RUN', "0") == "1":
-                uri = os.getenv('OCP_TEST_SERVER_URI', '')
-                self.runner = ApplicationRunner(uri, "ocptest")
-                coro = self.runner.run(OCPTestSession, start_loop=False)
-                asyncio.get_event_loop().run_until_complete(coro)
-            
-        except Exception as e:
-            print("Unable to connect to OCP network: " + str(e))
+        if os.getenv('OCP_TEST_RUN', "0") == "1":
+            uri = os.getenv('OCP_TEST_SERVER_URI', '')
+            self.test = Component(transports=uri, realm = "ocptest")
+            self.test.on('join', self.testOnJoin)
+            self.test.on('leave', self.testOnLeave)
+            coros.append(self.test.start())
+
+        #blocks till all wamp handling is finsihed
+        await asyncio.wait(coros)
 
         
-    def onJoin(self):
+        
+    async def onJoin(self, session, details):
+        print("Connection to OCP node established")
+        self.session = session
         #startup all relevant components
         for comp in self.components:
             comp.setConnection(self)
             
-    def onLeave(self):
-        #startup all relevant components
+            
+    async def onLeave(self, session, reason):
+        print("Connection to OCP node lost: ", reason)
+        #stop all relevant components
         for comp in self.components:
             comp.removeConnection()
+            
+            
+    async def testOnJoin(self, session, details):
+        print("Connection to OCP test server established")
+        self.testSession = session
+            
+            
+    async def testOnLeave(self, session, reason):
+        print("Connection to OCP test server lost: ", reason)
+ 
