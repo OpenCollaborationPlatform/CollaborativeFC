@@ -50,17 +50,22 @@ class UIWidget(QtGui.QFrame):
         self.ui.DocumentList.activated.connect(self.onSelectionChanged)
         self.ui.Collaborate.toggled.connect(self.onShared)
 
-    def setConnection(self, con):
+
+    #component API
+    async def setConnection(self, con):
         self.connection = con
         self.ui.DocumentList.setModel(self.model)
         self.model.layoutChanged.emit
-        
-    def removeConnection(self):
+    
+    
+    #component API
+    async def removeConnection(self):
         self.connection = None
         self.model = None
         model = QtCore.QStringListModel()
         model.setStringList([])
         self.ui.DocumentList.setModel(model)
+        
 
     def show(self):
         #try to find the correct position for the popup

@@ -17,11 +17,11 @@
 # *   Suite 330, Boston, MA  02111-1307, USA                             *
 # ************************************************************************
 
-import logging, txaio
+import logging, txaio, os
 from Documents import Handler
 from Interface import Widget
 from Connection import OCPConnection
-import FreeCAD, Collaboration, Commands
+import FreeCAD, Collaboration, Commands, Test
 
 #handle basic logging first
 logging.basicConfig(level=logging.DEBUG, format="[%(levelname)8s] %(name)25s:   %(message)s")
@@ -32,6 +32,10 @@ txaio.start_logging(level='error')
 dochandler = Handler.DocumentHandler(Collaboration.path_collaboration)
 widget     = Widget.UIWidget(dochandler)
 connection = OCPConnection(dochandler, widget)
+
+if os.getenv('OCP_TEST_RUN', "0") == "1":
+    tester = Test.Handler(dochandler)
+    
 
 if FreeCAD.GuiUp:
     import FreeCADGui

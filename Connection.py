@@ -18,11 +18,11 @@
 # ************************************************************************
 
 
-import asyncio, txaio, subprocess, os
+import asyncio, txaio, os
 from autobahn.asyncio.component import Component
-from autobahn.wamp.serializer import MsgPackSerializer
 from asyncqt import QEventLoop
 from PySide import QtCore
+
 
 #Helper class to call the running node via CLI
 class OCPNode():
@@ -123,13 +123,41 @@ class OCPNode():
         out, err = await process.communicate()
         
         if not out:
-            raise Exception("Unable to call OCP network")
+            raise Exception("Unable to run OCP network node")
         
         if err and err.decode() != "":
             raise Exception("Unable to start OCP node:", err.decode())
         
+        await asyncio.sleep(1)
         if "No node is currently running" in out.decode():
-            await asyncio.create_subprocess_shell(self.ocp, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+            
+            #start it
+            process = await asyncio.create_subprocess_exec(self.ocp, *["start"], 
+                                                            stdout=asyncio.subprocess.PIPE, 
+                                                            stderr=asyncio.subprocess.PIPE)
+            
+            #and wait till setup fully
+            try:
+                async def indicator(process, text):
+                    while True:
+                        try:
+                            data = await asyncio.wait_for(process.stdout.readline(), timeout=0.5)
+                        except asyncio.TimeoutError:
+                            continue
+                        
+                        line = data.decode('ascii').rstrip()
+                        if line != "":
+                            text.append(line)
+                            
+                        if "OCP node ready" in line:
+                            return
+            
+                text = []
+                await asyncio.wait_for(indicator(process, text), timeout = 10)
+                
+            except asyncio.TimeoutError as e:
+                raise Exception("OCP node startup timed out: ", text) from None
+            
             
 
     async def setup(self):
@@ -138,7 +166,7 @@ class OCPNode():
       
 
 #Class to handle all connection matters to the ocp node
-# must be provided all components that need to use this connection
+#must be provided all components that need to use this connection
 class OCPConnection():
         
     def __init__(self, *argv):
@@ -150,8 +178,10 @@ class OCPConnection():
         #make sure asyncio and qt work together
         app = QtCore.QCoreApplication.instance()
         loop = QEventLoop(app)
-        txaio.config.loop = loop
+        txaio.config.loop = loop #workaround as component.start(loop=) does not propagate the loop correctly
         asyncio.set_event_loop(loop)       
+        
+        #run the conenction asyncronously but not blocking
         asyncio.ensure_future(self._startup())
    
    
@@ -167,18 +197,8 @@ class OCPConnection():
         self.wamp.on('join', self.onJoin)
         self.wamp.on('leave', self.onLeave)
 
-        coros = [self.wamp.start()]
-            
-        if os.getenv('OCP_TEST_RUN', "0") == "1":
-            uri = os.getenv('OCP_TEST_SERVER_URI', '')
-            self.test = Component(transports=uri, realm = "ocptest")
-            self.test.on('join', self.testOnJoin)
-            self.test.on('leave', self.testOnLeave)
-            coros.append(self.test.start())
-
         #blocks till all wamp handling is finsihed
-        await asyncio.wait(coros)
-
+        await self.wamp.start()
         
         
     async def onJoin(self, session, details):
@@ -186,14 +206,15 @@ class OCPConnection():
         self.session = session
         #startup all relevant components
         for comp in self.components:
-            comp.setConnection(self)
+            await comp.setConnection(self)
             
             
     async def onLeave(self, session, reason):
         print("Connection to OCP node lost: ", reason)
+        self.session = None
         #stop all relevant components
         for comp in self.components:
-            comp.removeConnection()
+            await comp.removeConnection()
             
             
     async def testOnJoin(self, session, details):
@@ -203,4 +224,5 @@ class OCPConnection():
             
     async def testOnLeave(self, session, reason):
         print("Connection to OCP test server lost: ", reason)
+        self.testSession = None
  

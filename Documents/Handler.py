@@ -49,19 +49,41 @@ class DocumentHandler():
         FreeCAD.addDocumentObserver(self.observer)
         FreeCADGui.addDocumentObserver(self.guiObserver)
     
-    def setConnection(self, con):
+    #component API
+    async def setConnection(self, con):
         self.connection = con
         self.dataservice = DataService(self.uuid, con)
         #TODO check all local documents available, as this may be startet after the user opened documents in freecad     
-        
-        #lets initialize the async stuff!
-        asyncio.ensure_future(self.asyncInit())
-        
-    def removeConnection(self):
+              
+        try:
+            #we register ourself for some key events
+            await self.connection.session.subscribe(self.asyncOnDocumentOpened, u"ocp.documents.opened")
+            await self.connection.session.subscribe(self.asyncOnDocumentClosed, u"ocp.documents.closed")
+            await self.connection.session.subscribe(self.asyncOnDocumentInvited, u"ocp.documents.invited")
+
+            res = await self.connection.session.call(u"ocp.documents.list")
+            if res == None:
+                doclist = []
+            elif type(res) == str:
+                doclist = [res]
+            elif type(res) == CallResult:
+                doclist = res.results
+            
+            for doc in doclist:
+                docmap = {"id": doc, "status": "node", "onlinedoc": None, "fcdoc": None}
+                self.documents.append(docmap)
+            
+            self.update()
+            
+        except Exception as e:
+            print("Document Handöer connection init error: {0}".format(e))
+      
+    #component API
+    async def removeConnection(self):
         self.connection = None
         self.dataservice = None
         self.documents = {}
-       
+        
 
     def closeFCDocument(self, doc):
         if not self.connection:
@@ -125,34 +147,7 @@ class DocumentHandler():
         
         return False
        
-    async def asyncInit(self):
-        #get a list of open documents of the node and add them to the list
-        if not self.connection:
-            return 
-        
-        try:
-            #we register ourself for some key events
-            await self.connection.session.subscribe(self.asyncOnDocumentOpened, u"ocp.documents.opened")
-            await self.connection.session.subscribe(self.asyncOnDocumentClosed, u"ocp.documents.closed")
-            await self.connection.session.subscribe(self.asyncOnDocumentInvited, u"ocp.documents.invited")
 
-            res = await self.connection.session.call(u"ocp.documents.list")
-            if res == None:
-                doclist = []
-            elif type(res) == str:
-                doclist = [res]
-            elif type(res) == CallResult:
-                doclist = res.results
-            
-            for doc in doclist:
-                docmap = {"id": doc, "status": "node", "onlinedoc": None, "fcdoc": None}
-                self.documents.append(docmap)
-            
-            self.update()
-            
-        except Exception as e:
-            print("Async init error: {0}".format(e))
-    
     async def asyncStopCollaborateOnDoc(self, docmap):
         
         if not self.connection:
