@@ -100,7 +100,7 @@ def __fromPOD(obj, prop, value):
 
 
 def __fromRaw(obj, prop, value):
-    return obj.dumpPropertyContent(prop, Compression=9)
+    return obj.restorePropertyContent(prop, value)
 
 def __fromLinkString(obj, prop, value):
     if value == "":

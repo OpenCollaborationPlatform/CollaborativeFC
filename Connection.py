@@ -132,7 +132,7 @@ class OCPNode():
         if "No node is currently running" in out.decode():
             
             #start it
-            process = await asyncio.create_subprocess_exec(self.ocp, *["start"], 
+            process = await asyncio.create_subprocess_shell(self.ocp + " start -d", 
                                                             stdout=asyncio.subprocess.PIPE, 
                                                             stderr=asyncio.subprocess.PIPE)
             
