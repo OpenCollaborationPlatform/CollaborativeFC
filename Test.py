@@ -20,6 +20,8 @@
 import asyncio, os
 from autobahn.asyncio.component import Component
 
+import FreeCAD, FreeCADGui
+
 class Handler():
     
     def __init__(self, dochandler):
@@ -43,6 +45,8 @@ class Handler():
     
     
     async def onJoin(self, session, details):
+        #litte remark that we joined (needed for test executable, it waits for this)
+        FreeCAD.Console.PrintMessage("Connection to OCP test server established\n")
         
         #get all the testing functions in this class!
         methods = [func for func in dir(self) if callable(getattr(self, func))]
@@ -55,18 +59,41 @@ class Handler():
         
         for rpc in rpcs:
             rpc_uri = uri + "." + rpc[len('_rpc'):]
-            session.register(getattr(self, rpc), uri)
+            await session.register(getattr(self, rpc), rpc_uri)
     
+        #inform test framework that we are set up!
+        print("trigger event: ", uri)
+        try:
+            await session.call("ocp.test.triggerEvent", uri, True)
+        except Exception as e:
+            print("Exception in event call: ", str(e))
+        
     
     async def onLeave(self, session, reason):
-        pass
+        #inform test framework that we are not here anymore!
+        await session.call("ocp.test.triggerEvent", os.getenv('OCP_TEST_RPC_ADDRESS', ''), False)
 
-
-    async def _rpcNewSharedDocument(self):
+    
+    async def _rpcShareDocument(self, name):
         pass
     
-    async def _rpcUserToDocument(self):
+    async def _rpcUnshareDocument(self, name):
         pass
     
-    async def _rpcJoinSharedDocument(self):
+    
+    async def _rpcAddNodeToDocument(self):
         pass
+    
+    async def _rpcExecuteCode(self, code):
+        
+        code.insert(0, "import FreeCADGui as Gui")
+        code.insert(0, "import FreeCAD as App")
+        
+        exec(
+            f'async def __ex(): ' +
+            ''.join(f'\n {line}' for line in code)
+        )
+
+        return await locals()['__ex']()
+
+

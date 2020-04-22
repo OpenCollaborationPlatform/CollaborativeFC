@@ -24,6 +24,10 @@ from Documents.OnlineObject import OnlineObject, OnlineViewProvider
 from autobahn.wamp.exception import ApplicationError
 
 class OnlineDocument():
+    ''' Describing a FreeCAD document in the OCP framework. Properties can be changed or objects added/removed 
+        like with a normal FreeCAD document, with the difference, that all changes are mirrored to all collabrators.
+        Changes to the online doc do not change anything on the local one. The intenion is to mirror all user changes 
+        done to the local document'''
 
     def __init__(self, id, doc, observer, connection, dataservice):
         self.id = id

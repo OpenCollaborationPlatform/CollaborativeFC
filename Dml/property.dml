@@ -104,31 +104,12 @@ Map {
             .type:  Raw {
                         .name: "raw"
                         
-                        const property object prop: Property
+                        property object prop
                         
                         .onDataChanged: function(cid) {
                             this.prop.onChanged.Emit()
                         }
-                        
-                        Transaction {
-                            .name: "trans"
-                            
-                            .onParticipation: function() {
-                                Transaction.Add(this.prop)
-                            }
-                        }
                     }
-                    
-            Transaction {
-                .name: "trans"
-                
-                //when added to transaction the Raw object needs to be added too
-                .onParticipation: function() {                    
-                    if (this.parent.type.IsComplex()) {
-                        Transaction.Add(this.parent.type)
-                    }
-                }
-            }
         }
         
         function Init(type, typeID, group, documentation) {          
@@ -169,6 +150,11 @@ Map {
                 case "App::PropertyUUID":
                     this.PropertyData.type = DataType("string")
                     break  
+                    
+                default:
+                    //default is a Raw data property. For this we set the property 
+                    //object to make sure it can be called for the updates
+                    this.PropertyData.GetValue().prop = this
             }
             
             //do this after assigning the variant as we use this as indicator for 
@@ -201,7 +187,7 @@ Map {
 
             return dict
         }
-        
+        /*
         Transaction {
             .name: "trans"
             
@@ -209,9 +195,9 @@ Map {
             .onParticipation: function() {                    
                 Transaction.Add(this.parent.PropertyData)
             }
-        }
+        }*/
     }
-    
+    /*
     //we take part in transactions
     Transaction {
         .name: "transaction"
@@ -231,7 +217,7 @@ Map {
             }
             return result
         }
-    }
+    }*/
 }
 
 /* Remaining default Properties (excluding modules and gui):

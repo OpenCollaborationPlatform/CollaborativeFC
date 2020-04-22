@@ -17,29 +17,25 @@
 # *   Suite 330, Boston, MA  02111-1307, USA                             *
 # ************************************************************************
 
-import logging, txaio, os
-from Documents import Handler
-from Interface import Widget
-from Connection import OCPConnection
+#handle basic logging first
+#*******************************************************
+import logging, txaio, sys
+#txaio.use_asyncio()
+#txaio.start_logging(level='error') 
+logging.basicConfig(level=logging.DEBUG, stream=sys.stdout, format="[%(levelname)8s] %(name)25s:   %(message)s")
+logging.getLogger('asyncqt').setLevel(logging.ERROR)
+
+
+#import the collaboration infrastructure
+#*******************************************************
 import FreeCAD, Collaboration, Commands, Test
 
-#handle basic logging first
-logging.basicConfig(level=logging.DEBUG, format="[%(levelname)8s] %(name)25s:   %(message)s")
-logging.getLogger('asyncqt').setLevel(logging.ERROR)
-txaio.start_logging(level='error')
 
-#for now use simple global variables!
-dochandler = Handler.DocumentHandler(Collaboration.path_collaboration)
-widget     = Widget.UIWidget(dochandler)
-connection = OCPConnection(dochandler, widget)
-
-if os.getenv('OCP_TEST_RUN', "0") == "1":
-    tester = Test.Handler(dochandler)
-    
-
+#setup the UI
+#*******************************************************
 if FreeCAD.GuiUp:
     import FreeCADGui
-    FreeCADGui.addCommand('Collaborate', Commands.CommandCollaboration(widget))
+    FreeCADGui.addCommand('Collaborate', Commands.CommandCollaboration(Collaboration.widget))
     
 # setup the toolbar
 group = FreeCAD.ParamGet("User parameter:BaseApp/Workbench/Global/Toolbar")

@@ -21,12 +21,24 @@ __title__ = "FreeCAD Collaboration API"
 __author__ = "Stefan Troeger"
 __url__ = "http://www.freecadweb.org"
 
-'''The Collaboration module provides functions to work on documents with others'''
-
 import os
 from PySide import QtCore
+from Documents.Manager import Manager
+from Interface.Widget import UIWidget
+from Connection import OCPConnection
 
-#needs to be done before anything access the icons in the resource
-path_collaboration = os.path.dirname(__file__)
-path_resources = os.path.join(path_collaboration, 'Resources', 'resources.rcc')
-resourcesLoaded = QtCore.QResource.registerResource(path_resources)
+#handle the resources required
+#*******************************************************
+QtCore.QResource.registerResource(os.path.join(os.path.dirname(__file__), 'Resources', 'resources.rcc'))
+
+
+#The Collaboration module provides functions to work on documents with others
+#for now use simple global variables!
+manager     = Manager(os.path.dirname(__file__))
+widget      = UIWidget(manager)
+connection  = OCPConnection(manager, widget)
+
+if os.getenv('OCP_TEST_RUN', "0") == "1":
+    #connect to test server
+    import Test
+    tester = Test.Handler(dochandler)

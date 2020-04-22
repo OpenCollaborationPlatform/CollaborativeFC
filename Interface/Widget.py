@@ -25,12 +25,12 @@ from Interface.DocumentModel import DocumentModel
 
 class UIWidget(QtGui.QFrame):
     
-    def __init__(self, dochandler, parent=None):
+    def __init__(self, manager, parent=None):
         super().__init__(parent)
 
-        self.connection = None
-        self.dochandler = dochandler
-        self.model = DocumentModel(self.dochandler)
+        self.__connection = None
+        self.__manager = manager
+        self.__model = DocumentModel(self.__manager)
 
         # We are a popup, make sure we look like it
         self.setContentsMargins(1,1,1,1)
@@ -53,15 +53,15 @@ class UIWidget(QtGui.QFrame):
 
     #component API
     async def setConnection(self, con):
-        self.connection = con
-        self.ui.DocumentList.setModel(self.model)
-        self.model.layoutChanged.emit
+        self.__connection = con
+        self.ui.DocumentList.setModel(self.__model)
+        self.__model.layoutChanged.emit
     
     
     #component API
     async def removeConnection(self):
-        self.connection = None
-        self.model = None
+        self.__connection = None
+        self.__model = None
         model = QtCore.QStringListModel()
         model.setStringList([])
         self.ui.DocumentList.setModel(model)
@@ -79,7 +79,7 @@ class UIWidget(QtGui.QFrame):
     @QtCore.Slot(bool)
     def onShared(self, collaborate):
         
-        if not self.connection:
+        if not self.__connection:
             return
         
         indexs = self.ui.DocumentList.selectedIndexes()
@@ -87,32 +87,32 @@ class UIWidget(QtGui.QFrame):
             return
         
         idx = indexs[0].row()
-        docmap = self.dochandler.documents[idx]
+        entity = self.__manager.getEntities()[idx]
         
-        shared = docmap['status'] == "shared"
+        shared = entity.status == "shared"
         if shared and collaborate:
             #we are done.. event thougth this should not have happend
             return
         
         if shared and not collaborate:
-            asyncio.ensure_future(self.dochandler.asyncStopCollaborateOnDoc(docmap))
+            asyncio.ensure_future(self.__manager.stopCollaborate(entity))
             return
-            
+
         #we need to collaborate!
-        asyncio.ensure_future(self.dochandler.asyncCollaborateOnDoc(docmap))
+        asyncio.ensure_future(self.__manager.collaborate(entity))
             
         
         
     @QtCore.Slot(int)    
     def onSelectionChanged(self, index):
         
-        if not self.connection:
+        if not self.__connection:
             return
         
-        #change the doc info side to the selected doc!
-        docmap = self.dochandler.documents[index.row()]
+        #change the entity info side to the selected doc!
+        entity = self.__manager.getEntities()[index.row()]
         
-        shared = docmap['status'] == "shared"
+        shared = entity.status == "shared"
         self.ui.Collaborate.setChecked(shared)
         
         #if shared:

@@ -193,7 +193,10 @@ class OCPConnection():
         
         #make the OCP node connection!            
         uri = "ws://" + await self.node.uri() + ":" + await self.node.port() + "/ws"          
-        self.wamp = Component(transports=uri, realm = "ocp")
+        self.wamp = Component(  transports={
+                                    "url":uri,
+                                    "serializers": ['msgpack']},
+                                realm = "ocp")
         self.wamp.on('join', self.onJoin)
         self.wamp.on('leave', self.onLeave)
 

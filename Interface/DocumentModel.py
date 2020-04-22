@@ -21,36 +21,36 @@ from PySide import QtCore, QtGui
 
 class DocumentModel(QtCore.QAbstractListModel):
     
-    def __init__(self, dochandler):
+    def __init__(self, manager):
         super().__init__()
         
-        self.dochandler = dochandler
-        dochandler.addUpdateFunc(self.layoutChanged.emit)
+        self.__manager = manager
+        manager.addUpdateFunc(self.layoutChanged.emit)
 
     def data(self, index, role):
         
         if role == QtCore.Qt.DisplayRole:
             
-            docmap = self.dochandler.documents[index.row()]
-            if docmap['fcdoc'] != None:
-                return docmap['fcdoc'].Name
-            if docmap['id'] != None:
-                return docmap['id']
+            entity = self.__manager.getEntities()[index.row()]
+            if entity.fcdoc != None:
+                return entity.fcdoc.Name
+            if entity.id != None:
+                return entity.id
                         
             return "Unknown name"
 
         if role == QtCore.Qt.DecorationRole:
-            docmap = self.dochandler.documents[index.row()]
-            if docmap['status'] == 'shared':
+            entity = self.__manager.getEntities()[index.row()]
+            if entity.status == 'shared':
                 return QtGui.QColor('green')
-            if docmap['status'] == 'local':
+            if entity.status == 'local':
                 return QtGui.QColor('orange')
-            if docmap['status'] == 'node':
+            if entity.status == 'node':
                 return QtGui.QColor('yellow')
-            if docmap['status'] == 'invited':
+            if entity.status == 'invited':
                 return QtGui.QColor('purple')
             
             return QtGui.QColor('black')
 
     def rowCount(self, index):
-        return len(self.dochandler.documents)
+        return len(self.__manager.getEntities())

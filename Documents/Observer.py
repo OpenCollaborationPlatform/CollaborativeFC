@@ -76,7 +76,7 @@ class DocumentObserver(ObserverBase):
             return
         
         #print("Observed new document")
-        self.handler.openFCDocument(doc)
+        self.handler.onFCDocumentOpened(doc)
         
 
     def slotDeletedDocument(self, doc):
@@ -85,7 +85,7 @@ class DocumentObserver(ObserverBase):
             return
         
         #print("Observer close document")
-        self.handler.closeFCDocument(doc)
+        self.handler.onFCDocumentClosed(doc)
 
 
     #def slotRelabelDocument(self, doc):
