@@ -22,6 +22,7 @@ from PySide import QtCore, QtGui
 from PySide.QtUiTools import QUiLoader
 
 from Interface.DocumentModel import DocumentModel
+from Documents.Manager import Entity
 
 class UIWidget(QtGui.QFrame):
     
@@ -89,7 +90,7 @@ class UIWidget(QtGui.QFrame):
         idx = indexs[0].row()
         entity = self.__manager.getEntities()[idx]
         
-        shared = entity.status == "shared"
+        shared = entity.status == Entity.Status.shared
         if shared and collaborate:
             #we are done.. event thougth this should not have happend
             return
@@ -112,7 +113,7 @@ class UIWidget(QtGui.QFrame):
         #change the entity info side to the selected doc!
         entity = self.__manager.getEntities()[index.row()]
         
-        shared = entity.status == "shared"
+        shared = entity.status == Entity.Status.shared
         self.ui.Collaborate.setChecked(shared)
         
         #if shared:

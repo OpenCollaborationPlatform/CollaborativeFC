@@ -128,7 +128,6 @@ class OCPNode():
         if err and err.decode() != "":
             raise Exception("Unable to start OCP node:", err.decode())
         
-        await asyncio.sleep(1)
         if "No node is currently running" in out.decode():
             
             #start it
@@ -189,7 +188,6 @@ class OCPConnection():
 
         #setup the node
         await self.node.setup()
-        print("Node setup done!")
         
         #make the OCP node connection!            
         uri = "ws://" + await self.node.uri() + ":" + await self.node.port() + "/ws"          

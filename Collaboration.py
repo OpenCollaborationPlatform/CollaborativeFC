@@ -41,4 +41,4 @@ connection  = OCPConnection(manager, widget)
 if os.getenv('OCP_TEST_RUN', "0") == "1":
     #connect to test server
     import Test
-    tester = Test.Handler(dochandler)
+    tester = Test.Handler(manager)

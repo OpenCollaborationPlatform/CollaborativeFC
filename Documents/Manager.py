@@ -25,6 +25,7 @@ from Documents.OnlineDocument   import OnlineDocument
 
 import uuid
 from autobahn.wamp.types import CallResult
+from enum import Enum, auto
 
 class Entity():
     ''' data structure describing a entity in the collaboration framework. A entity is a things that can be calloborated on, e.g.:
@@ -33,8 +34,15 @@ class Entity():
         - A open document on the node, not available locally 
         - etc.
     '''
+    
+    class Status(Enum):
+        unknown = auto()
+        local   = auto()
+        node    = auto()
+        invited = auto()
+        shared  = auto()
         
-    def __init__(self, id = None, status = 'unknown', onlinedoc = None, fcdoc = None ):
+    def __init__(self, id = None, status = Status.unknown, onlinedoc = None, fcdoc = None ):
         self.id = id
         self.status = status
         self.onlinedoc = onlinedoc
@@ -53,7 +61,7 @@ class Manager():
         self.__updatefuncs = []
         self.__connection = None
         self.__collab_path = collab_path
-        self.__blockObserver = False
+        self.__blockLocalEvents = False
         self.__uuid = uuid.uuid4()
         self.__dataservice = None
 
@@ -74,20 +82,15 @@ class Manager():
               
         try:
             #we register ourself for some key events
+            await self.__connection.session.subscribe(self.onOCPDocumentCreated, u"ocp.documents.created")
             await self.__connection.session.subscribe(self.onOCPDocumentOpened, u"ocp.documents.opened")
             await self.__connection.session.subscribe(self.onOCPDocumentClosed, u"ocp.documents.closed")
             await self.__connection.session.subscribe(self.onOCPDocumentInvited, u"ocp.documents.invited")
 
-            res = await self.__connection.session.call(u"ocp.documents.list")
-            if res == None:
-                doclist = []
-            elif type(res) == str:
-                doclist = [res]
-            elif type(res) == CallResult:
-                doclist = res.results
-            
+            doclist = await self.__connection.session.call(u"ocp.documents.list")
+           
             for doc in doclist:
-                entity = Entity(id = doc, status = "node", onlinedoc = None, fcdoc = None)
+                entity = Entity(id = doc, status = Entity.Status.node, onlinedoc = None, fcdoc = None)
                 self.__entities.append(entity)
             
             self.__update()
@@ -120,11 +123,11 @@ class Manager():
         if not self.__connection:
             return 
         
-        if self.__blockObserver:
+        if self.__blockLocalEvents:
             return
         
         #If a document was opened in freecad this function makes it known to the Handler. 
-        entity = Entity(id = None, status = "local", onlinedoc = None, fcdoc = doc)
+        entity = Entity(id = None, status = Entity.Status.local, onlinedoc = None, fcdoc = doc)
         self.__entities.append(entity)
         self.__update()
         
@@ -134,7 +137,7 @@ class Manager():
         if not self.__connection:
             return 
         
-        if self.__blockObserver:
+        if self.__blockLocalEvents:
             return
         
         async def coro(entity):
@@ -144,7 +147,6 @@ class Manager():
         
             #as the doc was closed completely we also delete it from this handler
             #TODO: the change should depend on state: it still could be open on the node, than it needs to stay in the handler
-            entity = self.getEntity(key, value)
             self.__entities.remove(entity)
   
             #finally inform about that update.
@@ -157,18 +159,31 @@ class Manager():
     #OCP event handling  (used as wamp event callbacks)
     #**********************************************************************
     
-    async def onOCPDocumentOpened(self):
-        #TODO add new doc to docmap
+    def onOCPDocumentCreated(self, id):
+
+        #could be that we alread have this id (e.g. if we created it ourself)
+        if self.hasEntity('id', id):
+            return
+        
+        entity = Entity(id = id, status = Entity.Status.node, onlinedoc = None, fcdoc = None)
+        self.__entities.append(entity)
         self.__update()
         
+    def onOCPDocumentOpened(self, id):
         
-    async def onOCPDocumentClosed(self):
-        #TODO add new doc to docmap
+        return self.onOCPDocumentCreated(id)
+            
+        
+    def onOCPDocumentClosed(self, id):
+        
+        #we do not check if entity exists, as a raise does not bother us
+        entity = self.getEntity('id', id)
+        self.__entities.remove(entity)              
         self.__update()
     
-    async def onOCPDocumentInvited(self):
-        #TODO add new doc to docmap
-        self.__update()
+    def onOCPDocumentInvited(self):
+        #TODO not implemented on note yet
+        pass
         
     
     
@@ -216,31 +231,31 @@ class Manager():
         
         obs = ObserverManager(self.__guiObserver, self.__observer)
             
-        if entity.status == "local":
+        if entity.status == Entity.Status.local:
             dmlpath = os.path.join(self.__collab_path, "Dml")
             res = await self.__connection.session.call(u"ocp.documents.create", dmlpath)
             entity.id = res
             entity.onlinedoc = OnlineDocument(res, entity.fcdoc, obs, self.__connection, self.__dataservice)
             await entity.onlinedoc.asyncSetup()
                 
-        elif entity.status == 'node':
-            self.__blockObserver = True
+        elif entity.status == Entity.Status.node:
+            self.__blockLocalEvents = True
             doc = FreeCAD.newDocument()
-            self.__blockObserver = False
+            self.__blockLocalEvents = False
             entity.fcdoc = doc
             entity.onlinedoc = OnlineDocument(entity.id, doc, obs, self.__connection, self.__dataservice)
             await entity.onlinedoc.asyncLoad() 
                 
-        elif entity.status == 'invited':
+        elif entity.status == Entity.Status.invited:
             await self.__connection.session.call(u"ocp.documents.open", entity.id)
-            self.__blockObserver = True
+            self.__blockLocalEvents = True
             doc = FreeCAD.newDocument()
-            self.__blockObserver = False
+            self.__blockLocalEvents = False
             entity.fcdoc = doc
             entity.onlinedoc = OnlineDocument(entity.id, doc, obs, self.__connection, self.__dataservice)
             await entity.onlinedoc.asyncUnload() 
 
-        entity.status = "shared"
+        entity.status = Entity.Status.shared
         self.__update()
             
 
@@ -252,11 +267,11 @@ class Manager():
             return 
         
         try:
-            if entity.status == 'shared':
+            if entity.status == Entity.Status.shared:
                 await entity.onlinedoc.asyncUnload()
                 await self.__connection.session.call(u"ocp.documents.close", entity.id)
             
-            entity.status = "local"
+            entity.status = Entity.Status.local
             self.__update()
         
         except Exception as e:
@@ -267,7 +282,16 @@ class Manager():
         #returns the entity for the given key/value pair, e.g. "fcdoc":doc. Careful: if status is used
         #the first matching docmap is returned
         for entity in self.__entities: 
-            if getattr(entity, key) is not None:
+            if getattr(entity, key) == val:
                 return entity
         
         raise Exception('no such entity found')
+
+    def hasEntity(self, key, val):
+        #returns the entity for the given key/value pair, e.g. "fcdoc":doc. Careful: if status is used
+        #the first matching docmap is returned
+        for entity in self.__entities: 
+            if getattr(entity, key) == val:
+                return True
+        
+        return False

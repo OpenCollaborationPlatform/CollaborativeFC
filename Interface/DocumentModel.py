@@ -18,6 +18,7 @@
 # ************************************************************************
 
 from PySide import QtCore, QtGui
+from Documents.Manager import Entity
 
 class DocumentModel(QtCore.QAbstractListModel):
     
@@ -41,13 +42,13 @@ class DocumentModel(QtCore.QAbstractListModel):
 
         if role == QtCore.Qt.DecorationRole:
             entity = self.__manager.getEntities()[index.row()]
-            if entity.status == 'shared':
+            if entity.status == Entity.Status.shared:
                 return QtGui.QColor('green')
-            if entity.status == 'local':
+            if entity.status == Entity.Status.local:
                 return QtGui.QColor('orange')
-            if entity.status == 'node':
+            if entity.status == Entity.Status.node:
                 return QtGui.QColor('yellow')
-            if entity.status == 'invited':
+            if entity.status == Entity.Status.invited:
                 return QtGui.QColor('purple')
             
             return QtGui.QColor('black')
