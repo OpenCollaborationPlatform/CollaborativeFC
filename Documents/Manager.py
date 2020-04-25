@@ -64,13 +64,13 @@ class Manager():
         self.__blockLocalEvents = False
         self.__uuid = uuid.uuid4()
         self.__dataservice = None
-
         
-        #add the observer 
+        #add the freecad observer 
         self.__observer = DocumentObserver(self)
         self.__guiObserver = GUIDocumentObserver(self)
         FreeCAD.addDocumentObserver(self.__observer)
         FreeCADGui.addDocumentObserver(self.__guiObserver)
+
     
     #component API
     #**********************************************************************
@@ -285,7 +285,7 @@ class Manager():
             if getattr(entity, key) == val:
                 return entity
         
-        raise Exception('no such entity found')
+        raise Exception(f'no such entity found: {key} == {val}')
 
     def hasEntity(self, key, val):
         #returns the entity for the given key/value pair, e.g. "fcdoc":doc. Careful: if status is used

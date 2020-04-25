@@ -24,16 +24,18 @@ import FreeCAD, FreeCADGui
 
 class Handler():
     
-    def __init__(self, dochandler):
+    def __init__(self, connection, dochandler):
            
         if os.getenv('OCP_TEST_RUN', "0") != "1":
             raise Exception("Test Handler created, but test environment variable not set")
           
         self.dochandler = dochandler          
-        asyncio.ensure_future(self._startup())
+        asyncio.ensure_future(self._startup(connection))
         
           
-    async def _startup(self):
+    async def _startup(self, connection):
+        
+        await connection.ready()
         
         uri = os.getenv('OCP_TEST_SERVER_URI', '')
         self.test = Component(transports=uri, realm = "ocptest")

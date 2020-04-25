@@ -181,10 +181,11 @@ class OCPConnection():
         asyncio.set_event_loop(loop)       
         
         #run the conenction asyncronously but not blocking
-        asyncio.ensure_future(self._startup())
+        self.__readyEvent = asyncio.Event()
+        asyncio.ensure_future(self.__startup())
    
    
-    async def _startup(self):
+    async def __startup(self):
 
         #setup the node
         await self.node.setup()
@@ -195,35 +196,33 @@ class OCPConnection():
                                     "url":uri,
                                     "serializers": ['msgpack']},
                                 realm = "ocp")
-        self.wamp.on('join', self.onJoin)
-        self.wamp.on('leave', self.onLeave)
+        self.wamp.on('join', self.__onJoin)
+        self.wamp.on('leave', self.__onLeave)
 
         #blocks till all wamp handling is finsihed
         await self.wamp.start()
         
         
-    async def onJoin(self, session, details):
+    async def __onJoin(self, session, details):
         print("Connection to OCP node established")
+       
         self.session = session
         #startup all relevant components
         for comp in self.components:
             await comp.setConnection(self)
+
+        self.__readyEvent.set()
             
             
-    async def onLeave(self, session, reason):
+    async def __onLeave(self, session, reason):
         print("Connection to OCP node lost: ", reason)
+        
+        self.__readyEvent.clear()
         self.session = None
         #stop all relevant components
         for comp in self.components:
             await comp.removeConnection()
             
             
-    async def testOnJoin(self, session, details):
-        print("Connection to OCP test server established")
-        self.testSession = session
-            
-            
-    async def testOnLeave(self, session, reason):
-        print("Connection to OCP test server lost: ", reason)
-        self.testSession = None
- 
+    async def ready(self):
+        await self.__readyEvent.wait()
