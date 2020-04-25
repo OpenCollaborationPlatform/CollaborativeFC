@@ -140,20 +140,20 @@ class Manager():
         if self.__blockLocalEvents:
             return
         
-        async def coro(entity):
-            
-            #stop collaboration first
-            await self.stopCollaborate(entity)
+        entity = self.getEntity('fcdoc', doc)
         
-            #as the doc was closed completely we also delete it from this handler
-            #TODO: the change should depend on state: it still could be open on the node, than it needs to stay in the handler
+        if entity.status == Entity.Status.local:
+            #we can remove the entity if it is local only
             self.__entities.remove(entity)
-  
-            #finally inform about that update.
-            self.__update()
             
-        asyncio.ensure_future(coro(self.getEntity('fcdoc', doc)))
-       
+        elif entity.status == Entity.Status.shared:
+            #but if shared we change it to be on node only
+            entity.status = Entity.Status.node
+            entity.fcdoc = None
+            entity.onlinedoc = None #garbage collect takes care of online doc and obj
+ 
+        self.__update()
+
 
 
     #OCP event handling  (used as wamp event callbacks)
@@ -178,8 +178,12 @@ class Manager():
         
         #we do not check if entity exists, as a raise does not bother us
         entity = self.getEntity('id', id)
-        self.__entities.remove(entity)              
-        self.__update()
+        
+        #we only remove it if is a pure node document
+        if entity.status == Entity.Status.node:
+            self.__entities.remove(entity)     
+            self.__update()
+
     
     def onOCPDocumentInvited(self):
         #TODO not implemented on note yet
