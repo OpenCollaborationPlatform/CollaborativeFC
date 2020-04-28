@@ -179,11 +179,19 @@ class Manager():
         #we do not check if entity exists, as a raise does not bother us
         entity = self.getEntity('id', id)
         
-        #we only remove it if is a pure node document
-        if entity.status == Entity.Status.node:
+        if entity.status == Entity.Status.node or entity.status == Entity.Status.invited:
+            #it if is a pure node document we can remove it
             self.__entities.remove(entity)     
-            self.__update()
-
+        
+        elif entity.status == Entity.Status.shared:
+            #it was shared before, hence now with it being closed on the node it is only availble locally
+            entity.onlinedoc = None
+            entity.status = Entity.Status.local
+            entity.id = ''
+            
+        self.__update()
+             
+        
     
     def onOCPDocumentInvited(self):
         #TODO not implemented on note yet
@@ -223,7 +231,7 @@ class Manager():
         return self.__entities
 
 
-    async def collaborate(self, entity):
+    async def collaborate(self, entity, documentname = "Unnamed"):
         #for the entity collaboration is started. That means:
         # - Created in OCP when open local only
         # - Opened in FC if open on node
@@ -231,20 +239,26 @@ class Manager():
         # - Doing nothing if already shared
     
         if not self.__connection:
-            return 
+            raise Exception("Currently not connected, cannot collaborate")
         
         obs = ObserverManager(self.__guiObserver, self.__observer)
             
         if entity.status == Entity.Status.local:
             dmlpath = os.path.join(self.__collab_path, "Dml")
             res = await self.__connection.session.call(u"ocp.documents.create", dmlpath)
+            
+            #it could have been that we already received the "documentCreated" event, and hence have a new entity created.
+            #that would be wrong! 
+            if self.hasEntity("id", res):
+                self.__entities.remove(self.getEntity("id", res))
+            
             entity.id = res
             entity.onlinedoc = OnlineDocument(res, entity.fcdoc, obs, self.__connection, self.__dataservice)
             await entity.onlinedoc.asyncSetup()
                 
         elif entity.status == Entity.Status.node:
             self.__blockLocalEvents = True
-            doc = FreeCAD.newDocument()
+            doc = FreeCAD.newDocument(documentname)
             self.__blockLocalEvents = False
             entity.fcdoc = doc
             entity.onlinedoc = OnlineDocument(entity.id, doc, obs, self.__connection, self.__dataservice)
@@ -253,7 +267,7 @@ class Manager():
         elif entity.status == Entity.Status.invited:
             await self.__connection.session.call(u"ocp.documents.open", entity.id)
             self.__blockLocalEvents = True
-            doc = FreeCAD.newDocument()
+            doc = FreeCAD.newDocument(documentname)
             self.__blockLocalEvents = False
             entity.fcdoc = doc
             entity.onlinedoc = OnlineDocument(entity.id, doc, obs, self.__connection, self.__dataservice)
@@ -280,7 +294,7 @@ class Manager():
         
         except Exception as e:
             print("Close document id error: {0}".format(e))
-          
+    
 
     def getEntity(self, key, val):
         #returns the entity for the given key/value pair, e.g. "fcdoc":doc. Careful: if status is used

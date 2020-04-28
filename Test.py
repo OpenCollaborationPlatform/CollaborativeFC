@@ -24,12 +24,14 @@ import FreeCAD, FreeCADGui
 
 class Handler():
     
-    def __init__(self, connection, dochandler):
+    def __init__(self, connection, manager):
            
         if os.getenv('OCP_TEST_RUN', "0") != "1":
             raise Exception("Test Handler created, but test environment variable not set")
           
-        self.dochandler = dochandler          
+        self.__manager = manager  
+        self.__session = None
+        
         asyncio.ensure_future(self._startup(connection))
         
           
@@ -49,6 +51,9 @@ class Handler():
     async def onJoin(self, session, details):
         #litte remark that we joined (needed for test executable, it waits for this)
         FreeCAD.Console.PrintMessage("Connection to OCP test server established\n")
+        
+        #store the session for later use
+        self.__session = session
         
         #get all the testing functions in this class!
         methods = [func for func in dir(self) if callable(getattr(self, func))]
@@ -72,8 +77,23 @@ class Handler():
         
     
     async def onLeave(self, session, reason):
+        
+        self.__session = None
+        
         #inform test framework that we are not here anymore!
         await session.call("ocp.test.triggerEvent", os.getenv('OCP_TEST_RPC_ADDRESS', ''), False)
+
+    
+    async def synchronize(self):
+        #we wait till all tasks are finished
+        coros =  []
+        for entity in self.__manager.getEntities():
+            if entity.OnlineDoc != None:
+                coros.append(entity.OnlineDoc.waitTillCloseout())
+                
+        await asyncio.wait(coros)
+        
+        #and now increment the 
 
     
     async def _rpcShareDocument(self, name):

@@ -202,10 +202,19 @@ class OnlineDocument():
     
     async def asyncGetDocumentPeers(self):
         try:
-            res = await self.connection.session.call(u"ocp.documents.{0}.listPeers".format(self.id))
-            return res.results[0]
+            return await self.connection.session.call(u"ocp.documents.{0}.listPeers".format(self.id))
         
         except Exception as e:
             self.logger.error("Getting peers error: {0}".format(e))
-            return []      
+            return []
+        
+        
+    async def waitTillCloseout(self, timeout = 10):
+        #wait till all current async tasks are finished. Note that it also wait for task added during the wait period.
+        #throws an error on timeout.
+        
+        coros = []
+        for obj in list(self.objects.values()):
+            coros.append(obj.waitTillCloseout(timeout))
  
+        await asyncio.wait(coros)

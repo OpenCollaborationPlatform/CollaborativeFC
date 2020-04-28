@@ -237,6 +237,13 @@ class FreeCADOnlineObject():
         
         except Exception as e:
             self.logger.error("Removing error: {0}".format(e))
+            
+    
+    async def waitTillCloseout(self, timeout = 10):
+        #wait till all current async tasks are finished. Note that it also wait for task added during the wait period.
+        #throws an error on timeout.
+        
+        await self.runner.waitTillCloseout(timeout)
 
 
 class OnlineObject(FreeCADOnlineObject):

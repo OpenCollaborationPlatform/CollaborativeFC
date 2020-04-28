@@ -38,12 +38,27 @@ class AsyncRunner():
         self.setupTasks = []
         self.intermediateSetupTasks = []
         self.allTasks = []
+        self.__finishEvent = None
     
     
     async def __run(self, awaitable, ctx):
             async with ctx:
-                await awaitable                
-         
+                await awaitable   
+               
+
+    async def waitTillCloseout(self, timeout = 10):
+        #returns when all tasks are finished. Note that it also wait for all task that are added 
+        #during the wait time. Throws TimeOutError if it takes longer than the provided timeout
+        
+        if len(self.allTasks) == 0:
+            return
+        
+        try:
+            self.__finishEvent = asyncio.Event()
+            await asyncio.wait_for(self.__finishEvent, timeout)
+        finally:
+            self.__finishEvent = None
+        
          
     def __removeTask(self, task):
         while task in self.setupTasks:
@@ -54,7 +69,10 @@ class AsyncRunner():
             
         while task in self.intermediateSetupTasks:
             self.intermediateSetupTasks.remove(task)
-           
+        
+        if self.__finishEvent  != None and len(self.allTasks) == 0:
+            self.__finishEvent.set()
+        
            
     def runAsyncAsSetup(self, awaitable):
         
