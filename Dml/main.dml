@@ -3,7 +3,7 @@ import "property.dml" as PropertyContainer
 
 Data {
     .name: "Document"
-
+    
     PropertyContainer {
         .name: "Properties"
     }
@@ -92,4 +92,7 @@ Data {
             }
         }
     }
+    
+    //mainly required for testing purposes
+    event sync
 }

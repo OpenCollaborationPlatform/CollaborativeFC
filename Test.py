@@ -19,6 +19,7 @@
 
 import asyncio, os
 from autobahn.asyncio.component import Component
+from autobahn.wamp.types import SubscribeOptions
 
 import FreeCAD, FreeCADGui
 
@@ -37,18 +38,23 @@ class Handler():
           
     async def _startup(self, connection):
         
+        self.__connection = connection
         await connection.ready()
         
+        #register ourself to the OCP node
+        await connection.session.subscribe(self.__receiveSync, "ocp.documents.edit..events.Document.sync", options=SubscribeOptions(match="wildcard"))
+        
+        #connect to testserver       
         uri = os.getenv('OCP_TEST_SERVER_URI', '')
         self.test = Component(transports=uri, realm = "ocptest")
-        self.test.on('join', self.onJoin)
-        self.test.on('leave', self.onLeave)
+        self.test.on('join', self.__onJoin)
+        self.test.on('leave', self.__onLeave)
         
         #block till all handling is done
         await self.test.start()
     
     
-    async def onJoin(self, session, details):
+    async def __onJoin(self, session, details):
         #litte remark that we joined (needed for test executable, it waits for this)
         FreeCAD.Console.PrintMessage("Connection to OCP test server established\n")
         
@@ -76,24 +82,39 @@ class Handler():
             print("Exception in event call: ", str(e))
         
     
-    async def onLeave(self, session, reason):
+    async def __onLeave(self, session, reason):
         
         self.__session = None
         
         #inform test framework that we are not here anymore!
         await session.call("ocp.test.triggerEvent", os.getenv('OCP_TEST_RPC_ADDRESS', ''), False)
 
-    
-    async def synchronize(self):
+
+    async def synchronize(self, docId):
+                
         #we wait till all tasks are finished
         coros =  []
         for entity in self.__manager.getEntities():
-            if entity.OnlineDoc != None:
-                coros.append(entity.OnlineDoc.waitTillCloseout())
+            if entity.onlinedoc != None:
+                coros.append(entity.onlinedoc.waitTillCloseout())
                 
         await asyncio.wait(coros)
         
-        #and now increment the 
+        #check how many peers are connected and how many sync calls we need
+        peers = await self.__connection.session.call(f"ocp.documents.{docId}.listPeers")
+        
+        #register the sync with the testserver
+        await self.__session.call("ocp.test.registerSync", docId, len(peers))
+        
+        #and now issue the event
+        uri = f"ocp.documents.edit.{docId}.call.Document.sync"
+        await self.__connection.session.call(uri, docId)
+
+     
+    async def  __receiveSync(self, docId):
+
+        #call testserver that we received the sync!
+        self.__session.call("ocp.test.sync", docId)
 
     
     async def _rpcShareDocument(self, name):

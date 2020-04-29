@@ -55,7 +55,7 @@ class AsyncRunner():
         
         try:
             self.__finishEvent = asyncio.Event()
-            await asyncio.wait_for(self.__finishEvent, timeout)
+            await asyncio.wait_for(self.__finishEvent.wait(), timeout)
         finally:
             self.__finishEvent = None
         
