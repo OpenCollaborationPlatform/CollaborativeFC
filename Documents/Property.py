@@ -70,6 +70,13 @@ def __linkToString(obj, prop):
     
     return linked.Name
 
+def __toJson(obj, prop):
+    
+    import json
+    value = getattr(obj, prop)
+    return json.dumps(value)
+    
+
 __PropertyToWamp = {
 "App::PropertyFloat": __toFloat,
 "App::PropertyPrecision": __toFloat,
@@ -91,7 +98,8 @@ __PropertyToWamp = {
 "App::PropertyUUID": __toString,
 "App::PropertyLink": __linkToString,
 "App::PropertyLinkChild": __linkToString,
-"App::PropertyLinkGlobal": __linkToString
+"App::PropertyLinkGlobal": __linkToString,
+"App::PropertyExpressionEngine": __toJson
 }
 
 
@@ -102,6 +110,7 @@ def __fromPOD(obj, prop, value):
 def __fromRaw(obj, prop, value):
     return obj.restorePropertyContent(prop, value)
 
+
 def __fromLinkString(obj, prop, value):
     if value == "":
         setattr(obj, prop, None)
@@ -110,6 +119,22 @@ def __fromLinkString(obj, prop, value):
     doc = obj.Document 
     linked = doc.getObject(value)
     setattr(obj, prop, linked)
+    
+    
+def __exprFromJson(obj, prop, value):
+    
+    import json
+    load_exprs = json.loads(value)
+    
+    #clear all expressions
+    current_exprs = obj.ExpressionEngine
+    for expr in current_exprs:
+        obj.setExpression(expr[0], None)
+    
+    for expr in load_exprs:
+        obj.setExpression(expr[0], expr[1])
+
+        
 
 __PropertyFromWamp = {
 "App::PropertyFloat": __fromPOD,
@@ -132,5 +157,6 @@ __PropertyFromWamp = {
 "App::PropertyUUID": __fromPOD,
 "App::PropertyLink": __fromLinkString,
 "App::PropertyLinkChild": __fromLinkString,
-"App::PropertyLinkGlobal": __fromLinkString
+"App::PropertyLinkGlobal": __fromLinkString,
+"App::PropertyExpressionEngine": __exprFromJson
 }

@@ -148,6 +148,7 @@ Map {
                 case "App::PropertyPath":
                 case "App::PropertyString":
                 case "App::PropertyUUID":
+                case "App::PropertyExpressionEngine":
                     this.PropertyData.type = DataType("string")
                     break  
                     
@@ -260,5 +261,4 @@ App::PropertyMaterialList
 App::PropertyFile
 App::PropertyFileIncluded
 App::PropertyPythonObject
-App::PropertyExpressionEngine
 */

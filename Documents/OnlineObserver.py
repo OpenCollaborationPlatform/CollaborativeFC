@@ -299,10 +299,17 @@ class OnlineObserver():
             self.logger.error("Read property {0} error: {1}".format(prop, e))
 
         finally:
-            self.docObserver.activateFor(self.onlineDoc.document)
-            if hasattr(obj, "purgeTouched"):
+                        
+            #most objects do not need a recompute on property change. And we want to avoid it, as
+            #it could be quite time intensive. However, we know some objects that absolutely require it.
+            if obj.isDerivedFrom("Spreadsheet::Sheet"):
+                obj.recompute()
+                
+            elif hasattr(obj, "purgeTouched"):
                 obj.purgeTouched()
-            
+                
+            self.docObserver.activateFor(self.onlineDoc.document)
+           
     
     def __createDynProperty(self, obj, prop, ptype, typeID, group, documentation):
         
