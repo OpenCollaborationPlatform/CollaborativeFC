@@ -24,14 +24,15 @@ import Documents.Property as Property
 class FreeCADOnlineObject():
     
     def __init__(self, name, onlinedoc, objGroup):
-        self.docId          = onlinedoc.id
-        self.data           = onlinedoc.data
-        self.connection     = onlinedoc.connection
-        self.runner         = AsyncRunner()
-        self.name           = name
-        self.objGroup       = objGroup 
-        self.dynPropCache   = {}
-        self.logger         = logging.getLogger(objGroup[:-1] + " " + name)
+        self.docId           = onlinedoc.id
+        self.data            = onlinedoc.data
+        self.connection      = onlinedoc.connection
+        self.runner          = AsyncRunner()
+        self.name            = name
+        self.objGroup        = objGroup 
+        self.dynPropCache    = {}
+        self.statusPropCache = {}
+        self.logger          = logging.getLogger(objGroup[:-1] + " " + name)
 
 
     async def _asyncSetup(self, typeid, values, infos):
@@ -79,7 +80,7 @@ class FreeCADOnlineObject():
                 fnc = "SetupProperty"
                 
             uri = u"ocp.documents.edit.{0}.call.Document.{1}.{2}.Properties.{3}".format(self.docId, self.objGroup, self.name, fnc)
-            await self.connection.session.call(uri, prop, info["ptype"], info["typeid"], info["group"], info["docu"])
+            await self.connection.session.call(uri, prop, info["ptype"], info["typeid"], info["group"], info["docu"], info["status"])
         
         except Exception as e:
             self.logger.error("Setup property {0} failed: {1}".format(prop, e))
@@ -87,9 +88,9 @@ class FreeCADOnlineObject():
     
     async def _asyncRemoveProperty(self, prop):
         try:        
-            self.logger.debug("Remove property {}".format(prop))
-            uri = u"ocp.documents.edit.{0}.call.Document.{1}.{2}.Properties.RemoveDynamicProperty".format(self.id, self.objGroup, self.name)
-            await self.connection.session.call(uri, prop,)
+            self.logger.debug(f"Remove property {prop}")
+            uri = u"ocp.documents.edit.{0}.call.Document.{1}.{2}.Properties.RemoveDynamicProperty".format(self.docId, self.objGroup, self.name)
+            await self.connection.session.call(uri, prop)
         
         except Exception as e:
             self.logger.error("Remove property {0} failed: {1}".format(prop, e))
@@ -114,17 +115,57 @@ class FreeCADOnlineObject():
             props = self.dynPropCache.copy()
             self.dynPropCache.clear()
             
+            keys   = list(props.keys())
+            values = list(props.values())
+            
             if len(props) == 1:
-                self.logger.debug("Create dynamic property {0}".format(props.keys()[0]))
-                await self._asyncCreateProperty(True, props.keys()[0], props.values()[0])
+                await self._asyncCreateProperty(True, keys[0], values[0])
             
             else:
-                self.logger.debug("Create batched dynamic properties: {0}".format(props.keys()))
+                self.logger.debug("Create batched dynamic properties: {0}".format(keys))
                 uri = u"ocp.documents.edit.{0}.call.Document.{1}.{2}.Properties.CreateDynamicProperties".format(self.docId, self.objGroup, self.name)
-                await self.connection.session.call(uri, list(props.keys()), list(props.values()))
-                
+                await self.connection.session.call(uri, keys, values)
+
         except Exception as e:
             self.logger.error("Create dyn property from cache failed: {0}".format(e))
+            
+            
+    def addPropertyStatusChange(self, prop, status):
+        
+        #add property with status to the cache. 
+        self.statusPropCache[prop] = status
+        
+        #if there was no entry before we start a cache processing. If there is something in the cache already
+        #we are sure processing was already startet
+        if len(self.statusPropCache) == 1:
+            #add it to the dyn property creation cache. If it is the first entry we also start the 
+            self.runner.runAsync(self._asyncStatusPropertiesFromCache())
+        
+        
+    async def _asyncStatusPropertiesFromCache(self):
+        
+        if len(self.statusPropCache) == 0:
+            return
+        try:
+            props = self.statusPropCache.copy()
+            self.statusPropCache.clear()
+            
+            keys   = list(props.keys())
+            values = list(props.values())
+                        
+            uri = f"ocp.documents.edit.{self.docId}.call.Document.{self.objGroup}.{self.name}.Properties."
+            if len(props) == 1:
+                self.logger.debug("Change property status {0}".format(keys[0]))
+                uri += keys[0] + ".status"
+                await self.connection.session.call(uri, values[0])
+            
+            else:
+                self.logger.debug("Change batched property status: {0}".format(keys))
+                uri += "SetStatus"
+                await self.connection.session.call(uri, keys, values)
+                
+        except Exception as e:
+            self.logger.error("Change property status from cache failed: {0}".format(e))
             
         
     async def _asyncWriteProperty(self, prop, value):
@@ -276,7 +317,8 @@ class OnlineObject(FreeCADOnlineObject):
     
     
     def removeDynamicProperty(self, prop):
-        self.runner.runAsync(self._asyncRemoveProperty(prop))
+        #we need to make sure the remove comes after the creation
+        self.runner.runAsyncAsCloseout(self._asyncRemoveProperty(prop))
     
     
     def changeProperty(self, prop):
@@ -290,6 +332,12 @@ class OnlineObject(FreeCADOnlineObject):
             
         else:
             self.changed.add(prop)
+ 
+ 
+    def changePropertyStatus(self, prop):
+        info = Property.createPropertyInfo(self.obj, prop)        
+        self.addPropertyStatusChange(prop, info["status"])
+    
     
     
     def recompute(self):
@@ -373,7 +421,7 @@ class OnlineViewProvider(FreeCADOnlineObject):
     
     
     def removeDynamicProperty(self, prop):
-        self.runner.runAsyncAsIntermediateSetup(self._asyncRemoveProperty(prop))
+        self.runner.runAsyncAsCloseout(self._asyncRemoveProperty(prop))
     
     
     def changeProperty(self, prop):
@@ -392,3 +440,9 @@ class OnlineViewProvider(FreeCADOnlineObject):
         
         value = Property.convertPropertyToWamp(self.obj, prop)
         self.runner.runAsync(self._asyncWriteProperty(prop, value))
+
+
+    def changePropertyStatus(self, prop):
+        info = Property.createPropertyInfo(self.obj, prop)        
+        self.addPropertyStatusChange(prop, info["status"])
+    

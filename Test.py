@@ -113,8 +113,14 @@ class Handler():
      
     async def  __receiveSync(self, docId):
 
-        #call testserver that we received the sync!
-        self.__session.call("ocp.test.sync", docId)
+        #wait till everything is done!
+        entities = self.__manager.getEntities()
+        for entity in entities:
+            if entity.id == docId:
+                await entity.onlinedoc.waitTillCloseout()
+
+        #call testserver that we received and executed the sync!
+        await self.__session.call("ocp.test.sync", docId)
 
     
     async def _rpcShareDocument(self, name):

@@ -6,6 +6,7 @@ Map {
     event onCreated                     //name + typeid
     event onRemoved                     //name
     event onPropChanged                 //obj name, property name
+    event onPropStatusChanged           //obj name, property name, new status
     event onDynamicPropertyCreated      //obj name, property name, type, typeid, group, documentation
     event onDynamicPropertiesCreated    //obj name, property names, property infos
     event onDynamicPropertyRemoved      //obj name, property name
@@ -27,8 +28,11 @@ Map {
         obj.onChangedProperty.RegisterCallback(function(prop) {
             container.onPropChanged.Emit(name, prop)
         })
-        obj.onCreatedDynamicProperty.RegisterCallback(function(prop, type, typeID, group, documentation) {
-            container.onDynamicPropertyCreated.Emit(name, prop, type, typeID, group, documentation)
+        obj.onStatusProperty.RegisterCallback(function(prop, value) {
+            container.onPropStatusChanged.Emit(name, prop, value)
+        })
+        obj.onCreatedDynamicProperty.RegisterCallback(function(prop, type, typeID, group, documentation, status) {
+            container.onDynamicPropertyCreated.Emit(name, prop, type, typeID, group, documentation, status)
         })
         obj.onCreatedDynamicProperties.RegisterCallback(function(props, infos) {
             container.onDynamicPropertiesCreated.Emit(name, props, infos)
@@ -65,6 +69,7 @@ Map {
         
         //events for communication
         event onChangedProperty
+        event onStatusProperty
         event onCreatedDynamicProperty
         event onCreatedDynamicProperties
         event onRemovedDynamicProperty
@@ -81,8 +86,12 @@ Map {
                 this.parent.onChangedProperty.Emit(name)
             }
             
-            .onCreatedDynamic: function(prop, type, typeID, group, documentation) {
-                this.parent.onCreatedDynamicProperty.Emit(prop, type, typeID, group, documentation)
+            .onStatusChanged: function(name, value) {
+                this.parent.onStatusProperty.Emit(name, value)
+            }
+            
+            .onCreatedDynamic: function(prop, type, typeID, group, documentation, status) {
+                this.parent.onCreatedDynamicProperty.Emit(prop, type, typeID, group, documentation, status)
             }
             
             .onMultiCreatedDynamic: function(names, infos) {

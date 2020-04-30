@@ -36,6 +36,7 @@ class OnlineObserver():
             odoc.connection.session.subscribe(self.__newObject, uri+"Document.Objects.onCreated")
             odoc.connection.session.subscribe(self.__removeObject, uri+"Document.Objects.onRemoved")
             odoc.connection.session.subscribe(self.__changeObject, uri+"Document.Objects.onPropChanged")
+            odoc.connection.session.subscribe(self.__changePropStatus, uri+"Document.Objects.onPropStatusChanged")
             odoc.connection.session.subscribe(self.__createObjectDynProperty, uri+"Document.Objects.onDynamicPropertyCreated")
             odoc.connection.session.subscribe(self.__createObjectDynProperties, uri+"Document.Objects.onDynamicPropertiesCreated")
             odoc.connection.session.subscribe(self.__removeObjectDynProperty, uri+"Document.Objects.onDynamicPropertyRemoved")
@@ -44,6 +45,7 @@ class OnlineObserver():
             odoc.connection.session.subscribe(self.__objectRecomputed, uri+"Document.Objects.onObjectRecomputed")
             
             odoc.connection.session.subscribe(self.__changeViewProvider, uri+"Document.ViewProviders.onPropChanged")
+            odoc.connection.session.subscribe(self.__changeViewProvierPropStatus, uri+"Document.ViewProviders.onPropStatusChanged")
             odoc.connection.session.subscribe(self.__createViewProviderDynProperty,   uri+"Document.ViewProviders.onDynamicPropertyCreated")
             odoc.connection.session.subscribe(self.__createViewProviderDynProperties, uri+"Document.ViewProviders.onDynamicPropertiesCreated")
             odoc.connection.session.subscribe(self.__removeViewProviderDynProperty, uri+"Document.ViewProviders.onDynamicPropertyRemoved")
@@ -109,14 +111,24 @@ class OnlineObserver():
         await self.__readProperty(obj, name, prop)
  
  
-    def __createObjectDynProperty(self, name, prop, ptype, typeID, group, documentation):
+    async def __changePropStatus(self, name, prop, status):
+        
+        obj = self.onlineDoc.document.getObject(name)
+        if obj is None:
+            return
+        
+        self.logger.debug("Object: Change {0} property {1} status".format(name, prop))
+        self.__setPropertyStatus(obj, prop, status)
+ 
+ 
+    def __createObjectDynProperty(self, name, prop, ptype, typeID, group, documentation, status):
         obj = self.onlineDoc.document.getObject(name)
         if obj is None:
             self.logger.error("Should add dynamic property {0} for not existing object {1}".format(prop, name))
             return
         
         self.logger.debug("Object: Create dynamic property in {0}: {1}".format(name, prop))
-        self.__createDynProperty(obj, prop, ptype, typeID, group, documentation)
+        self.__createDynProperty(obj, prop, ptype, typeID, group, documentation, status)
         
     
     def __createObjectDynProperties(self, name, props, infos):
@@ -129,7 +141,7 @@ class OnlineObserver():
         self.logger.debug("Object: Create dynamic properties in {0}: {1}".format(name, props))
         for i in range(0, len(props)):
             info = infos[i]
-            self.__createDynProperty(obj, props[i], info["ptype"], info["typeid"], info["group"], info["docu"])
+            self.__createDynProperty(obj, props[i], info["ptype"], info["typeid"], info["group"], info["docu"], info["status"])
         
     
     
@@ -189,9 +201,19 @@ class OnlineObserver():
         
         self.logger.debug("ViewProvider: Change {0} property {1}".format(name, prop))
         await self.__readProperty(obj.ViewObject, name, prop)
-        
+     
     
-    def __createViewProviderDynProperty(self, name, prop, ptype, typeID, group, documentation):
+    async def __changeViewProvierPropStatus(self, name, prop, status):
+        
+        obj = self.onlineDoc.document.getObject(name)
+        if obj is None:
+            return
+        
+        self.logger.debug("ViewProvider: Change {0} property {1} status".format(name, prop))
+        self.__setPropertyStatus(obj.ViewObject, name, prop, status)
+     
+    
+    def __createViewProviderDynProperty(self, name, prop, ptype, typeID, group, documentation, status):
         
         obj = self.onlineDoc.document.getObject(name)
         if obj is None:
@@ -199,7 +221,7 @@ class OnlineObserver():
             return
         
         self.logger.debug("ViewProvider: Change {0} property {0}".format(name, prop))
-        self.__createDynProperty(obj.ViewObject, prop, ptype, typeID, group, documentation)
+        self.__createDynProperty(obj.ViewObject, prop, ptype, typeID, group, documentation, status)
     
     
     def __createViewProviderDynProperties(self, name, props, infos):
@@ -213,7 +235,7 @@ class OnlineObserver():
         
         for i in range(0, len(props)):
             info = infos[i]
-            self.__createDynProperty(obj.ViewObject, props[i], info["ptype"], info["typeid"], info["group"], info["docu"])
+            self.__createDynProperty(obj.ViewObject, props[i], info["ptype"], info["typeid"], info["group"], info["docu"], info["status"])
             
     
     def __removeViewProviderDynProperty(self, name, prop):
@@ -298,20 +320,15 @@ class OnlineObserver():
         except Exception as e:
             self.logger.error("Read property {0} error: {1}".format(prop, e))
 
-        finally:
-                        
-            #most objects do not need a recompute on property change. And we want to avoid it, as
-            #it could be quite time intensive. However, we know some objects that absolutely require it.
-            if obj.isDerivedFrom("Spreadsheet::Sheet"):
-                obj.recompute()
-                
-            elif hasattr(obj, "purgeTouched"):
+        finally:            
+            self.docObserver.activateFor(self.onlineDoc.document)
+            
+            if hasattr(obj, "purgeTouched"):
                 obj.purgeTouched()
                 
-            self.docObserver.activateFor(self.onlineDoc.document)
            
     
-    def __createDynProperty(self, obj, prop, ptype, typeID, group, documentation):
+    def __createDynProperty(self, obj, prop, ptype, typeID, group, documentation, status):
         
         if hasattr(obj, prop):
             return
@@ -319,6 +336,12 @@ class OnlineObserver():
         try:                 
             self.docObserver.deactivateFor(self.onlineDoc.document)
             obj.addProperty(typeID, prop, group, documentation)
+            mode = []
+            if "2" in status:
+                mode.append("ReadOnly")
+            if "3" in status:
+                mode.append("Hidden")
+            obj.setEditorMode(prop, mode)
             
         except Exception as e:
             self.logger.error("Dynamic property adding failed: {0}".format(e))
@@ -381,3 +404,17 @@ class OnlineObserver():
             self.docObserver.activateFor(self.onlineDoc.document)
             if hasattr(obj, "purgeTouched"):
                 obj.purgeTouched()
+
+
+    def __setPropertyStatus(self, obj, prop, status):
+        
+        if not hasattr(obj, prop):
+            return
+        
+        assign = []
+        if "2" in status:
+            assign.append("ReadOnly")
+        if "3" in status:
+            assign.append("Hidden")   
+            
+        obj.setEditorMode(prop, assign)

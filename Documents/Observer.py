@@ -133,7 +133,7 @@ class DocumentObserver(ObserverBase):
 
 
     def slotAppendDynamicProperty(self, obj, prop):    
-        
+               
         doc = obj.Document
         if self.isDeactivatedFor(doc):
             return
@@ -150,7 +150,7 @@ class DocumentObserver(ObserverBase):
             
     
     def slotRemoveDynamicProperty(self, obj, prop):   
-        
+               
         doc = obj.Document
         if self.isDeactivatedFor(doc):
             return
@@ -166,6 +166,23 @@ class DocumentObserver(ObserverBase):
         else:
             odoc.removeViewProviderDynamicProperty(obj, prop)
 
+
+    def slotChangePropertyEditor(self, obj, prop):
+        
+        #this gets called when the editor mode, or status, of the property changes
+        doc = obj.Document
+        if self.isDeactivatedFor(doc):
+            return          
+        
+        odoc = self.handler.getOnlineDocument(doc)
+        if not odoc:
+            return
+        
+        if obj.isDerivedFrom("App::DocumentObject"):
+            odoc.changePropertyStatus(obj, prop)
+        else:
+            odoc.changeViewProviderPropertyStatus(obj, prop)
+        
 
     def slotRecomputedObject(self, obj):
         
@@ -206,8 +223,6 @@ class DocumentObserver(ObserverBase):
     #def slotBeforeChangeObject(self, obj, prop):
         #pass
     
-    #def slotChangePropertyEditor(self, obj, prop):
-        #pass
     
     #def slotStartSaveDocument(self, obj, name):
         #pass

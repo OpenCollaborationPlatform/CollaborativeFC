@@ -86,6 +86,18 @@ class OnlineDocument():
         oobj.changeProperty(prop)
     
     
+    def changePropertyStatus(self, obj, prop):
+        
+        if self.shouldExcludeTypeId(obj.TypeId):
+            return
+        
+        if obj.Name not in self.objects:
+            return
+        
+        oobj = self.objects[obj.Name]
+        oobj.changePropertyStatus(prop)
+    
+    
     def newDynamicProperty(self, obj, prop):
         
         if self.shouldExcludeTypeId(obj.TypeId):
@@ -164,6 +176,18 @@ class OnlineDocument():
         ovp = self.viewproviders[vp.Object.Name]
         ovp.changeProperty(prop)
     
+    
+    def changeViewProviderPropertyStatus(self, obj, prop):
+        
+        if self.shouldExcludeTypeId(obj.TypeId):
+            return
+        
+        if vp.Object.Name not in self.viewproviders:
+            return
+        
+        ovp = self.viewproviders[vp.Object.Name]
+        ovp.changePropertyStatus(prop)
+        
     
     def newViewProviderDynamicProperty(self, vp, prop):
         

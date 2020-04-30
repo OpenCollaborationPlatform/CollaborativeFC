@@ -25,6 +25,14 @@ def createPropertyInfo(obj, prop):
     info["typeid"] = obj.getTypeIdOfProperty(prop)
     info["ptype"] = '-'.join(obj.getTypeOfProperty(prop))
     
+    status = ""
+    editor = obj.getEditorMode(prop)
+    if "ReadOnly" in editor:
+        status += "2 "
+    if "Hidden" in editor:
+        status += "3 "
+    info["status"] = status 
+    
     return info
 
 def convertPropertyToWamp(obj, prop):

@@ -6,9 +6,10 @@ Map {
     event onMultiCreatedDynamic
     event onRemovedDynamic 
     event onChanged
+    event onStatusChanged
     
     //creates a new property and sets it up correctly. No new property event emitted
-    function SetupProperty(name, type, typeID, group, documentation) {
+    function SetupProperty(name, type, typeID, group, documentation, status) {
     
         if (this.Has(name)) {
             throw "Property already exists"
@@ -17,9 +18,12 @@ Map {
         var container = this
         var prop = this.New(name)
         
-        prop.Init(type, typeID, group, documentation)    
+        prop.Init(type, typeID, group, documentation, status)    
         prop.onChanged.RegisterCallback(function() {
             container.onChanged.Emit(name)
+        })
+        prop.onStatusChanged.RegisterCallback(function(value) {
+            container.onStatusChanged.Emit(name, value)  
         })
         
         return prop
@@ -36,19 +40,19 @@ Map {
             
             //setup
             var info = infos[i]
-            this.SetupProperty(names[i], info["ptype"], info["typeid"], info["group"], info["docu"])
+            this.SetupProperty(names[i], info["ptype"], info["typeid"], info["group"], info["docu"], info["status"])
         }
     }
     
-    function CreateDynamicProperty(name, type, typeID, group, documentation) {
+    function CreateDynamicProperty(name, type, typeID, group, documentation, status) {
         
         if (this.Has(name)) {
             throw "Property already exists"
         }
         
         //setup and inform!
-        prop = this.SetupProperty(name, type, typeID, group, documentation)
-        this.onCreatedDynamic.Emit(name, type, typeID, group, documentation)
+        prop = this.SetupProperty(name, type, typeID, group, documentation, status)
+        this.onCreatedDynamic.Emit(name, type, typeID, group, documentation, status)
         return prop
     }
     
@@ -60,8 +64,9 @@ Map {
     }
     
     function RemoveDynamicProperty(name) {
-        container.Remove(name)
-        this.onRemovedDynamic(name)
+        
+        this.Remove(name)
+        this.onRemovedDynamic.Emit(name)
     }
     
     function SetValues(props, values) {
@@ -78,6 +83,20 @@ Map {
         }
     }
     
+    function SetStatus(props, values) {
+    
+        for (var i=0; i<props.length; i++) {
+            
+            var prop = props[i]
+            if (!this.Has(prop)) {
+                throw "Property " + prop + " does not exist"
+            }
+            
+            var obj = this.Get(prop)
+            obj.status = values[i]
+        }
+    }
+    
     .key: string
     .value: Data {
         
@@ -88,9 +107,17 @@ Map {
         property string typeid
         property string group
         property string documentation
+        property string status
         
         event onChanged
+        event onStatusChanged
         
+        .status.onChanged: function(value) {
+            if (this.typeid != "") {
+                this.onStatusChanged.Emit(value)
+            }
+        }
+               
         Variant {
             .name: "PropertyData"
             
@@ -112,7 +139,7 @@ Map {
                     }
         }
         
-        function Init(type, typeID, group, documentation) {          
+        function Init(type, typeID, group, documentation, status) {          
 
             switch(typeID) {
                 case "App::PropertyLink":
@@ -160,6 +187,7 @@ Map {
             
             //do this after assigning the variant as we use this as indicator for 
             //finished initialization
+            this.status = status
             this.propertyType = type
             this.typeid = typeID
             this.group = group
@@ -183,7 +211,8 @@ Map {
                 "type": this.propertyType, 
                 "id": this.typeid,
                 "group": this.group,
-                "docu": this.documentation
+                "docu": this.documentation,
+                "status": this.status
             }
 
             return dict

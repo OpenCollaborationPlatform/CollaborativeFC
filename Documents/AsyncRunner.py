@@ -75,6 +75,8 @@ class AsyncRunner():
         
            
     def runAsyncAsSetup(self, awaitable):
+        #runs after the already known setup tasks
+        #setup tasks run in the same order as provided by this function
         
         ctx = TaskContext(self.setupTasks.copy())
         t = asyncio.ensure_future(self.__run(awaitable, ctx))
@@ -84,6 +86,8 @@ class AsyncRunner():
         
         
     def runAsyncAsIntermediateSetup(self, awaitable):
+        #runs after setup, before all normal tasks, however, in contrast to setup 
+        #these tasks run async, hence not in order
         
         ctx = TaskContext(self.setupTasks.copy())
         t = asyncio.ensure_future(self.__run(awaitable, ctx))
@@ -93,6 +97,8 @@ class AsyncRunner():
         
         
     def runAsync(self, awaitable):
+        #runs the awaitable after all setup & runAsyncAsIntermediateSetup tasks are done.
+        #Execution is async, hence not in order. This mode is to be used as default
         
         ctx = TaskContext(self.setupTasks.copy() + self.intermediateSetupTasks.copy())
         t = asyncio.ensure_future(self.__run(awaitable, ctx))
@@ -101,6 +107,8 @@ class AsyncRunner():
         
         
     def runAsyncAsCloseout(self, awaitable):
+        #runs the awaitable after all other known tasks are done
+        #This is for action that need to ensure nothing comes afterwards
         
         ctx = TaskContext(self.allTasks.copy())
         t = asyncio.ensure_future(self.__run(awaitable, ctx))
