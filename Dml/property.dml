@@ -9,7 +9,7 @@ Map {
     event onStatusChanged
     
     //creates a new property and sets it up correctly. No new property event emitted
-    function SetupProperty(name, type, typeID, group, documentation, status) {
+    function SetupProperty(name, typeID, group, documentation, status) {
     
         if (this.Has(name)) {
             throw "Property already exists"
@@ -18,7 +18,7 @@ Map {
         var container = this
         var prop = this.New(name)
         
-        prop.Init(type, typeID, group, documentation, status)    
+        prop.Init(typeID, group, documentation, status)    
         prop.onChanged.RegisterCallback(function() {
             container.onChanged.Emit(name)
         })
@@ -40,19 +40,19 @@ Map {
             
             //setup
             var info = infos[i]
-            this.SetupProperty(names[i], info["ptype"], info["typeid"], info["group"], info["docu"], info["status"])
+            this.SetupProperty(names[i], info["typeid"], info["group"], info["docu"], info["status"])
         }
     }
     
-    function CreateDynamicProperty(name, type, typeID, group, documentation, status) {
+    function CreateDynamicProperty(name, typeID, group, documentation, status) {
         
         if (this.Has(name)) {
             throw "Property already exists"
         }
         
         //setup and inform!
-        prop = this.SetupProperty(name, type, typeID, group, documentation, status)
-        this.onCreatedDynamic.Emit(name, type, typeID, group, documentation, status)
+        prop = this.SetupProperty(name, typeID, group, documentation, status)
+        this.onCreatedDynamic.Emit(name, typeID, group, documentation, status)
         return prop
     }
     
@@ -103,7 +103,6 @@ Map {
         .name: "Property"
 
         //FreeCAD infos
-        property string propertyType
         property string typeid
         property string group
         property string documentation
@@ -139,7 +138,7 @@ Map {
                     }
         }
         
-        function Init(type, typeID, group, documentation, status) {          
+        function Init(typeID, group, documentation, status) {          
 
             switch(typeID) {
                 case "App::PropertyLink":
@@ -188,7 +187,6 @@ Map {
             //do this after assigning the variant as we use this as indicator for 
             //finished initialization
             this.status = status
-            this.propertyType = type
             this.typeid = typeID
             this.group = group
             this.documentation = documentation
@@ -208,7 +206,6 @@ Map {
         
         const function GetInfo() {
             var dict = {
-                "type": this.propertyType, 
                 "id": this.typeid,
                 "group": this.group,
                 "docu": this.documentation,

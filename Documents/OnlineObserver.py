@@ -117,18 +117,18 @@ class OnlineObserver():
         if obj is None:
             return
         
-        self.logger.debug("Object: Change {0} property {1} status".format(name, prop))
+        self.logger.debug(f"ViewProvider: Change {name} property {prop} status to ({status})")
         self.__setPropertyStatus(obj, prop, status)
  
  
-    def __createObjectDynProperty(self, name, prop, ptype, typeID, group, documentation, status):
+    def __createObjectDynProperty(self, name, prop, typeID, group, documentation, status):
         obj = self.onlineDoc.document.getObject(name)
         if obj is None:
             self.logger.error("Should add dynamic property {0} for not existing object {1}".format(prop, name))
             return
         
         self.logger.debug("Object: Create dynamic property in {0}: {1}".format(name, prop))
-        self.__createDynProperty(obj, prop, ptype, typeID, group, documentation, status)
+        self.__createDynProperty(obj, prop, typeID, group, documentation, status)
         
     
     def __createObjectDynProperties(self, name, props, infos):
@@ -141,7 +141,7 @@ class OnlineObserver():
         self.logger.debug("Object: Create dynamic properties in {0}: {1}".format(name, props))
         for i in range(0, len(props)):
             info = infos[i]
-            self.__createDynProperty(obj, props[i], info["ptype"], info["typeid"], info["group"], info["docu"], info["status"])
+            self.__createDynProperty(obj, props[i], info["typeid"], info["group"], info["docu"], info["status"])
         
     
     
@@ -209,11 +209,11 @@ class OnlineObserver():
         if obj is None:
             return
         
-        self.logger.debug("ViewProvider: Change {0} property {1} status".format(name, prop))
+        self.logger.debug(f"ViewProvider: Change {name} property {prop} status to ({status})")
         self.__setPropertyStatus(obj.ViewObject, name, prop, status)
      
     
-    def __createViewProviderDynProperty(self, name, prop, ptype, typeID, group, documentation, status):
+    def __createViewProviderDynProperty(self, name, prop, typeID, group, documentation, status):
         
         obj = self.onlineDoc.document.getObject(name)
         if obj is None:
@@ -221,7 +221,7 @@ class OnlineObserver():
             return
         
         self.logger.debug("ViewProvider: Change {0} property {0}".format(name, prop))
-        self.__createDynProperty(obj.ViewObject, prop, ptype, typeID, group, documentation, status)
+        self.__createDynProperty(obj.ViewObject, prop, typeID, group, documentation, status)
     
     
     def __createViewProviderDynProperties(self, name, props, infos):
@@ -235,7 +235,7 @@ class OnlineObserver():
         
         for i in range(0, len(props)):
             info = infos[i]
-            self.__createDynProperty(obj.ViewObject, props[i], info["ptype"], info["typeid"], info["group"], info["docu"], info["status"])
+            self.__createDynProperty(obj.ViewObject, props[i], info["typeid"], info["group"], info["docu"], info["status"])
             
     
     def __removeViewProviderDynProperty(self, name, prop):
@@ -328,21 +328,39 @@ class OnlineObserver():
                 
            
     
-    def __createDynProperty(self, obj, prop, ptype, typeID, group, documentation, status):
+    def __createDynProperty(self, obj, prop, typeID, group, documentation, status):
         
         if hasattr(obj, prop):
             return
         
         try:                 
             self.docObserver.deactivateFor(self.onlineDoc.document)
-            obj.addProperty(typeID, prop, group, documentation)
-            mode = []
-            if "2" in status:
-                mode.append("ReadOnly")
-            if "3" in status:
-                mode.append("Hidden")
-            obj.setEditorMode(prop, mode)
             
+            attributes = 0
+            
+            if "ReadOnly" in status:
+                attributes |= 1
+            if "Transient" in status:
+                attributes |= 2
+            if "Hidden" in status:
+                attributes |= 4
+            if "Output" in status:
+                attributes |= 8
+            if "NoRecompute" in status:
+                attributes |= 16
+            
+            obj.addProperty(typeID, prop, group, documentation, attributes)
+            
+            mode = []
+            if "EditModeReadOnly" in status:
+                mode.append("ReadOnly")
+            if "EditModeHidden" in status:
+                mode.append("Hidden")
+
+            if len(mode) > 0:
+                obj.setEditorMode(prop, mode)
+        
+        
         except Exception as e:
             self.logger.error("Dynamic property adding failed: {0}".format(e))
             
@@ -411,10 +429,11 @@ class OnlineObserver():
         if not hasattr(obj, prop):
             return
         
+        #the only possible runtime settings are Hidden and ReadOnly of EditorMode
         assign = []
-        if "2" in status:
+        if "EditModeReadOnly" in status:
             assign.append("ReadOnly")
-        if "3" in status:
+        if "EditModeHidden" in status:
             assign.append("Hidden")   
             
         obj.setEditorMode(prop, assign)

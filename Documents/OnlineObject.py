@@ -80,7 +80,7 @@ class FreeCADOnlineObject():
                 fnc = "SetupProperty"
                 
             uri = u"ocp.documents.edit.{0}.call.Document.{1}.{2}.Properties.{3}".format(self.docId, self.objGroup, self.name, fnc)
-            await self.connection.session.call(uri, prop, info["ptype"], info["typeid"], info["group"], info["docu"], info["status"])
+            await self.connection.session.call(uri, prop, info["typeid"], info["group"], info["docu"], info["status"])
         
         except Exception as e:
             self.logger.error("Setup property {0} failed: {1}".format(prop, e))

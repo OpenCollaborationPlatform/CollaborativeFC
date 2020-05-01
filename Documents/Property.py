@@ -23,16 +23,21 @@ def createPropertyInfo(obj, prop):
     info["docu"] = obj.getDocumentationOfProperty(prop)
     info["group"] = obj.getGroupOfProperty(prop)
     info["typeid"] = obj.getTypeIdOfProperty(prop)
-    info["ptype"] = '-'.join(obj.getTypeOfProperty(prop))
     
-    status = ""
-    editor = obj.getEditorMode(prop)
-    if "ReadOnly" in editor:
-        status += "2 "
-    if "Hidden" in editor:
-        status += "3 "
-    info["status"] = status 
-    
+    #type and edit mode work the following:
+    #Type is immutable, set at creation time (attr in addDynamicProperty"), and includes Hidden/ReadOnly
+    #setEditMode can set Hidden and ReadOnly as extra variable
+    #getEditMode returns the or-combination of Type and setEditMode for Hidden and ReadOnly
+    #as boolean expression: Hidden = TypeHidden | SetEditHidden (same for ReadOnly) mode
+    status = obj.getTypeOfProperty(prop)
+    editmode = obj.getEditorMode(prop)
+    for edit in editmode:
+        #if type is Hidden or ReadOnly we do not need to set it again, it's always set.
+        if not edit in status:
+            status.append("EditMode" + edit)
+
+    info["status"] = '-'.join(status)
+       
     return info
 
 def convertPropertyToWamp(obj, prop):

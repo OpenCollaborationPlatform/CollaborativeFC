@@ -7,7 +7,7 @@ Map {
     event onRemoved                     //name
     event onPropChanged                 //obj name, property name
     event onPropStatusChanged           //obj name, property name, new status
-    event onDynamicPropertyCreated      //obj name, property name, type, typeid, group, documentation
+    event onDynamicPropertyCreated      //obj name, property name, typeid, group, documentation
     event onDynamicPropertiesCreated    //obj name, property names, property infos
     event onDynamicPropertyRemoved      //obj name, property name
     event onExtensionCreated            //obj name, extension name
@@ -31,8 +31,8 @@ Map {
         obj.onStatusProperty.RegisterCallback(function(prop, value) {
             container.onPropStatusChanged.Emit(name, prop, value)
         })
-        obj.onCreatedDynamicProperty.RegisterCallback(function(prop, type, typeID, group, documentation, status) {
-            container.onDynamicPropertyCreated.Emit(name, prop, type, typeID, group, documentation, status)
+        obj.onCreatedDynamicProperty.RegisterCallback(function(prop, typeID, group, documentation, status) {
+            container.onDynamicPropertyCreated.Emit(name, prop, typeID, group, documentation, status)
         })
         obj.onCreatedDynamicProperties.RegisterCallback(function(props, infos) {
             container.onDynamicPropertiesCreated.Emit(name, props, infos)
@@ -90,8 +90,8 @@ Map {
                 this.parent.onStatusProperty.Emit(name, value)
             }
             
-            .onCreatedDynamic: function(prop, type, typeID, group, documentation, status) {
-                this.parent.onCreatedDynamicProperty.Emit(prop, type, typeID, group, documentation, status)
+            .onCreatedDynamic: function(prop, typeID, group, documentation, status) {
+                this.parent.onCreatedDynamicProperty.Emit(prop, typeID, group, documentation, status)
             }
             
             .onMultiCreatedDynamic: function(names, infos) {
