@@ -18,27 +18,79 @@
 # ************************************************************************
 #
 
+import FreeCAD as App
+
+__typeToStatusMap__ = {
+    "NoRecompute": "23",
+    "ReadOnly": "24",
+    "Transient": "25",
+    "Hidden": "26",
+    "Output": "27"
+}
+
 def createPropertyInfo(obj, prop):
     info = {}
     info["docu"] = obj.getDocumentationOfProperty(prop)
     info["group"] = obj.getGroupOfProperty(prop)
     info["typeid"] = obj.getTypeIdOfProperty(prop)
     
-    #type and edit mode work the following:
-    #Type is immutable, set at creation time (attr in addDynamicProperty"), and includes Hidden/ReadOnly
-    #setEditMode can set Hidden and ReadOnly as extra variable
-    #getEditMode returns the or-combination of Type and setEditMode for Hidden and ReadOnly
-    #as boolean expression: Hidden = TypeHidden | SetEditHidden (same for ReadOnly) mode
-    status = obj.getTypeOfProperty(prop)
-    editmode = obj.getEditorMode(prop)
-    for edit in editmode:
-        #if type is Hidden or ReadOnly we do not need to set it again, it's always set.
-        if not edit in status:
-            status.append("EditMode" + edit)
+    status = []
+    if  float(".".join(App.Version()[0:2])) >= 0.19:
+        status = [str(e) for e in obj.getPropertyStatus(prop)]
+    else:
+        #add the types (static status in >=0.19)
+        for pt in obj.getTypeOfProperty(prop):
+            status.append(__typeToStatusMap__[pt])
+            
+        #add the two variable status fields that are already supported in 0.18
+        for edit in obj.getEditorMode(prop):
+            status.append(edit)
 
     info["status"] = '-'.join(status)
        
     return info
+
+def statusToType(status):
+    
+    statusBitMap = {
+        "24": 1,
+        "25": 2,
+        "26": 4, 
+        "27": 8, 
+        "23": 16,
+        "22": 32
+    }
+    
+    attributes = 0
+    strs = status.split("-")
+    for stat in strs:
+        if stat in statusBitMap:
+            attributes  |= statusBitMap[stat]
+            
+    return attributes
+
+def statusToEditorMode(status):
+    
+    modes = []
+    if "ReadOnly" in status:
+        modes.append("ReadOnly")
+    if "Hidden" in status:
+        modes.append("Hidden")
+            
+    return modes
+
+def statusToList(status):
+    
+    entries = status.split("-")
+    result = []
+    for entry in entries:
+        if len(entry)>2:
+            result.append(entry)
+        else:
+            result.append(int(entry))
+    
+    return result
+
 
 def convertPropertyToWamp(obj, prop):
     #converts the property to a wamp usable form

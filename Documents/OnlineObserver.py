@@ -336,29 +336,15 @@ class OnlineObserver():
         try:                 
             self.docObserver.deactivateFor(self.onlineDoc.document)
             
-            attributes = 0
-            
-            if "ReadOnly" in status:
-                attributes |= 1
-            if "Transient" in status:
-                attributes |= 2
-            if "Hidden" in status:
-                attributes |= 4
-            if "Output" in status:
-                attributes |= 8
-            if "NoRecompute" in status:
-                attributes |= 16
-            
+            attributes = Property.statusToType(status)            
             obj.addProperty(typeID, prop, group, documentation, attributes)
             
-            mode = []
-            if "EditModeReadOnly" in status:
-                mode.append("ReadOnly")
-            if "EditModeHidden" in status:
-                mode.append("Hidden")
-
-            if len(mode) > 0:
-                obj.setEditorMode(prop, mode)
+            if float(".".join(FreeCAD.Version()[0:2])) >= 0.19:
+                obj.setPropertyStatus(prop, Property.statusToIntList(status))
+            else:
+                mode = Property.statusToEditorMode(status)
+                if len(mode) > 0:
+                    obj.setEditorMode(prop, mode)
         
         
         except Exception as e:
@@ -429,11 +415,17 @@ class OnlineObserver():
         if not hasattr(obj, prop):
             return
         
-        #the only possible runtime settings are Hidden and ReadOnly of EditorMode
-        assign = []
-        if "EditModeReadOnly" in status:
-            assign.append("ReadOnly")
-        if "EditModeHidden" in status:
-            assign.append("Hidden")   
+        try:
+            self.docObserver.deactivateFor(self.onlineDoc.document)
             
-        obj.setEditorMode(prop, assign)
+            if  float(".".join(FreeCAD.Version()[0:2])) >= 0.19:
+                obj.setPropertyStatus(prop, Property.statusToList(status))
+            
+            else:
+                obj.setEditorMode(prop, Property.statusToEditorMode(status))
+        
+        finally:
+            
+            self.docObserver.activateFor(self.onlineDoc.document)
+            if hasattr(obj, "purgeTouched"):
+                obj.purgeTouched()
