@@ -64,9 +64,10 @@ class OnlineObserver():
             
             #maybe the object exists already (e.g. auto created by annother added object like App::Part Origin)
             if hasattr(self.onlineDoc.document, name):
+                #TODO: check if typeid matches
                 return
             
-            #we do not add App origins, lines and planes, as they are only Autocreated from parts and bodie
+            #we do not add App origins, lines and planes, as they are only Autocreated from parts and bodies
             #hence they will be created later then the parent is added
             if typeID in ["App::Origin", "App::Line", "App::Plane"]:
                 return
@@ -92,7 +93,7 @@ class OnlineObserver():
             
             self.docObserver.deactivateFor(self.onlineDoc.document)
             self.onlineDoc.document.removeObject(name)
-            del(self.onlineDoc[name])
+            del(self.onlineDoc.objects[name])
             
         except Exception as e:
             self.logger.error("Remove object online callback failed: {0}".format(e))
@@ -101,17 +102,25 @@ class OnlineObserver():
             self.docObserver.activateFor(self.onlineDoc.document)
         
         
-    async def __changeObject(self, name, prop):
+    def __changeObject(self, name, prop):
         
         obj = self.onlineDoc.document.getObject(name)
         if obj is None:
             return
         
         self.logger.debug("Object: Change {0} property {1}".format(name, prop))
-        await self.__readProperty(obj, name, prop)
+        
+        #property changes need to be partially synced:
+        # as the node needs to be called for values (or even binary data) it takes a while and the call is async.
+        # However, things like Proxy need to be set in the correct order, as this triggers certain setups like "attach".
+        # Without that other property changes may not have the correct object state 
+        if "PropertyPythonObject" in obj.getTypeIdOfProperty(prop):
+            self.onlineDoc.objects[name].sender.runAsyncAsSetup(self.__readProperty(obj, name, prop))
+        else:
+            self.onlineDoc.objects[name].sender.runAsync(self.__readProperty(obj, name, prop))
  
  
-    async def __changePropStatus(self, name, prop, status):
+    def __changePropStatus(self, name, prop, status):
         
         obj = self.onlineDoc.document.getObject(name)
         if obj is None:
@@ -200,7 +209,13 @@ class OnlineObserver():
             return
         
         self.logger.debug("ViewProvider: Change {0} property {1}".format(name, prop))
-        await self.__readProperty(obj.ViewObject, name, prop)
+        
+        #see __changeObject for explanation
+        if "PropertyPythonObject" in obj.ViewObject.getTypeIdOfProperty(prop):
+            print("run as setup: ", prop)
+            self.onlineDoc.objects[name].sender.runAsyncAsSetup(self.__readProperty(obj.ViewObject, name, prop))
+        else:
+            self.onlineDoc.objects[name].sender.runAsync(self.__readProperty(obj.ViewObject, name, prop))
      
     
     async def __changeViewProvierPropStatus(self, name, prop, status):

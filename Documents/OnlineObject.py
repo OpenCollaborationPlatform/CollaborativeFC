@@ -27,7 +27,8 @@ class FreeCADOnlineObject():
         self.docId           = onlinedoc.id
         self.data            = onlinedoc.data
         self.connection      = onlinedoc.connection
-        self.runner          = AsyncRunner()
+        self.sender          = AsyncRunner() #used by the object to sync outgoing events
+        self.receiver        = AsyncRunner() #used by online observer to sync incoming events
         self.name            = name
         self.objGroup        = objGroup 
         self.dynPropCache    = {}
@@ -61,7 +62,7 @@ class FreeCADOnlineObject():
                     batchvalues.append(values[prop])
             
             if len(batchprops) > 0:
-                tasks.append(self._asyncBatchWriteProperties(batchprops, batchvalues))
+                tasks.append(self._asyncWriteProperties(batchprops, batchvalues))
                              
             if len(tasks) > 0:
                 await asyncio.wait(tasks)
@@ -71,6 +72,9 @@ class FreeCADOnlineObject():
            
     
     async def _asyncCreateProperty(self, dyn, prop, info):
+        #adds a property with its property info
+        #could be added as normal or as dynamic property, dependend on dyn boolean
+        
         try:            
             if dyn:
                 self.logger.debug("Create dynamic property {0} ({1})".format(prop, info["typeid"]))
@@ -79,8 +83,27 @@ class FreeCADOnlineObject():
                 self.logger.debug("Setup default property {0} ({1})".format(prop, info["typeid"]))
                 fnc = "SetupProperty"
                 
-            uri = u"ocp.documents.edit.{0}.call.Document.{1}.{2}.Properties.{3}".format(self.docId, self.objGroup, self.name, fnc)
+            uri = f"ocp.documents.edit.{self.docId}.call.Document.{self.objGroup}.{self.name}.Properties.{fnc}"
             await self.connection.session.call(uri, prop, info["typeid"], info["group"], info["docu"], info["status"])
+        
+        except Exception as e:
+            self.logger.error("Setup property {0} failed: {1}".format(prop, e))
+    
+    
+    async def _asyncCreateProperties(self, dyn, props, infos):
+        #adds a list of properties and a list with their property infos
+        #could be added as normal or as dynamic property, dependend on dyn boolean
+        
+        try:            
+            if dyn:
+                self.logger.debug(f"Create dynamic properties {props}")
+                fnc = "CreateDynamicProperties"
+            else:
+                self.logger.debug(f"Setup default properties {props}")
+                fnc = "SetupProperties"
+                
+            uri = f"ocp.documents.edit.{self.docId}.call.Document.{self.objGroup}.{self.name}.Properties.{fnc}"
+            await self.connection.session.call(uri, props, infos)
         
         except Exception as e:
             self.logger.error("Setup property {0} failed: {1}".format(prop, e))
@@ -96,7 +119,9 @@ class FreeCADOnlineObject():
             self.logger.error("Remove property {0} failed: {1}".format(prop, e))
         
     
-    def addDynamicPropertyCreation(self, prop, info):
+    def _addDynamicPropertyCreation(self, prop, info):
+        #caches the dynamic property creation to be executed as batch later
+        
         #add property with info to the cache. 
         self.dynPropCache[prop] = info
         
@@ -104,10 +129,10 @@ class FreeCADOnlineObject():
         #we are sure processing was already startet
         if len(self.dynPropCache) == 1:
             #add it to the dyn property creation cache. If it is the first entry we also start the 
-            self.runner.runAsyncAsIntermediateSetup(self._asyncCreateDynamicPropertiesFromCache())
+            self.sender.runAsyncAsIntermediateSetup(self.__asyncCreateDynamicPropertiesFromCache())
         
         
-    async def _asyncCreateDynamicPropertiesFromCache(self):
+    async def __asyncCreateDynamicPropertiesFromCache(self):
         
         if len(self.dynPropCache) == 0:
             return
@@ -122,15 +147,13 @@ class FreeCADOnlineObject():
                 await self._asyncCreateProperty(True, keys[0], values[0])
             
             else:
-                self.logger.debug("Create batched dynamic properties: {0}".format(keys))
-                uri = u"ocp.documents.edit.{0}.call.Document.{1}.{2}.Properties.CreateDynamicProperties".format(self.docId, self.objGroup, self.name)
-                await self.connection.session.call(uri, keys, values)
+                await self._asyncCreateProperties(True, keys, values)
 
         except Exception as e:
             self.logger.error("Create dyn property from cache failed: {0}".format(e))
             
             
-    def addPropertyStatusChange(self, prop, status):
+    def _addPropertyStatusChange(self, prop, status):
         
         #add property with status to the cache. 
         self.statusPropCache[prop] = status
@@ -139,10 +162,10 @@ class FreeCADOnlineObject():
         #we are sure processing was already startet
         if len(self.statusPropCache) == 1:
             #add it to the dyn property creation cache. If it is the first entry we also start the 
-            self.runner.runAsync(self._asyncStatusPropertiesFromCache())
+            self.sender.runAsync(self.__asyncStatusPropertiesFromCache())
         
         
-    async def _asyncStatusPropertiesFromCache(self):
+    async def __asyncStatusPropertiesFromCache(self):
         
         if len(self.statusPropCache) == 0:
             return
@@ -199,7 +222,7 @@ class FreeCADOnlineObject():
             self.logger.error("Writing property error ({1}, {2}): {0}".format(e, self.name, prop))
    
    
-    async def _asyncBatchWriteProperties(self, props, values):
+    async def _asyncWriteProperties(self, props, values):
         
         try:
             self.logger.debug("Write batch properties {0}".format(props))
@@ -208,67 +231,53 @@ class FreeCADOnlineObject():
             
         except Exception as e:
             self.logger.error("Writing property batch error: {0}".format(e))
-            
-       
-    async def _updateExtensions(self, obj):
-        #we need to check if the correct set of extensions is known and change it if not
-        #as we do not have a correct event for adding/removing extensions this is the only way
+     
+     
+    async def _asyncAddDynamcExtension(self, extension, props):
         
-        try:
-            uri = u"ocp.documents.edit.{0}".format(self.docId)
-
-            #a list of all known python extensions and the properties they add
-            extensions = {"App::GroupExtensionPython": ["ExtensionProxy", "Group"], 
-                          "App::GeoFeatureGroupExtensionPython": ["ExtensionProxy", "Group"],
-                          "App::OriginGroupExtensionPython": ["ExtensionProxy", "Group", "Origin"],
-                          "Gui::ViewProviderGeoFeatureGroupExtensionPython": ["ExtensionProxy"],
-                          "Gui::ViewProviderGroupExtensionPython": ["ExtensionProxy"],
-                          "Gui::ViewProviderOriginGroupExtensionPython": ["ExtensionProxy"],
-                          "Part::AttachExtensionPython": ["ExtensionProxy", "AttacherType", "Support", "MapMode", "MapReversed", "MapPathParameter", "AttachmentOffset"],
-                          "PartGui::ViewProviderAttachExtensionPython": ["ExtensionProxy"]}
-
-            availExt = []
-            for ext in extensions.keys():
-                #need try/except as hasExtension can fail if e.g. PartGui is not yet loaded but we ask for it
-                try:
-                    if obj.hasExtension(ext):
-                        availExt.append(ext)
-                except:
-                    pass
+        try:           
+            uri = f"ocp.documents.edit.{self.docId}"
             
-            tasks = []
-            calluri = uri + u".call.Document.{0}.{1}.Extensions.GetAll".format(self.objGroup, self.name)
-            knownExt = await self.connection.session.call(calluri)
-   
-            #extensions can only be added dynamically
-            addedProps = []
-            addExt = set(availExt) - set(knownExt)
-            for ext in addExt:
-                self.logger.debug("Add extension {0}".format(ext))
-                calluri = uri + u".call.Document.{0}.{1}.Extensions.Append".format(self.objGroup, self.name)
-                tasks.append(self.connection.session.call(calluri, ext))
+            #add the extension must be done: a changed property could result in use of the extension
+            self.logger.debug("Add extension {0}".format(extension))
+            calluri = uri + u".call.Document.{0}.{1}.Extensions.Append".format(self.objGroup, self.name)
+            await self.connection.session.call(calluri, extension)
+            
+            #the props can be created by a single call
+            infos = []
+            for prop in props:
+                infos.append(Property.createPropertyInfo(self.obj, prop))
                 
-                for prop in extensions[ext]:
-                    addedProps.append(prop)
-                    info = Property.createPropertyInfo(obj, prop)        
-                    tasks.append(self._asyncCreateProperty(False, prop, info))
+            await self._asyncCreateProperties(False, props, infos)
             
-            if len(tasks) > 0:
-                await asyncio.wait(tasks)
-            
-            #write the default values for the extension properties
-            self.logger.debug("Add extension properties {0}".format(addedProps))
+            #split properties into binary and non-binary
+            batchprops  = []
+            batchvalues = []
+            binaryprops  =  []
+            binaryvalues =  []
+            for prop in props:
+                value = Property.convertPropertyToWamp(self.obj, prop)
+                if not isinstance(value, bytearray):
+                    batchvalues.append(value)
+                    batchprops.append(prop)
+                else:
+                    binaryvalues.append(value)
+                    binaryprops.append(prop)
+
+            #create the setting coroutines
             tasks = []
-            for prop in addedProps:
-                value = Property.convertPropertyToWamp(obj, prop)
+            tasks.append(self._asyncWriteProperties(batchprops, batchvalues))
+            for prop, value in zip(binaryprops, binaryvalues):
                 tasks.append(self._asyncWriteProperty(prop, value))
-            
+
+            #batchproces the property writing
             if len(tasks) > 0:
                 await asyncio.wait(tasks)
-        
+
+                
         except Exception as e:
-            self.logger.error("UpdateExtensions failed: {0}".format(e))
-            
+            self.logger.error("Adding extension failed: {0}".format(e))
+     
      
     async def _asyncRemove(self):
         try:
@@ -284,7 +293,7 @@ class FreeCADOnlineObject():
         #wait till all current async tasks are finished. Note that it also wait for task added during the wait period.
         #throws an error on timeout.
         
-        await self.runner.waitTillCloseout(timeout)
+        await self.sender.waitTillCloseout(timeout)
 
 
 class OnlineObject(FreeCADOnlineObject):
@@ -304,21 +313,25 @@ class OnlineObject(FreeCADOnlineObject):
             values[prop] = Property.convertPropertyToWamp(self.obj, prop)
             infos[prop]  = Property.createPropertyInfo(self.obj, prop)
             
-        self.runner.runAsyncAsSetup(self._asyncSetup(self.obj.TypeId, values, infos))
+        self.sender.runAsyncAsSetup(self._asyncSetup(self.obj.TypeId, values, infos))
     
     
     def remove(self):
-        self.runner.runAsyncAsCloseout(self._asyncRemove())
+        self.sender.runAsyncAsCloseout(self._asyncRemove())
         
     
     def createDynamicProperty(self, prop):
         info = Property.createPropertyInfo(self.obj, prop)        
-        self.addDynamicPropertyCreation(prop, info)
+        self._addDynamicPropertyCreation(prop, info)
     
     
     def removeDynamicProperty(self, prop):
         #we need to make sure the remove comes after the creation
-        self.runner.runAsyncAsCloseout(self._asyncRemoveProperty(prop))
+        self.sender.runAsyncAsCloseout(self._asyncRemoveProperty(prop))
+    
+    
+    def addDynamicExtension(self, extension, props):
+        self.sender.runAsyncAsSetup(self._asyncAddDynamcExtension(extension, props))
     
     
     def changeProperty(self, prop):
@@ -328,7 +341,7 @@ class OnlineObject(FreeCADOnlineObject):
         #f.e. with App::Parts group property on drag n drop. So let's check for it.
         if "Up-to-date" in self.obj.State:
             value = Property.convertPropertyToWamp(self.obj, prop)
-            self.runner.runAsync(self._asyncWriteProperty(prop, value))
+            self.sender.runAsync(self._asyncWriteProperty(prop, value))
             
         else:
             self.changed.add(prop)
@@ -336,7 +349,7 @@ class OnlineObject(FreeCADOnlineObject):
  
     def changePropertyStatus(self, prop):
         info = Property.createPropertyInfo(self.obj, prop)        
-        self.addPropertyStatusChange(prop, info["status"])
+        self._addPropertyStatusChange(prop, info["status"])
     
     
     
@@ -350,17 +363,13 @@ class OnlineObject(FreeCADOnlineObject):
         for prop in changed:
             values[prop] = Property.convertPropertyToWamp(self.obj, prop)
             
-        self.runner.runAsyncAsCloseout(self.__asyncRecompute(values))
+        self.sender.runAsyncAsCloseout(self.__asyncRecompute(values))
                
             
     async def __asyncRecompute(self, values):
         
         try:
             self.logger.debug("Recompute")
-            
-            #handle the extensions if required
-            if "ExtensionProxy" in values.keys():
-                await self._updateExtensions(self.obj)
             
             #after recompute all changes are commited          
             batchprops = []
@@ -375,7 +384,7 @@ class OnlineObject(FreeCADOnlineObject):
                     batchvalues.append(values[prop])
             
             if len(batchprops) > 0:
-                tasks.append(self._asyncBatchWriteProperties(batchprops, batchvalues))
+                tasks.append(self._asyncWriteProperties(batchprops, batchvalues))
             
             if len(tasks) > 0:
                 await asyncio.wait(tasks)
@@ -408,27 +417,27 @@ class OnlineViewProvider(FreeCADOnlineObject):
             values[prop] = Property.convertPropertyToWamp(self.obj, prop)
             infos[prop]  = Property.createPropertyInfo(self.obj, prop)
             
-        self.runner.runAsyncAsSetup(self._asyncSetup(self.obj.TypeId, values, infos))
+        self.sender.runAsyncAsSetup(self._asyncSetup(self.obj.TypeId, values, infos))
     
     
     def remove(self):
-        self.runner.runAsyncAsCloseout(self._asyncRemove())
+        self.sender.runAsyncAsCloseout(self._asyncRemove())
         
     
     def createDynamicProperty(self, prop):
         info = Property.createPropertyInfo(self.obj, prop)        
-        self.addDynamicPropertyCreation(prop, info)
+        self._addDynamicPropertyCreation(prop, info)
     
     
     def removeDynamicProperty(self, prop):
-        self.runner.runAsyncAsCloseout(self._asyncRemoveProperty(prop))
+        self.sender.runAsyncAsCloseout(self._asyncRemoveProperty(prop))
+    
+    
+    def addDynamicExtension(self, extension, props):
+        self.sender.runAsyncAsSetup(self._asyncAddDynamcExtension(extension, props))
     
     
     def changeProperty(self, prop):
-        
-        #work around missing extension callbacks
-        if prop == "ExtensionProxy":
-            self.runner.runAsyncAsSetup(self._updateExtensions(self.obj))
         
         #work around missing proxy callback. This may add to some delay, as proxy change is ony forwarded 
         #when annother property changes afterwards, however, at least the order of changes is keept
@@ -436,13 +445,13 @@ class OnlineViewProvider(FreeCADOnlineObject):
             proxydata = self.obj.dumpPropertyContent('Proxy')
             if not proxydata == self.proxydata:
                 self.proxydata = proxydata
-                self.runner.runAsync(self._asyncWriteProperty('Proxy', proxydata))
+                self.sender.runAsync(self._asyncWriteProperty('Proxy', proxydata))
         
         value = Property.convertPropertyToWamp(self.obj, prop)
-        self.runner.runAsync(self._asyncWriteProperty(prop, value))
+        self.sender.runAsync(self._asyncWriteProperty(prop, value))
 
 
     def changePropertyStatus(self, prop):
         info = Property.createPropertyInfo(self.obj, prop)        
-        self.addPropertyStatusChange(prop, info["status"])
+        self._addPropertyStatusChange(prop, info["status"])
     

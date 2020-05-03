@@ -18,7 +18,7 @@
 # ************************************************************************
 
 import asyncio
-import FreeCADGui
+import FreeCAD, FreeCADGui
 
 class ObserverManager():
     
@@ -39,10 +39,20 @@ class ObserverManager():
     
 class ObserverBase():
     
+    __fc018_extensions = {"App::GroupExtensionPython": ["ExtensionProxy", "Group"], 
+                          "App::GeoFeatureGroupExtensionPython": ["ExtensionProxy", "Group"],
+                          "App::OriginGroupExtensionPython": ["ExtensionProxy", "Group", "Origin"],
+                          "Gui::ViewProviderGeoFeatureGroupExtensionPython": ["ExtensionProxy"],
+                          "Gui::ViewProviderGroupExtensionPython": ["ExtensionProxy"],
+                          "Gui::ViewProviderOriginGroupExtensionPython": ["ExtensionProxy"],
+                          "Part::AttachExtensionPython": ["ExtensionProxy", "AttacherType", "Support", "MapMode", "MapReversed", "MapPathParameter", "AttachmentOffset"],
+                          "PartGui::ViewProviderAttachExtensionPython": ["ExtensionProxy"]}
+    
     def __init__(self, handler):
         
         self.handler = handler
         self.inactive = []
+        self.objExtensions = {}
 
 
     def activateFor(self, doc):
@@ -63,7 +73,39 @@ class ObserverBase():
         
         return False
     
+    def fc018GetNewExtensions(self, obj):
+        #this function checks if there are new extensions in the given object and returns them (or empty list if none are new)
+        #if new ones are available it than saves the current state of extensions and compares to this new state next time its called. 
+        #Note: works only for 0.18 as this checks only for 0.18 extensions!
+        
+        #make sure all objects have a list
+        if not obj in self.objExtensions:
+            self.objExtensions[obj] = []
+            
+        before = self.objExtensions[obj]
+        
+        now = []
+        for extension in self.__fc018_extensions.keys():
+            try: 
+                if obj.hasExtension(extension):
+                    now.append(extension)
+            except:
+                #it raises if no such exception is registered,  wht could happen if a module is not yet loaded
+                continue
+                           
+        #get the new ones
+        added = [item for item in now if item not in before]
+        
+        #store the current extensions
+        self.objExtensions[obj] = now
+        
+        return added
     
+    
+    def fc018GetPropertiesForExtension(self, extension):
+        #for freecad 0.18 it returns the properties a certain extension adds to a object
+        return self.__fc018_extensions[extension]
+
 
 class DocumentObserver(ObserverBase):
     
@@ -120,13 +162,19 @@ class DocumentObserver(ObserverBase):
         
         doc = obj.Document
         if self.isDeactivatedFor(doc):
-            return
-          
+            return                
         
         #print("Observer changed document object ( ", obj.Name, ", ", prop, " ) into state ", obj.State)
         odoc = self.handler.getOnlineDocument(doc)
         if not odoc:
             return
+            
+        #0.18 workaround: get new extensions (in >=0.19 there are observer events for that)
+        if float(".".join(FreeCAD.Version()[0:2])) == 0.18:
+            added = self.fc018GetNewExtensions(obj)
+            for extension in added:
+                props = self.fc018GetPropertiesForExtension(extension)
+                odoc.addDynamicExtension(obj, extension, props)
             
         #finally call change object!    
         odoc.changeObject(obj, prop)
@@ -195,7 +243,36 @@ class DocumentObserver(ObserverBase):
         odoc = self.handler.getOnlineDocument(doc)
         if odoc:
             odoc.recomputObject(obj)
+    
+    
+    def slotBeforeAddingDynamicExtension(self, obj,  extension):
+        #works for >=0.19
+        #store the current properties to figure out later which ones were added by the extension
+        self.propertiesBeforeExtension = obj.PropertiesList
+    
+    
+    def slotAddedDynamicExtension(self, obj, extension):
+        #works for >=0.19
         
+        doc = obj.Document
+        if self.isDeactivatedFor(doc):
+            return          
+        
+        odoc = self.handler.getOnlineDocument(doc)
+        if not odoc:
+            return
+        
+        #calculate the properties that were added by the extension
+        props = [item for item in obj.PropertiesList if item not in self.propertiesBeforeExtension]
+        
+        #handle it!
+        if obj.isDerivedFrom("App::DocumentObject"):
+            odoc.addDynamicExtension(obj, extension, props)
+        else:
+            odoc.addViewProviderDynamicExtension(obj, extension, props)
+        
+    
+    
     #def slotRecomputedDocument(self, doc):
         #pass
     
@@ -281,6 +358,13 @@ class GUIDocumentObserver(ObserverBase):
         odoc = self.handler.getOnlineDocument(doc)
         if not odoc:
             return
+        
+        #0.18 workaround: get new extensions (in >=0.19 there are observer events for that)
+        if float(".".join(FreeCAD.Version()[0:2])) == 0.18:
+            added = self.fc018GetNewExtensions(vp)
+            for extension in added:
+                props = self.fc018GetPropertiesForExtension(extension)
+                odoc.addViewProviderDynamicExtension(vp, extension, props)
             
         #finally call change object!    
         odoc.changeViewProvider(vp, prop)

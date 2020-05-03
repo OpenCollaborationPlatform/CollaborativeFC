@@ -122,6 +122,17 @@ class OnlineDocument():
         oobj.removeDynamicProperty(prop)
 
 
+    def addDynamicExtension(self, obj, extension, props):
+        if self.shouldExcludeTypeId(obj.TypeId):
+            return
+        
+        if obj.Name not in self.objects:
+            return
+        
+        oobj = self.objects[obj.Name]
+        oobj.addDynamicExtension(extension, props)
+        
+
     def recomputObject(self, obj):
         
         if self.shouldExcludeTypeId(obj.TypeId):
@@ -177,9 +188,9 @@ class OnlineDocument():
         ovp.changeProperty(prop)
     
     
-    def changeViewProviderPropertyStatus(self, obj, prop):
+    def changeViewProviderPropertyStatus(self, vp, prop):
         
-        if self.shouldExcludeTypeId(obj.TypeId):
+        if self.shouldExcludeTypeId(vp.Object.TypeId):
             return
         
         if vp.Object.Name not in self.viewproviders:
@@ -211,7 +222,18 @@ class OnlineDocument():
         
         ovp = self.viewproviders[vp.Object.Name]
         ovp.removeDynamicProperty(prop)
+
+
+    def addViewProviderDynamicExtension(self, vp, extension, props):
+        if self.shouldExcludeTypeId(vp.Object.TypeId):
+            return
         
+        if vp.Object.Name not in self.viewproviders:
+            return
+        
+        ovp = self.viewproviders[vp.Object.Name]
+        ovp.addDynamicExtension(extension, props)
+
 
     async def asyncSetup(self):
         #loads the freecad doc into the online doc 

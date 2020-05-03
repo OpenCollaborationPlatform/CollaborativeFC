@@ -30,6 +30,9 @@ logging.getLogger('asyncqt').setLevel(logging.ERROR)
 #*******************************************************
 import FreeCAD, Collaboration, Commands, Test
 
+#need to import Part::Gui to register the coin nodes, e.g. EdgeBrepSet
+import PartGui
+
 
 #setup the UI
 #*******************************************************
