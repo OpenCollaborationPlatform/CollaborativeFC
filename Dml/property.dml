@@ -107,9 +107,15 @@ Map {
         property string group
         property string documentation
         property string status
+        property bool   isDefault
         
-        event onChanged
         event onStatusChanged
+        
+        event onChanged: function() {
+            if (this.isDefault) {
+                this.isDefault = false
+            }    
+        }
         
         .status.onChanged: function(value) {
             if (this.typeid != "") {
@@ -190,6 +196,7 @@ Map {
             this.typeid = typeID
             this.group = group
             this.documentation = documentation
+            this.isDefault = true
         }
         
         function SetValue(value) {

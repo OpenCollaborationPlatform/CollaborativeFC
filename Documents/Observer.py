@@ -185,9 +185,7 @@ class DocumentObserver(ObserverBase):
         doc = obj.Document
         if self.isDeactivatedFor(doc):
             return
-        
-        #print("Observer new dyn property ( ", obj.Name, ", ", prop, " )")
-            
+                
         odoc = self.handler.getOnlineDocument(doc)
         if not odoc:
             return
@@ -365,7 +363,7 @@ class GUIDocumentObserver(ObserverBase):
             for extension in added:
                 props = self.fc018GetPropertiesForExtension(extension)
                 odoc.addViewProviderDynamicExtension(vp, extension, props)
-            
+               
         #finally call change object!    
         odoc.changeViewProvider(vp, prop)
       

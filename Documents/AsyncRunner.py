@@ -31,14 +31,102 @@ class TaskContext():
     async def __aexit__(self, exc_type, exc, tb):
         pass
     
+
+class DocumentSyncRunner():
     
+    __sender   = {}
+    __receiver = {}
+    
+    @classmethod
+    def getSenderRunner(cls, docId):
+        if not docId in DocumentSyncRunner.__sender:
+            DocumentSyncRunner.__sender[docId] = SyncRunner()
+        
+        return DocumentSyncRunner.__sender[docId]
+    
+    @classmethod
+    def getReceiverRunner(cls, docId):
+        if not docId in DocumentSyncRunner.__receiver:
+            DocumentSyncRunner.__receiver[docId] = SyncRunner()
+        
+        return DocumentSyncRunner.__receiver[docId]
+   
+
+    
+class SyncRunner():
+   
+    #runns all tasks syncronous
+    def __init__(self, parentrunner = None):
+        
+        self.__tasks         = []
+        self.__syncEvent     = asyncio.Event() 
+        self.__finishEvent   = asyncio.Event()
+        
+        asyncio.ensure_future(self.__run())
+
+   
+    async def waitTillCloseout(self, timeout = 10):
+        await asyncio.wait_for(self.__finishEvent.wait(), timeout)
+         
+
+    async def __run(self):
+        
+        while True:
+            
+            self.__finishEvent.clear()
+            
+            #we grap the currently available tasks
+            tasks = self.__tasks.copy()
+            self.__tasks.clear()
+            self.__syncEvent.clear()
+        
+            #work the tasks syncronous
+            for task in tasks:
+                await task
+                
+            if len(self.__tasks) == 0:
+                self.__finishEvent.set()
+            
+            #wait till new tasks are given
+            await self.__syncEvent.wait()
+        
+           
+    def runAsyncAsSetup(self, awaitable):
+        
+        self.__tasks.append(awaitable)
+        self.__syncEvent.set()
+        
+        
+    def runAsyncAsIntermediateSetup(self, awaitable):
+        
+        self.__tasks.append(awaitable)
+        self.__syncEvent.set()
+        
+        
+    def runAsync(self, awaitable):
+        
+        self.__tasks.append(awaitable)
+        self.__syncEvent.set()
+        
+        
+    def runAsyncAsCloseout(self, awaitable):
+        
+        self.__tasks.append(awaitable)
+        self.__syncEvent.set()
+    
+ 
+
 class AsyncRunner():
     
-    def __init__(self):
+    def __init__(self, parentrunner = None):
         self.setupTasks = []
         self.intermediateSetupTasks = []
         self.allTasks = []
         self.__finishEvent = None
+        self.__parentTasks = []
+        if parentrunner is not None:
+            #get a reference of all parentrunner tasks
+            self.__parentTasks = parentrunner.allTasks
     
     
     async def __run(self, awaitable, ctx):
@@ -78,7 +166,7 @@ class AsyncRunner():
         #runs after the already known setup tasks
         #setup tasks run in the same order as provided by this function
         
-        ctx = TaskContext(self.setupTasks.copy())
+        ctx = TaskContext(self.setupTasks.copy() + self.__parentTasks.copy())
         t = asyncio.ensure_future(self.__run(awaitable, ctx))
         t.add_done_callback(self.__removeTask)
         self.setupTasks.append(t)
@@ -87,9 +175,9 @@ class AsyncRunner():
         
     def runAsyncAsIntermediateSetup(self, awaitable):
         #runs after setup, before all normal tasks, however, in contrast to setup 
-        #these tasks run async, hence not in order
+        #these tasks run async, hence not in order (and parallel)
         
-        ctx = TaskContext(self.setupTasks.copy())
+        ctx = TaskContext(self.setupTasks.copy() + self.__parentTasks.copy())
         t = asyncio.ensure_future(self.__run(awaitable, ctx))
         t.add_done_callback(self.__removeTask)
         self.intermediateSetupTasks.append(t)
@@ -100,7 +188,7 @@ class AsyncRunner():
         #runs the awaitable after all setup & runAsyncAsIntermediateSetup tasks are done.
         #Execution is async, hence not in order. This mode is to be used as default
         
-        ctx = TaskContext(self.setupTasks.copy() + self.intermediateSetupTasks.copy())
+        ctx = TaskContext(self.setupTasks.copy() + self.intermediateSetupTasks.copy() + self.__parentTasks.copy())
         t = asyncio.ensure_future(self.__run(awaitable, ctx))
         t.add_done_callback(self.__removeTask)
         self.allTasks.append(t)
@@ -110,7 +198,7 @@ class AsyncRunner():
         #runs the awaitable after all other known tasks are done
         #This is for action that need to ensure nothing comes afterwards
         
-        ctx = TaskContext(self.allTasks.copy())
+        ctx = TaskContext(self.allTasks.copy() + self.__parentTasks.copy())
         t = asyncio.ensure_future(self.__run(awaitable, ctx))
         t.add_done_callback(self.__removeTask)
         self.allTasks.append(t)

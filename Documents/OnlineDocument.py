@@ -159,8 +159,12 @@ class OnlineDocument():
         if self.shouldExcludeTypeId(vp.Object.TypeId):
             return
         
+        #get the corresponding online object
+        if not vp.Object.Name in self.objects:
+            raise Exception("Cannot add viewprovider for non existing object")
+        
         #create the online view provider for that object
-        ovp = OnlineViewProvider(vp, self)
+        ovp = OnlineViewProvider(vp, self.objects[vp.Object.Name], self)
         self.viewproviders[vp.Object.Name] = ovp
         ovp.setup()
      
@@ -262,5 +266,9 @@ class OnlineDocument():
         coros = []
         for obj in list(self.objects.values()):
             coros.append(obj.waitTillCloseout(timeout))
+            
+        for obj in list(self.viewproviders.values()):
+            coros.append(obj.waitTillCloseout(timeout))
  
-        await asyncio.wait(coros)
+        if len(coros)>0:
+            await asyncio.wait(coros)

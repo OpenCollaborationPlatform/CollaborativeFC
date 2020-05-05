@@ -18,29 +18,46 @@
 # ************************************************************************
 
 import asyncio, logging
-from Documents.AsyncRunner import AsyncRunner
+import FreeCAD, os
+from Documents.AsyncRunner import AsyncRunner, DocumentSyncRunner
 import Documents.Property as Property
 
 class FreeCADOnlineObject():
     
-    def __init__(self, name, onlinedoc, objGroup):
+    def __init__(self, name, onlinedoc, objGroup, parentOnlineObj = None):
+        
+        self.logger = logging.getLogger(objGroup[:-1] + " " + name)
+                
+        #check which type of runner to use 
+        if os.getenv('FC_OCP_SYNC_MODE', "0") == "1":
+            self.logger.info('Use non-default sync mode "Document-Sync"')
+            self.sender     = DocumentSyncRunner.getSenderRunner(onlinedoc.id)
+            self.receiver   = DocumentSyncRunner.getReceiverRunner(onlinedoc.id) 
+        
+        else:        
+            if parentOnlineObj is not None:
+                self.sender          = AsyncRunner(parentrunner = parentOnlineObj.sender) #used by the object to sync outgoing events
+                self.receiver        = AsyncRunner(parentrunner = parentOnlineObj.receiver) #used by online observer to sync incoming events
+            else:
+                self.sender          = AsyncRunner() #used by the object to sync outgoing events
+                self.receiver        = AsyncRunner() #used by online observer to sync incoming events
+
+        
         self.docId           = onlinedoc.id
         self.data            = onlinedoc.data
         self.connection      = onlinedoc.connection
-        self.sender          = AsyncRunner() #used by the object to sync outgoing events
-        self.receiver        = AsyncRunner() #used by online observer to sync incoming events
         self.name            = name
         self.objGroup        = objGroup 
         self.dynPropCache    = {}
         self.statusPropCache = {}
-        self.logger          = logging.getLogger(objGroup[:-1] + " " + name)
+        self.propChangeCache = {}
 
 
     async def _asyncSetup(self, typeid, values, infos):
         #creates the object in the ocp node
     
         try:
-            self.logger.debug("Setup with values for {0}".format(list(values.keys())))
+            self.logger.debug("Setup with properties {0}".format(list(values.keys())))
             
             uri = u"ocp.documents.edit.{0}".format(self.docId)
             await self.connection.session.call(uri + u".call.Document.{0}.NewObject".format(self.objGroup), self.name, typeid)
@@ -48,24 +65,6 @@ class FreeCADOnlineObject():
             #create all properties that need setup           
             uri = u"ocp.documents.edit.{0}.call.Document.{1}.{2}.Properties.SetupProperties".format(self.docId, self.objGroup, self.name)
             await self.connection.session.call(uri, list(values.keys()), list(infos.values()))
-            
-            #write the props if requried
-            batchprops = []
-            batchvalues = []
-            tasks = []
-            for prop in values:
-                #if byte array we need individual handling, but everything else can be batched
-                if isinstance(values[prop], bytearray):
-                    tasks.append(self._asyncWriteProperty(prop, values[prop]))
-                else:
-                    batchprops.append(prop)
-                    batchvalues.append(values[prop])
-            
-            if len(batchprops) > 0:
-                tasks.append(self._asyncWriteProperties(batchprops, batchvalues))
-                             
-            if len(tasks) > 0:
-                await asyncio.wait(tasks)
         
         except Exception as e:
             self.logger.error("Setup error: {0}".format(e))
@@ -128,7 +127,7 @@ class FreeCADOnlineObject():
         #if there was no entry before we start a cache processing. If there is something in the cache already
         #we are sure processing was already startet
         if len(self.dynPropCache) == 1:
-            #add it to the dyn property creation cache. If it is the first entry we also start the 
+            #add it to the dyn property creation cache. If it is the first entry we also start the
             self.sender.runAsyncAsIntermediateSetup(self.__asyncCreateDynamicPropertiesFromCache())
         
         
@@ -190,6 +189,49 @@ class FreeCADOnlineObject():
         except Exception as e:
             self.logger.error("Change property status from cache failed: {0}".format(e))
             
+    
+    def _addPropertyChange(self, prop, value):
+        
+        #add property with status to the cache. 
+        self.propChangeCache[prop] = value
+        
+        #if there was no entry before we start a cache processing. If there is something in the cache already
+        #we are sure processing was already startet
+        if len(self.propChangeCache) == 1:
+            #add it to the dyn property creation cache. If it is the first entry we also start the 
+            self.sender.runAsync(self.__asyncPropertyChangeFromCache())
+    
+    
+    async def __asyncPropertyChangeFromCache(self):
+        
+        if len(self.propChangeCache) == 0:
+            return
+
+        props = self.propChangeCache.copy()
+        self.propChangeCache.clear()
+            
+        keys   = list(props.keys())
+        values = list(props.values())
+        
+        #we need to make sure all  dynamic properties are created. The reason for this is, that this PropertyChangeFromCache could be triggered 
+        #by a non-dynamic property, hence before the DynPropertyFromCache was started. Afterwards the dyn property was added and changed.
+        #Hence it could happen that we write the proeprty here before it was created in the onlinedoc
+        await self.__asyncCreateDynamicPropertiesFromCache()
+        
+        #sort the binary properties out
+        tasks = []
+        podprops = []
+        podvalues = []
+        for prop, value in zip(keys, values):
+            if isinstance(value, bytearray):
+                tasks.append(self._asyncWriteProperty(prop, value))
+            else:
+                podprops.append(prop)
+                podvalues.append(value)
+        
+        tasks.append(self._asyncWriteProperties(podprops, podvalues))
+        await asyncio.wait(tasks)
+
         
     async def _asyncWriteProperty(self, prop, value):
         
@@ -214,7 +256,7 @@ class FreeCADOnlineObject():
                 
             else:
                 #simple POD property: just add it!
-                self.logger.debug("Write pod property {0}".format(prop))
+                self.logger.debug(f"Write pod property {prop}: {value}")
                 uri += u".call.Document.{0}.{1}.Properties.{2}.SetValue".format(self.objGroup, self.name, prop)
                 await self.connection.session.call(uri, value)
         
@@ -223,6 +265,7 @@ class FreeCADOnlineObject():
    
    
     async def _asyncWriteProperties(self, props, values):
+        #note: does not work for binary properties!
         
         try:
             self.logger.debug("Write batch properties {0}".format(props))
@@ -293,7 +336,7 @@ class FreeCADOnlineObject():
         #wait till all current async tasks are finished. Note that it also wait for task added during the wait period.
         #throws an error on timeout.
         
-        await self.sender.waitTillCloseout(timeout)
+        await asyncio.wait([self.sender.waitTillCloseout(timeout), self.receiver.waitTillCloseout(timeout)])
 
 
 class OnlineObject(FreeCADOnlineObject):
@@ -301,7 +344,7 @@ class OnlineObject(FreeCADOnlineObject):
     def __init__(self, obj, onlinedoc):
         
         super().__init__(obj.Name, onlinedoc, "Objects")
-        self.changed        = set()
+        self.recomputeCache        = {}
         self.odoc           = onlinedoc
         self.obj            = obj
         
@@ -336,15 +379,23 @@ class OnlineObject(FreeCADOnlineObject):
     
     def changeProperty(self, prop):
         
-        #if this change touched the object, we are able to wait for the revompute. Otherwise 
+        value = Property.convertPropertyToWamp(self.obj, prop)
+        
+        #for python properties order is important, as e.g. proxy does trigger attach methdods and hence setups
+        if prop == "Proxy":
+            print("App Proxy property as setup")
+            self.sender.runAsyncAsSetup(self._asyncWriteProperty(prop, value))
+            return
+        
+        #if this change touched the object, we are able to wait for the recompute. Otherwise 
         #no recompute will be triggered and hence the change would not be forwarded. That happens 
         #f.e. with App::Parts group property on drag n drop. So let's check for it.
         if "Up-to-date" in self.obj.State:
-            value = Property.convertPropertyToWamp(self.obj, prop)
+            #self._addPropertyChange(prop, value)
             self.sender.runAsync(self._asyncWriteProperty(prop, value))
             
         else:
-            self.changed.add(prop)
+            self.recomputeCache[prop] = value
  
  
     def changePropertyStatus(self, prop):
@@ -354,40 +405,35 @@ class OnlineObject(FreeCADOnlineObject):
     
     
     def recompute(self):
-        #to enable async change of object while we process this recompute we copy the set of changes
-        changed = self.changed.copy()
-        self.changed.clear()
         
-        #collect all the values
-        values = {}
-        for prop in changed:
-            values[prop] = Property.convertPropertyToWamp(self.obj, prop)
+        props = self.recomputeCache.copy()
+        self.recomputeCache.clear()
             
-        self.sender.runAsyncAsCloseout(self.__asyncRecompute(values))
+        keys   = list(props.keys())
+        values = list(props.values())
+        
+        self.sender.runAsyncAsCloseout(self.__asyncRecompute(props, values))
                
             
-    async def __asyncRecompute(self, values):
+    async def __asyncRecompute(self, props, values):
         
         try:
             self.logger.debug("Recompute")
             
-            #after recompute all changes are commited          
-            batchprops = []
-            batchvalues = []
+            #write the properties, sorted after binary and pod
             tasks = []
-            for prop in values:
-                #if byte array we need individual handling, but everything else can be batched
-                if isinstance(values[prop], bytearray):
-                    tasks.append(self._asyncWriteProperty(prop, values[prop]))
+            podprops = []
+            podvalues = []
+            for prop, value in zip(props, values):
+                if isinstance(value, bytearray):
+                    tasks.append(self._asyncWriteProperty(prop, value))
                 else:
-                    batchprops.append(prop)
-                    batchvalues.append(values[prop])
+                    podprops.append(prop)
+                    podvalues.append(value)
             
-            if len(batchprops) > 0:
-                tasks.append(self._asyncWriteProperties(batchprops, batchvalues))
-            
-            if len(tasks) > 0:
-                await asyncio.wait(tasks)
+            tasks.append(self._asyncWriteProperties(podprops, podvalues))
+            await asyncio.wait(tasks)
+ 
                 
             uri = u"ocp.documents.edit.{0}.call.Document.Objects.{1}.onRecomputed".format(self.docId, self.name)
             await self.connection.session.call(uri)
@@ -398,17 +444,18 @@ class OnlineObject(FreeCADOnlineObject):
 
 class OnlineViewProvider(FreeCADOnlineObject):
     
-    def __init__(self, obj, onlinedoc):        
-        super().__init__(obj.Object.Name, onlinedoc, "ViewProviders")
+    def __init__(self, obj, onlineobj, onlinedoc):        
+        super().__init__(obj.Object.Name, onlinedoc, "ViewProviders", parentOnlineObj=onlineobj)
         self.obj = obj
         self.proxydata = bytearray()   #as FreeCAD 0.18 does not forward viewprovider proxy changes we need a way to identify changes
           
         
     def setup(self):
         
-        #part of the FC 0.18 no proxy change event workaround
-        if hasattr(self.obj, 'Proxy'):
-            self.proxydata = self.obj.dumpPropertyContent('Proxy')
+        if float(".".join(FreeCAD.Version()[0:2])) == 0.18:
+            #part of the FC 0.18 no proxy change event workaround
+            if hasattr(self.obj, 'Proxy'):
+                self.proxydata = self.obj.dumpPropertyContent('Proxy')
         
         #collect all property values and infos
         values = {}
@@ -439,15 +486,24 @@ class OnlineViewProvider(FreeCADOnlineObject):
     
     def changeProperty(self, prop):
         
-        #work around missing proxy callback. This may add to some delay, as proxy change is ony forwarded 
-        #when annother property changes afterwards, however, at least the order of changes is keept
-        if hasattr(self.obj, 'Proxy'):
-            proxydata = self.obj.dumpPropertyContent('Proxy')
-            if not proxydata == self.proxydata:
-                self.proxydata = proxydata
-                self.sender.runAsync(self._asyncWriteProperty('Proxy', proxydata))
-        
         value = Property.convertPropertyToWamp(self.obj, prop)
+        
+        if float(".".join(FreeCAD.Version()[0:2])) == 0.18:
+            #work around missing proxy callback in ViewProvider. This may add to some delay, as proxy change is ony forwarded 
+            #when annother property changes afterwards, however, at least the order of changes is keept
+            if hasattr(self.obj, 'Proxy'):
+                proxydata = self.obj.dumpPropertyContent('Proxy')
+                if not proxydata == self.proxydata:
+                    self.proxydata = proxydata
+                    self.sender.runAsyncAsSetup(self._asyncWriteProperty('Proxy', proxydata))
+        else:
+            #for python properties order is important, as e.g. proxy does trigger attach methdods and hence setups
+            if prop == "Proxy":
+                print("Gui Proxy property as setup")
+                self.sender.runAsyncAsSetup(self._asyncWriteProperty(prop, value))
+                return
+        
+        #self._addPropertyChange(prop, value)
         self.sender.runAsync(self._asyncWriteProperty(prop, value))
 
 

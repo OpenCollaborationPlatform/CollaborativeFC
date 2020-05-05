@@ -103,7 +103,6 @@ def convertPropertyToWamp(obj, prop):
 
 def convertWampToProperty(obj, prop, value):
     #converts the wamp data in usable form and assigns it to the property
-    
     typeId = obj.getTypeIdOfProperty(prop)
     converter = __PropertyFromWamp.get(typeId, __fromRaw)
     converter(obj, prop, value)
