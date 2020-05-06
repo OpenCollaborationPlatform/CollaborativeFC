@@ -96,7 +96,7 @@ class Handler():
         coros =  []
         for entity in self.__manager.getEntities():
             if entity.onlinedoc != None:
-                coros.append(entity.onlinedoc.waitTillCloseout())
+                coros.append(entity.onlinedoc.waitTillCloseout(20))
                 
         await asyncio.wait(coros)
         
@@ -117,7 +117,7 @@ class Handler():
         entities = self.__manager.getEntities()
         for entity in entities:
             if entity.id == docId:
-                await entity.onlinedoc.waitTillCloseout()
+                await entity.onlinedoc.waitTillCloseout(20)
 
         #call testserver that we received and executed the sync!
         await self.__session.call("ocp.test.sync", docId)

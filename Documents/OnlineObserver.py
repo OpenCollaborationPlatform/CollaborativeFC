@@ -224,6 +224,10 @@ class OnlineObserver():
             #we need to reassign geometry to fix the invalid sketch
             obj.Geometry = obj.Geometry
             
+        #definitely purge purgeTouched.
+        if hasattr(obj, "purgeTouched"):
+            obj.purgeTouched()
+            
         
     async def __changeViewProvider(self, name, prop):
         
@@ -348,6 +352,9 @@ class OnlineObserver():
                 self.docObserver.deactivateFor(self.onlineDoc.document)   
                 self.logger.debug(f"{logentry}: Set binary property {prop}")
                 Property.convertWampToProperty(obj, prop, dat.data)
+                
+                if prop == "Proxy":
+                    print(obj.Proxy)
                                 
             else:
                 self.docObserver.deactivateFor(self.onlineDoc.document)

@@ -344,7 +344,7 @@ class OnlineObject(FreeCADOnlineObject):
     def __init__(self, obj, onlinedoc):
         
         super().__init__(obj.Name, onlinedoc, "Objects")
-        self.recomputeCache        = {}
+        self.recomputeCache = {}
         self.odoc           = onlinedoc
         self.obj            = obj
         
@@ -390,12 +390,12 @@ class OnlineObject(FreeCADOnlineObject):
         #if this change touched the object, we are able to wait for the recompute. Otherwise 
         #no recompute will be triggered and hence the change would not be forwarded. That happens 
         #f.e. with App::Parts group property on drag n drop. So let's check for it.
-        if "Up-to-date" in self.obj.State:
+       # if "Up-to-date" in self.obj.State:
             #self._addPropertyChange(prop, value)
-            self.sender.runAsync(self._asyncWriteProperty(prop, value))
+        self.sender.runAsync(self._asyncWriteProperty(prop, value))
             
-        else:
-            self.recomputeCache[prop] = value
+        #else:
+        #    self.recomputeCache[prop] = value
  
  
     def changePropertyStatus(self, prop):
@@ -447,7 +447,7 @@ class OnlineViewProvider(FreeCADOnlineObject):
     def __init__(self, obj, onlineobj, onlinedoc):        
         super().__init__(obj.Object.Name, onlinedoc, "ViewProviders", parentOnlineObj=onlineobj)
         self.obj = obj
-        self.proxydata = bytearray()   #as FreeCAD 0.18 does not forward viewprovider proxy changes we need a way to identify changes
+        self.proxydata = None   #as FreeCAD 0.18 does not forward viewprovider proxy changes we need a way to identify changes
           
         
     def setup(self):
@@ -455,7 +455,7 @@ class OnlineViewProvider(FreeCADOnlineObject):
         if float(".".join(FreeCAD.Version()[0:2])) == 0.18:
             #part of the FC 0.18 no proxy change event workaround
             if hasattr(self.obj, 'Proxy'):
-                self.proxydata = self.obj.dumpPropertyContent('Proxy')
+                self.proxydata = self.obj.Proxy
         
         #collect all property values and infos
         values = {}
@@ -492,16 +492,17 @@ class OnlineViewProvider(FreeCADOnlineObject):
             #work around missing proxy callback in ViewProvider. This may add to some delay, as proxy change is ony forwarded 
             #when annother property changes afterwards, however, at least the order of changes is keept
             if hasattr(self.obj, 'Proxy'):
-                proxydata = self.obj.dumpPropertyContent('Proxy')
-                if not proxydata == self.proxydata:
-                    self.proxydata = proxydata
-                    self.sender.runAsyncAsSetup(self._asyncWriteProperty('Proxy', proxydata))
+                if not self.proxydata is self.obj.Proxy:
+                    self.proxydata = self.obj.Proxy
+                    self.sender.runAsyncAsSetup(self._asyncWriteProperty('Proxy', self.obj.dumpPropertyContent('Proxy')))
         else:
             #for python properties order is important, as e.g. proxy does trigger attach methdods and hence setups
             if prop == "Proxy":
-                print("Gui Proxy property as setup")
                 self.sender.runAsyncAsSetup(self._asyncWriteProperty(prop, value))
                 return
+            
+        if prop == "Proxy":
+            print(self.obj.Proxy)
         
         #self._addPropertyChange(prop, value)
         self.sender.runAsync(self._asyncWriteProperty(prop, value))
