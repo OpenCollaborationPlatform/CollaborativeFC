@@ -54,9 +54,7 @@ class OnlineDocument():
         
         if self.shouldExcludeTypeId(obj.TypeId):
             return
-        
-        self.logger.debug("New object {0}".format(obj.Name))
-        
+                
         #create the async runner for that object
         oobj = OnlineObject(obj, self)
         self.objects[obj.Name] = oobj
@@ -75,7 +73,7 @@ class OnlineDocument():
         
         
     def changeObject(self, obj, prop):
-        
+               
         if self.shouldExcludeTypeId(obj.TypeId):
             return
         

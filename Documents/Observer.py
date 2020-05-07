@@ -176,7 +176,7 @@ class DocumentObserver(ObserverBase):
                 props = self.fc018GetPropertiesForExtension(extension)
                 odoc.addDynamicExtension(obj, extension, props)
             
-        #finally call change object!    
+        #finally call change object!
         odoc.changeObject(obj, prop)
 
 

@@ -200,11 +200,24 @@ Map {
         }
         
         function SetValue(value) {
-            this.PropertyData.SetValue(value)
+            if (!this.IsBinary()) {
+                this.PropertyData.SetValue(value)
+            }
+            else {
+                //should be a CID for binary data
+                this.PropertyData.GetValue().Set(value)
+            }
         }
         
         const function GetValue() {
-            return this.PropertyData.GetValue()
+
+            if (!this.IsBinary()) {
+                return this.PropertyData.GetValue()
+            }
+            else {
+                //should be a CID for binary data
+                return this.PropertyData.GetValue().Get()
+            }
         }
         
         const function IsBinary() {

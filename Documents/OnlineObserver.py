@@ -77,10 +77,7 @@ class OnlineObserver():
             return
 
         fnc = self.callbacks[key]
-        if self.synced:
-            AsyncRunner.DocumentSyncRunner.getSenderRunner(self.onlineDoc.id).runAsync(fnc(*args))
-        else:
-            await fnc(*args)
+        AsyncRunner.DocumentOrderedRunner.getSenderRunner(self.onlineDoc.id).run(fnc, *args)
 
         
     async def __newObject(self, name, typeID):
@@ -325,10 +322,10 @@ class OnlineObserver():
                 
             uri = u"ocp.documents.edit.{0}.call.Document.{1}.".format(self.onlineDoc.id, group)
                         
-            calluri = uri + "{0}.Properties.{1}.IsBinary".format(name, prop)
+            calluri = uri + f"{name}.Properties.{prop}.IsBinary"
             binary = await self.onlineDoc.connection.session.call(calluri)
             
-            calluri = uri + "{0}.Properties.{1}.GetValue".format(name, prop)
+            calluri = uri + f"{name}.Properties.{prop}.GetValue"
             val = await self.onlineDoc.connection.session.call(calluri)
                        
             if binary:
@@ -341,10 +338,10 @@ class OnlineObserver():
                         self.data += bytes(update)
                 
                 #get the binary data
-                uri = u"ocp.documents.edit.{0}.rawdata.".format(self.onlineDoc.id)
+                uri = f"ocp.documents.edit.{self.onlineDoc.id}.rawdata.BinaryByCid"
                 dat = Data()
                 opt = CallOptions(on_progress=dat.progress)
-                val = await self.onlineDoc.connection.session.call(uri + "{0}.ReadBinary".format(val), options=opt)
+                val = await self.onlineDoc.connection.session.call(uri, val, options=opt)
                 if val is not None:
                     dat.progress(val)
                 
@@ -352,9 +349,6 @@ class OnlineObserver():
                 self.docObserver.deactivateFor(self.onlineDoc.document)   
                 self.logger.debug(f"{logentry}: Set binary property {prop}")
                 Property.convertWampToProperty(obj, prop, dat.data)
-                
-                if prop == "Proxy":
-                    print(obj.Proxy)
                                 
             else:
                 self.docObserver.deactivateFor(self.onlineDoc.document)

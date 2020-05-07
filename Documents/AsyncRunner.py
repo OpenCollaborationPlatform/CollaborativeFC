@@ -32,31 +32,31 @@ class TaskContext():
         pass
     
 
-class DocumentSyncRunner():
+class DocumentOrderedRunner():
     
     __sender   = {}
     __receiver = {}
     
     @classmethod
     def getSenderRunner(cls, docId):
-        if not docId in DocumentSyncRunner.__sender:
-            DocumentSyncRunner.__sender[docId] = SyncRunner()
+        if not docId in DocumentOrderedRunner.__sender:
+            DocumentOrderedRunner.__sender[docId] = OrderedRunner()
         
-        return DocumentSyncRunner.__sender[docId]
+        return DocumentOrderedRunner.__sender[docId]
     
     @classmethod
     def getReceiverRunner(cls, docId):
-        if not docId in DocumentSyncRunner.__receiver:
-            DocumentSyncRunner.__receiver[docId] = SyncRunner()
+        if not docId in DocumentOrderedRunner.__receiver:
+            DocumentOrderedRunner.__receiver[docId] = OrderedRunner()
         
-        return DocumentSyncRunner.__receiver[docId]
+        return DocumentOrderedRunner.__receiver[docId]
    
 
     
-class SyncRunner():
+class __SyncRunner():
    
     #runns all tasks syncronous
-    def __init__(self, parentrunner = None):
+    def __init__(self):
         
         self.__tasks         = []
         self.__syncEvent     = asyncio.Event() 
@@ -91,114 +91,128 @@ class SyncRunner():
             await self.__syncEvent.wait()
         
            
-    def runAsyncAsSetup(self, awaitable):
+    def run(self, awaitable):
         
         self.__tasks.append(awaitable)
         self.__syncEvent.set()
-        
-        
-    def runAsyncAsIntermediateSetup(self, awaitable):
-        
-        self.__tasks.append(awaitable)
-        self.__syncEvent.set()
-        
-        
-    def runAsync(self, awaitable):
-        
-        self.__tasks.append(awaitable)
-        self.__syncEvent.set()
-        
-        
-    def runAsyncAsCloseout(self, awaitable):
-        
-        self.__tasks.append(awaitable)
-        self.__syncEvent.set()
-    
- 
 
-class AsyncRunner():
-    
-    def __init__(self, parentrunner = None):
-        self.setupTasks = []
-        self.intermediateSetupTasks = []
-        self.allTasks = []
-        self.__finishEvent = None
-        self.__parentTasks = []
-        if parentrunner is not None:
-            #get a reference of all parentrunner tasks
-            self.__parentTasks = parentrunner.allTasks
-    
-    
-    async def __run(self, awaitable, ctx):
-            async with ctx:
-                await awaitable   
-               
 
+class BatchedOrderedRunner():
+    #batched execution of tasks
+    #Normally run received a function object of an async function and its arguments.
+    #The functions are than processed in order one by one (each one awaited). If functions can be batched
+    #together, this can be done in the following way:
+    #1. register batch handler. This is a async function which is called after all batchable functions are executed
+    #2. run functions that have a batchhandler assigned. Those functions must not be awaitables, but default functions.
+    
+    #runns all tasks syncronous and batches tasks together if possible
+    def __init__(self):
+        
+        self.__tasks         = []
+        self.__syncEvent     = asyncio.Event() 
+        self.__finishEvent   = asyncio.Event()
+        self.__batchHandler  = {}
+        
+        asyncio.ensure_future(self.__run())
+
+
+    def registerBatchHandler(self, fncName, batchFnc):        
+        self.__batchHandler[fncName] = batchFnc;
+
+   
     async def waitTillCloseout(self, timeout = 10):
-        #returns when all tasks are finished. Note that it also wait for all task that are added 
-        #during the wait time. Throws TimeOutError if it takes longer than the provided timeout
-        
-        if len(self.allTasks) == 0:
-            return
-        
-        try:
-            self.__finishEvent = asyncio.Event()
-            await asyncio.wait_for(self.__finishEvent.wait(), timeout)
-        finally:
-            self.__finishEvent = None
-        
+        await asyncio.wait_for(self.__finishEvent.wait(), timeout)
          
-    def __removeTask(self, task):
-        while task in self.setupTasks:
-            self.setupTasks.remove(task)
-            
-        while task in self.allTasks:
-            self.allTasks.remove(task)
-            
-        while task in self.intermediateSetupTasks:
-            self.intermediateSetupTasks.remove(task)
+
+    async def __run(self):
         
-        if self.__finishEvent  != None and len(self.allTasks) == 0:
-            self.__finishEvent.set()
+        #initially we have no work
+        self.__finishEvent.set()
+        
+        while True:
+            
+            #wait till new tasks are given
+            await self.__syncEvent.wait()
+            
+            #inform that we are working
+            self.__finishEvent.clear()
+            
+            #we grap the currently available tasks
+            tasks = self.__tasks.copy()
+            self.__tasks.clear()
+            self.__syncEvent.clear()
+                   
+            #work the tasks in order
+            task = tasks.pop(0)
+            while task is not None:
+                
+                #check if we can batch tasks
+                if task[0].__name__ in self.__batchHandler:
+                    
+                    #execute all batchable functions of this type
+                    batchtask = task
+                    while batchtask and batchtask[0].__name__ == task[0].__name__:
+                        
+                        batchtask[0](*batchtask[1])
+                        if tasks:
+                            batchtask = tasks.pop(0)
+                        else:
+                            batchtask = None
+                            break
+                    
+                    #rund the batch handler
+                    await self.__batchHandler[task[0].__name__]()
+                    
+                    #reset the outer loop
+                    task = batchtask
+                    continue
+                
+                else:
+                    #not batchable, normal operation
+                    await task[0](*task[1])
+                    if tasks:
+                        task = tasks.pop(0)
+                    else:
+                        task = None
+            
+            if not self.__tasks:
+                self.__finishEvent.set()
         
            
-    def runAsyncAsSetup(self, awaitable):
-        #runs after the already known setup tasks
-        #setup tasks run in the same order as provided by this function
+    def run(self, fnc, *args):
         
-        ctx = TaskContext(self.setupTasks.copy() + self.__parentTasks.copy())
-        t = asyncio.ensure_future(self.__run(awaitable, ctx))
-        t.add_done_callback(self.__removeTask)
-        self.setupTasks.append(t)
-        self.allTasks.append(t)
+        self.__tasks.append((fnc, args))
+        self.__syncEvent.set()
         
+
+class OrderedRunner(BatchedOrderedRunner):
+    
+    async def __run(self):
         
-    def runAsyncAsIntermediateSetup(self, awaitable):
-        #runs after setup, before all normal tasks, however, in contrast to setup 
-        #these tasks run async, hence not in order (and parallel)
+        while True:
+            
+            self.__finishEvent.clear()
+            
+            #we grap the currently available tasks
+            tasks = self.__tasks.copy()
+            self.__tasks.clear()
+            self.__syncEvent.clear()
         
-        ctx = TaskContext(self.setupTasks.copy() + self.__parentTasks.copy())
-        t = asyncio.ensure_future(self.__run(awaitable, ctx))
-        t.add_done_callback(self.__removeTask)
-        self.intermediateSetupTasks.append(t)
-        self.allTasks.append(t)
-        
-        
-    def runAsync(self, awaitable):
-        #runs the awaitable after all setup & runAsyncAsIntermediateSetup tasks are done.
-        #Execution is async, hence not in order. This mode is to be used as default
-        
-        ctx = TaskContext(self.setupTasks.copy() + self.intermediateSetupTasks.copy() + self.__parentTasks.copy())
-        t = asyncio.ensure_future(self.__run(awaitable, ctx))
-        t.add_done_callback(self.__removeTask)
-        self.allTasks.append(t)
-        
-        
-    def runAsyncAsCloseout(self, awaitable):
-        #runs the awaitable after all other known tasks are done
-        #This is for action that need to ensure nothing comes afterwards
-        
-        ctx = TaskContext(self.allTasks.copy() + self.__parentTasks.copy())
-        t = asyncio.ensure_future(self.__run(awaitable, ctx))
-        t.add_done_callback(self.__removeTask)
-        self.allTasks.append(t)
+            #work the tasks in order
+            #work the tasks syncronous
+            for task in tasks:
+                
+                #execute the batch handler after each single comman
+                if task[0].__name__ in self.__batchHandler:
+                    task[0](*task[1])
+                    await self.__batchHandler[task[0].__name__]()
+                    
+                else:
+                    await task
+                
+
+            if len(self.__tasks) == 0:
+                self.__finishEvent.set()
+            
+            #wait till new tasks are given
+            await self.__syncEvent.wait()
