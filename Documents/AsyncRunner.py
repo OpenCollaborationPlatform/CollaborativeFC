@@ -121,6 +121,11 @@ class BatchedOrderedRunner():
 
    
     async def waitTillCloseout(self, timeout = 10):
+        
+        #we need to find the timeslot when tasks is empty
+        while self.__tasks:
+            await asyncio.sleep(0.1)
+            
         await asyncio.wait_for(self.__finishEvent.wait(), timeout)
          
 

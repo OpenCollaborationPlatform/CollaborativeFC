@@ -268,5 +268,7 @@ class OnlineDocument():
         for obj in list(self.viewproviders.values()):
             coros.append(obj.waitTillCloseout(timeout))
  
+        coros.append(self.onlineObs.waitTillCloseout(timeout))
+ 
         if len(coros)>0:
             await asyncio.wait(coros)

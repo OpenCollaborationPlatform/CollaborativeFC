@@ -30,12 +30,13 @@ class OnlineObserver():
         self.docObserver = observer
         self.onlineDoc = odoc
         self.logger = logging.getLogger("Online observer " + odoc.id[-5:])
+        self.runners = {}
         
         self.callbacks = {
                 "Objects.onCreated": self.__newObject,
                 "Objects.onRemoved": self.__removeObject, 
-                "Objects.onPropertyChanged": self.__changeObject, 
-                "Objects.onPropertiesChanged": self.__changeMultiObject, 
+                "Objects.onPropChanged": self.__changeObject, 
+                "Objects.onPropsChanged": self.__changeMultiObject, 
                 "Objects.onPropStatusChanged": self.__changePropStatus,
                 "Objects.onDynamicPropertyCreated": self.__createObjectDynProperty,
                 "Objects.onDynamicPropertiesCreated": self.__createObjectDynProperties,
@@ -44,8 +45,8 @@ class OnlineObserver():
                 "Objects.onExtensionRemoved": self.__removeObjextExtension,
                 "Objects.onObjectRecomputed": self.__objectRecomputed,
                 
-                "ViewProviders.onPropertyChanged": self.__changeViewProvider,
-                "ViewProviders.onPropertiesChanged": self.__changeMultiViewProdiver,
+                "ViewProviders.onPropChanged": self.__changeViewProvider,
+                "ViewProviders.onPropsChanged": self.__changeMultiViewProdiver,
                 "ViewProviders.onPropStatusChanged": self.__changeViewProvierPropStatus,
                 "ViewProviders.onDynamicPropertyCreated": self.__createViewProviderDynProperty,
                 "ViewProviders.onDynamicPropertiesCreated": self.__createViewProviderDynProperties,
@@ -72,6 +73,7 @@ class OnlineObserver():
         except Exception as e:
             self.logger.error("Setup failed: ", e)
         
+        
     async def __run(self, *args, details=None):
     
         key = ('.').join(details.topic.split(".")[-2:])
@@ -79,7 +81,31 @@ class OnlineObserver():
             return
 
         fnc = self.callbacks[key]
-        AsyncRunner.DocumentOrderedRunner.getSenderRunner(self.onlineDoc.id).run(fnc, *args)
+        
+        if "Properties" in key:
+            AsyncRunner.DocumentOrderedRunner.getSenderRunner(self.onlineDoc.id).run(fnc, *args)
+        else:
+            name = args[0] #obj name is always the first argument
+            self.getRunner(name).run(fnc, *args)
+
+
+    def getRunner(self, name):
+        
+        if not name in self.runners:
+            if self.synced:
+                self.runners[name] = AsyncRunner.DocumentOrderedRunner.getSenderRunner(self.onlineDoc.id)
+            else:
+                self.runners[name] = AsyncRunner.OrderedRunner()
+                
+        return self.runners[name]
+
+    async def waitTillCloseout(self, timeout = 10):
+        coros = []
+        for runner in self.runners:
+            coros.append(self.runners[runner].waitTillCloseout(timeout))
+            
+        if coros:
+            await asyncio.wait(coros)
 
         
     async def __newObject(self, name, typeID):
@@ -335,8 +361,8 @@ class OnlineObserver():
                 def __init__(self): 
                     self.data = bytes()
                             
-                    def progress(self, update):
-                        self.data += bytes(update)
+                def progress(self, update):
+                    self.data += bytes(update)
                     
             #get the binary data
             uri = f"ocp.documents.edit.{self.onlineDoc.id}.rawdata.BinaryByCid"
@@ -404,7 +430,7 @@ class OnlineObserver():
             #set all values
             self.docObserver.deactivateFor(self.onlineDoc.document)   
             self.logger.debug(f"{logentry}: Set properties {props}")
-            for prop  in values:
+            for prop  in props:
                 Property.convertWampToProperty(obj, prop, values[prop])
 
         except Exception as e:

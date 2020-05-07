@@ -31,16 +31,13 @@ class FreeCADOnlineObject():
         #check which type of runner to use 
         if os.getenv('FC_OCP_SYNC_MODE', "0") == "1":
             self.logger.info('Use non-default sync mode "Document-Sync"')
-            self.sender     = DocumentOrderedRunner.getSenderRunner(onlinedoc.id)
-            self.receiver   = DocumentOrderedRunner.getReceiverRunner(onlinedoc.id) 
+            self.runner     = DocumentOrderedRunner.getSenderRunner(onlinedoc.id)
         
         else:
             if parentOnlineObj is None:
-                self.sender     = BatchedOrderedRunner() #used by the object to sync outgoing events
-                self.receiver   = BatchedOrderedRunner() #used by the object to sync incoming events
+                self.runner     = BatchedOrderedRunner() #used by the object to sync outgoing events
             else:
-                self.sender     = parentOnlineObj.sender
-                self.receiver   = parentOnlineObj.receiver
+                self.runner     = parentOnlineObj.runner
                        
         self.docId           = onlinedoc.id
         self.data            = onlinedoc.data
@@ -130,7 +127,7 @@ class FreeCADOnlineObject():
         #we are sure processing was already startet
         if len(self.dynPropCache) == 1:
             #add it to the dyn property creation cache. If it is the first entry we also start the
-            self.sender.run(self.__asyncCreateDynamicPropertiesFromCache)
+            self.runner.run(self.__asyncCreateDynamicPropertiesFromCache)
         
         
     async def __asyncCreateDynamicPropertiesFromCache(self):
@@ -163,7 +160,7 @@ class FreeCADOnlineObject():
         #we are sure processing was already startet
         if len(self.statusPropCache) == 1:
             #add it to the dyn property creation cache. If it is the first entry we also start the 
-            self.sender.run(self.__asyncStatusPropertiesFromCache)
+            self.runner.run(self.__asyncStatusPropertiesFromCache)
         
         
     async def __asyncStatusPropertiesFromCache(self):
@@ -318,7 +315,7 @@ class FreeCADOnlineObject():
         #wait till all current async tasks are finished. Note that it also wait for task added during the wait period.
         #throws an error on timeout.
         
-        await asyncio.wait([self.sender.waitTillCloseout(timeout), self.receiver.waitTillCloseout(timeout)])
+        await self.runner.waitTillCloseout(timeout)
 
 
 class OnlineObject(FreeCADOnlineObject):
@@ -330,7 +327,7 @@ class OnlineObject(FreeCADOnlineObject):
         self.odoc           = onlinedoc
         self.obj            = obj
         
-        self.sender.registerBatchHandler("_addPropertyChange", self._asyncPropertyChangeFromCache)
+        self.runner.registerBatchHandler("_addPropertyChange", self._asyncPropertyChangeFromCache)
         
         
     def setup(self):
@@ -340,11 +337,11 @@ class OnlineObject(FreeCADOnlineObject):
             values[prop] = Property.convertPropertyToWamp(self.obj, prop)
             infos[prop]  = Property.createPropertyInfo(self.obj, prop)
             
-        self.sender.run(self._asyncSetup, self.obj.TypeId, values, infos)
+        self.runner.run(self._asyncSetup, self.obj.TypeId, values, infos)
     
     
     def remove(self):
-        self.sender.run(self._asyncRemove)
+        self.runner.run(self._asyncRemove)
         
     
     def createDynamicProperty(self, prop):
@@ -354,16 +351,16 @@ class OnlineObject(FreeCADOnlineObject):
     
     def removeDynamicProperty(self, prop):
         #we need to make sure the remove comes after the creation
-        self.sender.run(self._asyncRemoveProperty, prop)
+        self.runner.run(self._asyncRemoveProperty, prop)
     
     
     def addDynamicExtension(self, extension, props):
-        self.sender.run(self._asyncAddDynamcExtension, extension, props)
+        self.runner.run(self._asyncAddDynamcExtension, extension, props)
     
     
     def changeProperty(self, prop):
         value = Property.convertPropertyToWamp(self.obj, prop)
-        self.sender.run(self._addPropertyChange, prop, value)
+        self.runner.run(self._addPropertyChange, prop, value)
 
  
     def changePropertyStatus(self, prop):
@@ -373,7 +370,7 @@ class OnlineObject(FreeCADOnlineObject):
     
     def recompute(self):
       
-        self.sender.run(self.__asyncRecompute)
+        self.runner.run(self.__asyncRecompute)
                
             
     async def __asyncRecompute(self):
@@ -394,7 +391,7 @@ class OnlineViewProvider(FreeCADOnlineObject):
         self.obj = obj
         self.proxydata = None   #as FreeCAD 0.18 does not forward viewprovider proxy changes we need a way to identify changes
           
-        self.sender.registerBatchHandler("__vpAddPropChange", self._asyncPropertyChangeFromCache)
+        self.runner.registerBatchHandler("__vpAddPropChange", self._asyncPropertyChangeFromCache)
 
         
     def setup(self):
@@ -411,11 +408,11 @@ class OnlineViewProvider(FreeCADOnlineObject):
             values[prop] = Property.convertPropertyToWamp(self.obj, prop)
             infos[prop]  = Property.createPropertyInfo(self.obj, prop)
             
-        self.sender.run(self._asyncSetup, self.obj.TypeId, values, infos)
+        self.runner.run(self._asyncSetup, self.obj.TypeId, values, infos)
     
     
     def remove(self):
-        self.sender.run(self._asyncRemove)
+        self.runner.run(self._asyncRemove)
         
     
     def createDynamicProperty(self, prop):
@@ -424,11 +421,11 @@ class OnlineViewProvider(FreeCADOnlineObject):
     
     
     def removeDynamicProperty(self, prop):
-        self.sender.run(self._asyncRemoveProperty, prop)
+        self.runner.run(self._asyncRemoveProperty, prop)
     
     
     def addDynamicExtension(self, extension, props):
-        self.sender.run(self._asyncAddDynamcExtension, extension, props)
+        self.runner.run(self._asyncAddDynamcExtension, extension, props)
     
     
     def changeProperty(self, prop):
@@ -441,10 +438,10 @@ class OnlineViewProvider(FreeCADOnlineObject):
             if hasattr(self.obj, 'Proxy'):
                 if not self.proxydata is self.obj.Proxy:
                     self.proxydata = self.obj.Proxy
-                    self.sender.run(self.__vpAddPropChange, 'Proxy', self.obj.dumpPropertyContent('Proxy'))
+                    self.runner.run(self.__vpAddPropChange, 'Proxy', self.obj.dumpPropertyContent('Proxy'))
             
         
-        self.sender.run(self.__vpAddPropChange, prop, value)
+        self.runner.run(self.__vpAddPropChange, prop, value)
 
 
     def changePropertyStatus(self, prop):

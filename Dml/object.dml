@@ -5,8 +5,8 @@ Map {
     
     event onCreated                     //name + typeid
     event onRemoved                     //name
-    event onPropertyChanged             //obj name, property name
-    event onPropertiesChanged           //obj name, [property names]
+    event onPropChanged                 //obj name, property name
+    event onPropsChanged                //obj name, [property names]
     event onPropStatusChanged           //obj name, property name, new status
     event onDynamicPropertyCreated      //obj name, property name, typeid, group, documentation
     event onDynamicPropertiesCreated    //obj name, property names, [property infos]
@@ -27,10 +27,10 @@ Map {
         
         obj.typeid = typeid
         obj.onChangedProperty.RegisterCallback(function(prop) {
-            container.onPropertyChanged.Emit(name, prop)
+            container.onPropChanged.Emit(name, prop)
         })
         obj.onChangedProperties.RegisterCallback(function(props) {
-            container.onPropertiesChanged.Emit(name, props)
+            container.onPropsChanged.Emit(name, props)
         })
         obj.onStatusProperty.RegisterCallback(function(prop, value) {
             container.onPropStatusChanged.Emit(name, prop, value)
