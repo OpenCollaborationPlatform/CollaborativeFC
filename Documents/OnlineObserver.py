@@ -17,7 +17,7 @@
 # *   Suite 330, Boston, MA  02111-1307, USA                             *
 # ************************************************************************
 
-import FreeCAD, logging, os
+import FreeCAD, logging, os, asyncio
 import Documents.Property as Property
 import Documents.AsyncRunner as AsyncRunner
 from Documents.OnlineObject import OnlineObject
@@ -34,7 +34,8 @@ class OnlineObserver():
         self.callbacks = {
                 "Objects.onCreated": self.__newObject,
                 "Objects.onRemoved": self.__removeObject, 
-                "Objects.onPropChanged": self.__changeObject, 
+                "Objects.onPropertyChanged": self.__changeObject, 
+                "Objects.onPropertiesChanged": self.__changeMultiObject, 
                 "Objects.onPropStatusChanged": self.__changePropStatus,
                 "Objects.onDynamicPropertyCreated": self.__createObjectDynProperty,
                 "Objects.onDynamicPropertiesCreated": self.__createObjectDynProperties,
@@ -43,7 +44,8 @@ class OnlineObserver():
                 "Objects.onExtensionRemoved": self.__removeObjextExtension,
                 "Objects.onObjectRecomputed": self.__objectRecomputed,
                 
-                "ViewProviders.onPropChanged": self.__changeViewProvider,
+                "ViewProviders.onPropertyChanged": self.__changeViewProvider,
+                "ViewProviders.onPropertiesChanged": self.__changeMultiViewProdiver,
                 "ViewProviders.onPropStatusChanged": self.__changeViewProvierPropStatus,
                 "ViewProviders.onDynamicPropertyCreated": self.__createViewProviderDynProperty,
                 "ViewProviders.onDynamicPropertiesCreated": self.__createViewProviderDynProperties,
@@ -130,15 +132,17 @@ class OnlineObserver():
         if obj is None:
             return
                
-        #property changes need to be partially synced:
-        # as the node needs to be called for values (or even binary data) it takes a while and the call is async.
-        # However, things like Proxy need to be set in the correct order, as this triggers certain setups like "attach".
-        # Without that other property changes may not have the correct object state 
-        #if "PropertyPythonObject" in obj.getTypeIdOfProperty(prop):
-        #    self.onlineDoc.objects[name].sender.runAsyncAsSetup(self.__setProperty(obj, name, prop, f"Object ({name})"))
-        #else:
-        #    self.onlineDoc.objects[name].sender.runAsync(self.__setProperty(obj, name, prop, f"Object ({name})"))
         await self.__setProperty(obj, name, prop, f"Object ({name})")
+        
+        
+    async def __changeMultiObject(self, name, props):
+        
+        obj = self.onlineDoc.document.getObject(name)
+        if obj is None:
+            return
+               
+        await self.__setProperties(obj, name, props, f"Object ({name})")
+ 
  
     async def __changePropStatus(self, name, prop, status):
         
@@ -231,13 +235,17 @@ class OnlineObserver():
         obj = self.onlineDoc.document.getObject(name)
         if obj is None:
             return
-               
-        #see __changeObject for explanation
-        #if "PropertyPythonObject" in obj.ViewObject.getTypeIdOfProperty(prop):
-        #    self.onlineDoc.objects[name].sender.runAsyncAsSetup(self.__setProperty(obj.ViewObject, name, prop, f"ViewProvider ({name})"))
-        #else:
-        #    self.onlineDoc.objects[name].sender.runAsync(self.__setProperty(obj.ViewObject, name, prop, f"ViewProvider ({name})"))
+ 
         await self.__setProperty(obj.ViewObject, name, prop, f"ViewProvider ({name})")
+     
+    
+    async def __changeMultiViewProdiver(self, name, props):
+        
+        obj = self.onlineDoc.document.getObject(name)
+        if obj is None:
+            return
+               
+        await self.__setProperties(obj.ViewObject, name, props, f"ViewProvider ({name})")
      
     
     async def __changeViewProvierPropStatus(self, name, prop, status):
@@ -312,6 +320,38 @@ class OnlineObserver():
         print("Changed document property event")
         
 
+    async def __getPropertyValue(self, group, objname, prop):
+        
+        uri = u"ocp.documents.edit.{0}.call.Document.{1}.".format(self.onlineDoc.id, group)
+        
+        calluri = uri + f"{objname}.Properties.{prop}.IsBinary"
+        binary = await self.onlineDoc.connection.session.call(calluri)
+                
+        calluri = uri + f"{objname}.Properties.{prop}.GetValue"
+        val = await self.onlineDoc.connection.session.call(calluri)
+                        
+        if binary:                    
+            class Data():
+                def __init__(self): 
+                    self.data = bytes()
+                            
+                    def progress(self, update):
+                        self.data += bytes(update)
+                    
+            #get the binary data
+            uri = f"ocp.documents.edit.{self.onlineDoc.id}.rawdata.BinaryByCid"
+            dat = Data()
+            opt = CallOptions(on_progress=dat.progress)
+            val = await self.onlineDoc.connection.session.call(uri, val, options=opt)
+            if val is not None:
+                dat.progress(val)
+                    
+            return dat.data
+        
+        else:
+            return val
+
+
     async def __setProperty(self, obj, name, prop, logentry):
         
         try:      
@@ -320,40 +360,12 @@ class OnlineObserver():
             else:
                 group = "ViewProviders"
                 
-            uri = u"ocp.documents.edit.{0}.call.Document.{1}.".format(self.onlineDoc.id, group)
-                        
-            calluri = uri + f"{name}.Properties.{prop}.IsBinary"
-            binary = await self.onlineDoc.connection.session.call(calluri)
-            
-            calluri = uri + f"{name}.Properties.{prop}.GetValue"
-            val = await self.onlineDoc.connection.session.call(calluri)
-                       
-            if binary:
+            value = await self.__getPropertyValue(group, name, prop)
                 
-                class Data():
-                    def __init__(self): 
-                        self.data = bytes()
-                        
-                    def progress(self, update):
-                        self.data += bytes(update)
-                
-                #get the binary data
-                uri = f"ocp.documents.edit.{self.onlineDoc.id}.rawdata.BinaryByCid"
-                dat = Data()
-                opt = CallOptions(on_progress=dat.progress)
-                val = await self.onlineDoc.connection.session.call(uri, val, options=opt)
-                if val is not None:
-                    dat.progress(val)
-                
-                #set it for the property
-                self.docObserver.deactivateFor(self.onlineDoc.document)   
-                self.logger.debug(f"{logentry}: Set binary property {prop}")
-                Property.convertWampToProperty(obj, prop, dat.data)
-                                
-            else:
-                self.docObserver.deactivateFor(self.onlineDoc.document)
-                self.logger.debug(f"{logentry}: Set property {prop} with {val}")
-                Property.convertWampToProperty(obj, prop, val)
+            #set it for the property
+            self.docObserver.deactivateFor(self.onlineDoc.document)   
+            self.logger.debug(f"{logentry}: Set property {prop}")
+            Property.convertWampToProperty(obj, prop, value)
 
         except Exception as e:
             self.logger.error(f"{logentry} Set property {prop} error: {e}")
@@ -363,7 +375,46 @@ class OnlineObserver():
             
             if hasattr(obj, "purgeTouched"):
                 obj.purgeTouched()
+    
+    
+    async def __setProperties(self, obj, name, props, logentry):
+        
+        try:      
+            if obj.isDerivedFrom("App::DocumentObject"):
+                group = "Objects"
+            else:
+                group = "ViewProviders"
                 
+            uri = u"ocp.documents.edit.{0}.call.Document.{1}.".format(self.onlineDoc.id, group)
+                        
+            #get all the values of the properties
+            tasks = []
+            values = {}
+            for prop in props:
+                        
+                async def  run(results, group, name, prop):
+                    val = await self.__getPropertyValue(group, name, prop)
+                    results[prop] = val
+                    
+                tasks.append(run(values, group, name, prop))
+                
+            if tasks:
+                await asyncio.wait(tasks)
+
+            #set all values
+            self.docObserver.deactivateFor(self.onlineDoc.document)   
+            self.logger.debug(f"{logentry}: Set properties {props}")
+            for prop  in values:
+                Property.convertWampToProperty(obj, prop, values[prop])
+
+        except Exception as e:
+            self.logger.error(f"{logentry} Set properties {props} error: {e}")
+
+        finally:            
+            self.docObserver.activateFor(self.onlineDoc.document)
+            
+            if hasattr(obj, "purgeTouched"):
+                obj.purgeTouched()
            
     
     def __createDynProperty(self, obj, prop, typeID, group, documentation, status):

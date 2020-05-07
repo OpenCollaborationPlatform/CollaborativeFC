@@ -6,6 +6,7 @@ Map {
     event onMultiCreatedDynamic
     event onRemovedDynamic 
     event onChanged
+    event onMultiChanged
     event onStatusChanged
     
     //creates a new property and sets it up correctly. No new property event emitted
@@ -70,16 +71,22 @@ Map {
     }
     
     function SetValues(props, values) {
-    
-        for (var i=0; i<props.length; i++) {
-            
-            var prop = props[i]
-            if (!this.Has(prop)) {
-                throw "Property " + prop + " does not exist"
+        this.onChanged.Disable()
+        try {
+            for (var i=0; i<props.length; i++) {
+                
+                var prop = props[i]
+                if (!this.Has(prop)) {
+                    throw "Property " + prop + " does not exist"
+                }
+                
+                var obj = this.Get(prop)
+                obj.SetValue(values[i])
             }
-            
-            var obj = this.Get(prop)
-            obj.SetValue(values[i])
+            this.onMultiChanged.Emit(props)
+        }
+        finally {
+            this.onChanged.Enable()
         }
     }
     

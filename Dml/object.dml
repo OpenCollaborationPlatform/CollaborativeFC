@@ -5,10 +5,11 @@ Map {
     
     event onCreated                     //name + typeid
     event onRemoved                     //name
-    event onPropChanged                 //obj name, property name
+    event onPropertyChanged             //obj name, property name
+    event onPropertiesChanged           //obj name, [property names]
     event onPropStatusChanged           //obj name, property name, new status
     event onDynamicPropertyCreated      //obj name, property name, typeid, group, documentation
-    event onDynamicPropertiesCreated    //obj name, property names, property infos
+    event onDynamicPropertiesCreated    //obj name, property names, [property infos]
     event onDynamicPropertyRemoved      //obj name, property name
     event onExtensionCreated            //obj name, extension name
     event onExtensionRemoved            //obj name, extension name
@@ -26,7 +27,10 @@ Map {
         
         obj.typeid = typeid
         obj.onChangedProperty.RegisterCallback(function(prop) {
-            container.onPropChanged.Emit(name, prop)
+            container.onPropertyChanged.Emit(name, prop)
+        })
+        obj.onChangedProperties.RegisterCallback(function(props) {
+            container.onPropertiesChanged.Emit(name, props)
         })
         obj.onStatusProperty.RegisterCallback(function(prop, value) {
             container.onPropStatusChanged.Emit(name, prop, value)
@@ -69,6 +73,7 @@ Map {
         
         //events for communication
         event onChangedProperty
+        event onChangedProperties
         event onStatusProperty
         event onCreatedDynamicProperty
         event onCreatedDynamicProperties
@@ -84,6 +89,10 @@ Map {
             
             .onChanged: function(name) {
                 this.parent.onChangedProperty.Emit(name)
+            }
+            
+            .onMultiChanged: function(names) {
+                this.parent.onChangedProperties.Emit(names)
             }
             
             .onStatusChanged: function(name, value) {
