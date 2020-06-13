@@ -20,8 +20,12 @@ Map {
     
         if (this.Has(name)) {
             throw "Name already taken"
-        }        
+        }      
         
+        //set it up in the graph
+        Document.DAG.AddNode(name)
+        
+        //set up the event processing
         var container = this
         var obj = container.New(name)
         
@@ -61,6 +65,7 @@ Map {
     function RemoveObject(name) {
         
         this.Remove(name)
+        Document.DAG.RemoveNode(name)
         this.onRemoved.Emit(name)
     }   
     
@@ -87,7 +92,7 @@ Map {
         PropertyContainer {
             .name: "Properties"
             
-            .onChanged: function(name) {
+            .onSingleChanged: function(name) {
                 this.parent.onChangedProperty.Emit(name)
             }
             
@@ -147,18 +152,6 @@ Map {
                 }
                 throw "Cannot remove extension: not available"
             }
-            
-            /*
-            //we take part in transactions
-            Transaction {
-                .name: "transaction"
-            }*/
         }
-        /*
-        Transaction {
-            .name: "transaction"
-
-            .onParticipation: function() {this.parent.result.value += "p1"}
-        }*/
     }
 }

@@ -253,7 +253,7 @@ class OnlineDocument():
             return await self.connection.session.call(u"ocp.documents.{0}.listPeers".format(self.id))
         
         except Exception as e:
-            self.logger.error("Getting peers error: {0}".format(e))
+            self.logger.error(f"Getting peers error: {e}")
             return []
         
         

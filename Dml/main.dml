@@ -1,28 +1,36 @@
-import "object.dml" as ObjectContainer
+import "objectmap.dml" as ObjectContainer
 import "property.dml" as PropertyContainer
 
 Data {
     .name: "Document"
     
+    /* Document Properties */
     PropertyContainer {
         .name: "Properties"
     }
     
+    /* Document Objects */
     ObjectContainer {
         .name: "Objects"
     }
     
+    /* View Providers */
     ObjectContainer {
         .name: "ViewProviders"
     }    
     
-    Graph {
+    /* FreeCAD interdependencies is defined via the dependency graph. It could theoretically be build from all
+     * Properties, as FreeCAD does itself, however, this is complicated. It requires knowledge over all link 
+     * properties as well as expressions. To ease this we just recreate the FreeCAD DAG by the available info 
+     * from FreeCAD document objects 
+     */
+    Graph {        
         .name: "DAG"
         .node: string
         .edge: none
         .directed: true
         
-        //sets the FreeCAD outlist of a document object
+        //sets the FreeCAD outlist of a document object (list of object names)
         function SetObjectOutList(obj, list) {
             
             //the FreeCAD outlist gives us the graph children. For dependencies the object depends
@@ -38,48 +46,32 @@ Data {
             //add all edges that are in the list but not available
             var add = this.subtract(list, edges)
             for(var i=0; i<add.length; i++) {
-                this.AddEdgeBetween(add[i], obj)
+                this.NewEdge(add[i], obj)
             }
         }
         
-        //returns all objects, that depend on the given one
-        function GetDependentObjects(obj) {
-            
-            //we traverse the graph ourself, as not all objects in the graph are relevant
-            //for the dependencies, like Groups or Parts
-            var reachable = this.FromNode(obj)
-            var dependend = []
-            for(var i=0; i<reachable.length; i++) {
-                var type = this.parent.Objects.Get(reachable[i]).typeid
-                if (type == "App::Group" ||
-                    type == "App::Part") {
-                    continue
-                }
-                dependend.push(reachable[i])
-            }
-            
-            //now get all dependencies of the dependencies
-            result = dependend.slice()
-            for(var i=0; i<dependend.length; i++) {
-                var deps = this.GetDependentObjects(dependend[i])
-                result.concat(deps)
-            }
-            
-            return result
-        }
-        
-        //gets the FreeCAD outlist of a document object
-        function GetObjectOutlist(name) {
+        //gets the FreeCAD outlist of a document object (list of object names)
+        const function GetObjectOutList(name) {
             return this.ToNode(name)
         }
         
-        //gets the FreeCAD inlist of a document object
-        function GetObjectInlist(name) {
+        //gets the FreeCAD inlist of a document object (list of object names)
+        const function GetObjectInlist(name) {
             return this.FromNode(name)
         }
         
+        //returns all objects, that depend on the given one (list of objects)
+        const function GetDependentObjects(obj) {
+            names = this.ReachableNodes(obj.name)
+            var objs = []
+            for(var i=0; i<names.length; i++) {
+                objs.push(Document.Objects.Get(names[i]))
+            }
+            return objs
+        }
+        
         //helper function: return the first array without elements from the second
-        function subtract(base, remove) {
+        const function subtract(base, remove) {
 
             for( var i=base.length - 1; i>=0; i--){
                 
@@ -90,6 +82,8 @@ Data {
                     }
                 }
             }
+            
+            return base
         }
     }
     

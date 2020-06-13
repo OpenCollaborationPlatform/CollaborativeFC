@@ -47,6 +47,7 @@ class FreeCADOnlineObject():
         self.dynPropCache    = {}
         self.statusPropCache = {}
         self.propChangeCache = {}
+        self.propChangeOutlist = []
 
 
     async def _asyncSetup(self, typeid, values, infos):
@@ -100,7 +101,7 @@ class FreeCADOnlineObject():
             await self.connection.session.call(uri, props, infos)
         
         except Exception as e:
-            self.logger.error("Setup property {0} failed: {1}".format(prop, e))
+            self.logger.error(f"Setup properties failed: {e}")
     
     
     async def _asyncRemoveProperty(self, prop):
@@ -189,10 +190,11 @@ class FreeCADOnlineObject():
             self.logger.error("Change property status from cache failed: {0}".format(e))
             
     
-    def _addPropertyChange(self, prop, value):
+    def _addPropertyChange(self, prop, value, outlist):
         
         #add property with status to the cache. 
         self.propChangeCache[prop] = value
+        self.propChangeOutlist = outlist #we are only interested in the last set outlist, not intermediate steps
     
     
     async def __getCidForData(self, data):
@@ -211,8 +213,10 @@ class FreeCADOnlineObject():
         if not self.propChangeCache:
             return
 
+        #copy everything before first async op
         props = self.propChangeCache.copy()
         self.propChangeCache.clear()
+        out = self.propChangeOutlist.copy()
                
         #get the cids for the binary properties in parallel
         tasks = []
@@ -225,6 +229,18 @@ class FreeCADOnlineObject():
                     
                 tasks.append(run(props, prop))
 
+        #also in parallel: query the currently outlist
+        if self.objGroup == "Objects":
+            outlist = []
+            async def getOutlist():
+                uri = f"ocp.documents.edit.{self.docId}.call.Document.DAG.GetObjectOutList"
+                outlist = await self.connection.session.call(uri, self.obj.Name)
+                outlist.sort()
+                
+            tasks.append(getOutlist())
+
+
+        #execute all parallel tasks
         if tasks:
             await asyncio.wait(tasks)
         
@@ -235,33 +251,23 @@ class FreeCADOnlineObject():
         else:
             await self._asyncWriteProperties(list(props.keys()), list(props.values()))
 
+        #finally process the outlist
+        if self.objGroup == "Objects":
+            out.sort()
+            if out != outlist:
+                uri = f"ocp.documents.edit.{self.docId}.call.Document.DAG.SetObjectOutList"
+                await self.connection.session.call(uri, self.obj.Name, out)
+                
+        
         
     async def _asyncWriteProperty(self, prop, value):
         
-        try:
-            #value = Property.convertPropertyToWamp(self.obj, prop)
+        try:       
+            #simple POD property: just add it!
+            self.logger.debug(f"Write property {prop}")
             uri = u"ocp.documents.edit.{0}".format(self.docId)
-        
-            if isinstance(value, bytearray):
-                self.logger.debug("Write binary property {0}".format(prop))
-                
-                #store the data for the processing!
-                datakey = self.data.addData(value)
-                
-                #than we need the id of the property where we add the data
-                calluri = uri + u".call.Document.{0}.{1}.Properties.{2}.GetValue".format( self.objGroup, self.name, prop)
-                propid = await self.connection.session.call(calluri)
-                if propid == None or propid == "":
-                    raise Exception("Property {0} does return valid binary data ID".format(prop))
-                
-                #call "SetBinary" for the property
-                await self.connection.session.call(uri + u".rawdata.{0}.SetByBinary".format(propid), self.data.uri, datakey)
-                
-            else:
-                #simple POD property: just add it!
-                self.logger.debug(f"Write property {prop}")
-                uri += u".call.Document.{0}.{1}.Properties.{2}.SetValue".format(self.objGroup, self.name, prop)
-                await self.connection.session.call(uri, value)
+            uri += u".call.Document.{0}.{1}.Properties.{2}.SetValue".format(self.objGroup, self.name, prop)
+            await self.connection.session.call(uri, value)
         
         except Exception as e:
             self.logger.error("Writing property error ({1}, {2}): {0}".format(e, self.name, prop))
@@ -360,7 +366,8 @@ class OnlineObject(FreeCADOnlineObject):
     
     def changeProperty(self, prop):
         value = Property.convertPropertyToWamp(self.obj, prop)
-        self.runner.run(self._addPropertyChange, prop, value)
+        outlist = [obj.Name for obj in self.obj.OutList]
+        self.runner.run(self._addPropertyChange, prop, value, outlist)
 
  
     def changePropertyStatus(self, prop):
@@ -451,4 +458,4 @@ class OnlineViewProvider(FreeCADOnlineObject):
 
     def __vpAddPropChange(self, prop, value):
         #indirection to have different function name as parent object in runner
-        self._addPropertyChange(prop, value)
+        self._addPropertyChange(prop, value, [])

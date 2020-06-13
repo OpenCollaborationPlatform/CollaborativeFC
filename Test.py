@@ -90,7 +90,7 @@ class Handler():
         await session.call("ocp.test.triggerEvent", os.getenv('OCP_TEST_RPC_ADDRESS', ''), False)
 
 
-    async def synchronize(self, docId):
+    async def synchronize(self, docId, numFCs):
                 
         #we wait till all tasks are finished
         coros =  []
@@ -99,12 +99,9 @@ class Handler():
                 coros.append(entity.onlinedoc.waitTillCloseout(20))
                 
         await asyncio.wait(coros)
-        
-        #check how many peers are connected and how many sync calls we need
-        peers = await self.__connection.session.call(f"ocp.documents.{docId}.listPeers")
-        
+ 
         #register the sync with the testserver
-        await self.__session.call("ocp.test.registerSync", docId, len(peers))
+        await self.__session.call("ocp.test.registerSync", docId, numFCs)
         
         #and now issue the event
         uri = f"ocp.documents.edit.{docId}.call.Document.sync"
@@ -112,12 +109,15 @@ class Handler():
 
      
     async def  __receiveSync(self, docId):
-
+        
         #wait till everything is done!
         entities = self.__manager.getEntities()
         for entity in entities:
             if entity.id == docId:
                 await entity.onlinedoc.waitTillCloseout(20)
+                
+        #wait for online observer as well
+        
 
         #call testserver that we received and executed the sync!
         await self.__session.call("ocp.test.sync", docId)
