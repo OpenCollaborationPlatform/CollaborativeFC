@@ -217,9 +217,9 @@ class Manager():
             return None
 
     
-    def hasOnlineViewProvider(self, fcvp):
-        
+    def hasOnlineViewProvider(self, fcvp):        
         #returns if the given FreeCAD viewprovider has a corresponding OnlineViewProvider
+        
         for entity in self.__entities: 
             if entity.onlinedoc and entity.onlinedoc.hasViewProvider(fcvp):
                 return True

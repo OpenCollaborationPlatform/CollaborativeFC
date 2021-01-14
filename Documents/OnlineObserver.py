@@ -21,6 +21,7 @@ import FreeCAD, logging, os, asyncio
 import Documents.Property as Property
 import Documents.AsyncRunner as AsyncRunner
 from Documents.OnlineObject import OnlineObject
+from Documents.OnlineObject import OnlineViewProvider
 from autobahn.wamp.types    import SubscribeOptions, CallOptions
 
 class OnlineObserver():
@@ -152,6 +153,11 @@ class OnlineObserver():
             obj = self.onlineDoc.document.addObject(typeID, name)
             oobj = OnlineObject(obj, self.onlineDoc)
             self.onlineDoc.objects[obj.Name] = oobj
+            
+            #create the online view provider for that object
+            if obj.ViewObject:
+                ovp = OnlineViewProvider(obj.ViewObject, oobj, self.onlineDoc)
+                self.onlineDoc.viewproviders[obj.Name] = ovp
             
             obj.purgeTouched()
             

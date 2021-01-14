@@ -155,6 +155,7 @@ class OnlineDocument():
     
     
     def newViewProvider(self, vp):
+        #Setups and uploads a new ViewProvider
         
         if self.shouldExcludeTypeId(vp.Object.TypeId):
             return

@@ -350,13 +350,16 @@ class GUIDocumentObserver(ObserverBase):
                
         #we need to check if any document has this vp, as accessing it before 
         #creation crashes freecad
+        print("Changed VP callback")
         if not self.handler.hasOnlineViewProvider(vp):
             return
         
+        print("Check Deactivation")
         doc = vp.Document
         if self.isDeactivatedFor(doc):
             return
 
+        print("get doc")
         odoc = self.handler.getOnlineDocument(doc)
         if not odoc:
             return
@@ -369,6 +372,7 @@ class GUIDocumentObserver(ObserverBase):
                 odoc.addViewProviderDynamicExtension(vp, extension, props)
                
         #finally call change object!    
+        print("change online!")
         odoc.changeViewProvider(vp, prop)
       
     def slotInEdit(self, obj):
