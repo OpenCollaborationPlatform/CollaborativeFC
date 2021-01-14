@@ -1,4 +1,5 @@
 import "objectmap.dml" as ObjectContainer
+import "object.dml" as Object
 import "property.dml" as PropertyContainer
 
 Data {
@@ -12,12 +13,29 @@ Data {
     /* Document Objects */
     ObjectContainer {
         .name: "Objects"
+        
+        .value: Object{
+            .name: "DocumentObject"
+        }
+        
+        //every document object needs to be added to the DAG for later processing in 
+        //transactions. This does not apply to ViewProviders
+        .onObjectCreated: function(name) {                
+                Document.DAG.AddNode(name)
+        }            
+        .onObjectRemoved: function(name) {
+                Document.DAG.RemoveNode(name)
+        }
     }
     
     /* View Providers */
     ObjectContainer {
         .name: "ViewProviders"
-    }    
+        
+        .value: Object{
+            .name: "ViewProvider"
+        }
+    }
     
     /* FreeCAD interdependencies is defined via the dependency graph. It could theoretically be build from all
      * Properties, as FreeCAD does itself, however, this is complicated. It requires knowledge over all link 
@@ -31,27 +49,35 @@ Data {
         .directed: true
         
         //sets the FreeCAD outlist of a document object (list of object names)
-        function SetObjectOutList(obj, list) {
+        function SetObjectOutList(name, list) {
             
             //the FreeCAD outlist gives us the graph children. For dependencies the object depends
             //on the out list objects. Hence in our graph we add edges from outlist object to obj.
             
+            
             //remove all edges that are currently there but not in the list
-            var edges = this.ToNode(obj)
+            var edges = this.ToNode(name)
             var remove = this.subtract(edges, list)
             for(var i=0; i<remove.length; i++) {
-                this.RemoveEdgeBetween(remove[i], obj)
+                this.RemoveEdgeBetween(remove[i], name)
             }
             
-            //add all edges that are in the list but not available
+            //add all edges that are in the nodelist but not available
             var add = this.subtract(list, edges)
             for(var i=0; i<add.length; i++) {
-                this.NewEdge(add[i], obj)
+                this.NewEdge(add[i], name)
+                
+                //we check if the newly connected object is in a Transaction different than 
+                //ours. If so we need to fail, as this would connect two transaction subtrees
+                //var child = Document.Objects.Get(add[i])
+                //if (child.Transaction.InOtherTransaction()) {
+                //    throw "Object in outlist is in different transaction: cannot make the change"
+                //}
             }
         }
         
         //gets the FreeCAD outlist of a document object (list of object names)
-        const function GetObjectOutList(name) {
+        const function GetObjectOutList(name) {            
             return this.ToNode(name)
         }
         
@@ -61,8 +87,8 @@ Data {
         }
         
         //returns all objects, that depend on the given one (list of objects)
-        const function GetDependentObjects(obj) {
-            names = this.ReachableNodes(obj.name)
+        const function GetDependentObjects(name) {
+            names = this.ReachableNodes(name)
             var objs = []
             for(var i=0; i<names.length; i++) {
                 objs.push(Document.Objects.Get(names[i]))

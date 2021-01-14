@@ -42,7 +42,7 @@ class Handler():
         await connection.ready()
         
         #register ourself to the OCP node
-        await connection.session.subscribe(self.__receiveSync, "ocp.documents.edit..events.Document.sync", options=SubscribeOptions(match="wildcard"))
+        await connection.session.subscribe(self.__receiveSync, "ocp.documents..content.Document.sync", options=SubscribeOptions(match="wildcard"))
         
         #connect to testserver       
         uri = os.getenv('OCP_TEST_SERVER_URI', '')
@@ -104,7 +104,7 @@ class Handler():
         await self.__session.call("ocp.test.registerSync", docId, numFCs)
         
         #and now issue the event
-        uri = f"ocp.documents.edit.{docId}.call.Document.sync"
+        uri = f"ocp.documents.{docId}.content.Document.sync"
         await self.__connection.session.call(uri, docId)
 
      

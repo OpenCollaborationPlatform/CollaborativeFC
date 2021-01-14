@@ -31,11 +31,11 @@ class FreeCADOnlineObject():
         #check which type of runner to use 
         if os.getenv('FC_OCP_SYNC_MODE', "0") == "1":
             self.logger.info('Use non-default sync mode "Document-Sync"')
-            self.runner     = DocumentOrderedRunner.getSenderRunner(onlinedoc.id)
+            self.runner     = DocumentOrderedRunner.getSenderRunner(onlinedoc.id, self.logger)
         
         else:
             if parentOnlineObj is None:
-                self.runner     = BatchedOrderedRunner() #used by the object to sync outgoing events
+                self.runner     = BatchedOrderedRunner(self.logger) #used by the object to sync outgoing events
             else:
                 self.runner     = parentOnlineObj.runner
                        
@@ -49,6 +49,11 @@ class FreeCADOnlineObject():
         self.propChangeCache = {}
         self.propChangeOutlist = []
 
+    async def _docPrints(self):
+        uri = u"ocp.documents.{0}.prints".format(self.docId)
+        vals = await self.connection.session.call(uri)
+        for val in vals:
+            self.logger.debug(val)
 
     async def _asyncSetup(self, typeid, values, infos):
         #creates the object in the ocp node
@@ -56,17 +61,18 @@ class FreeCADOnlineObject():
         self.logger.debug(f"New object {self.name} ({typeid})")
 
         try:           
-            uri = u"ocp.documents.edit.{0}".format(self.docId)
-            await self.connection.session.call(uri + u".call.Document.{0}.NewObject".format(self.objGroup), self.name, typeid)
+            uri = u"ocp.documents.{0}".format(self.docId)
+            await self.connection.session.call(uri + u".content.Document.{0}.NewObject".format(self.objGroup), self.name, typeid)
             
             #create all properties that need setup           
-            await self._asyncCreateProperties(False, list(values.keys()), list(infos.values()))
+            await self.__asyncCreateProperties(False, list(values.keys()), list(infos.values()))
         
         except Exception as e:
+            await self._docPrints()
             self.logger.error("Setup error: {0}".format(e))
            
     
-    async def _asyncCreateProperty(self, dyn, prop, info):
+    async def __asyncCreateProperty(self, dyn, prop, info):
         #adds a property with its property info
         #could be added as normal or as dynamic property, dependend on dyn boolean
         
@@ -78,14 +84,14 @@ class FreeCADOnlineObject():
                 self.logger.debug("Setup default property {0} ({1})".format(prop, info["typeid"]))
                 fnc = "SetupProperty"
                 
-            uri = f"ocp.documents.edit.{self.docId}.call.Document.{self.objGroup}.{self.name}.Properties.{fnc}"
+            uri = f"ocp.documents.{self.docId}.content.Document.{self.objGroup}.{self.name}.Properties.{fnc}"
             await self.connection.session.call(uri, prop, info["typeid"], info["group"], info["docu"], info["status"])
         
         except Exception as e:
             self.logger.error("Create property {0} failed: {1}".format(prop, e))
     
     
-    async def _asyncCreateProperties(self, dyn, props, infos):
+    async def __asyncCreateProperties(self, dyn, props, infos):
         #adds a list of properties and a list with their property infos
         #could be added as normal or as dynamic property, dependend on dyn boolean
         
@@ -97,7 +103,7 @@ class FreeCADOnlineObject():
                 self.logger.debug(f"Setup default properties {props}")
                 fnc = "SetupProperties"
                 
-            uri = f"ocp.documents.edit.{self.docId}.call.Document.{self.objGroup}.{self.name}.Properties.{fnc}"
+            uri = f"ocp.documents.{self.docId}.content.Document.{self.objGroup}.{self.name}.Properties.{fnc}"
             await self.connection.session.call(uri, props, infos)
         
         except Exception as e:
@@ -107,7 +113,7 @@ class FreeCADOnlineObject():
     async def _asyncRemoveProperty(self, prop):
         try:        
             self.logger.debug(f"Remove property {prop}")
-            uri = u"ocp.documents.edit.{0}.call.Document.{1}.{2}.Properties.RemoveDynamicProperty".format(self.docId, self.objGroup, self.name)
+            uri = u"ocp.documents.{0}.content.Document.{1}.{2}.Properties.RemoveDynamicProperty".format(self.docId, self.objGroup, self.name)
             await self.connection.session.call(uri, prop)
         
         except Exception as e:
@@ -143,10 +149,10 @@ class FreeCADOnlineObject():
             values = list(props.values())
             
             if len(props) == 1:
-                await self._asyncCreateProperty(True, keys[0], values[0])
+                await self.__asyncCreateProperty(True, keys[0], values[0])
             
             else:
-                await self._asyncCreateProperties(True, keys, values)
+                await self.__asyncCreateProperties(True, keys, values)
 
         except Exception as e:
             self.logger.error("Create dyn property from cache failed: {0}".format(e))
@@ -175,7 +181,7 @@ class FreeCADOnlineObject():
             keys   = list(props.keys())
             values = list(props.values())
                         
-            uri = f"ocp.documents.edit.{self.docId}.call.Document.{self.objGroup}.{self.name}.Properties."
+            uri = f"ocp.documents.{self.docId}.content.Document.{self.objGroup}.{self.name}.Properties."
             if len(props) == 1:
                 self.logger.debug("Change property status {0}".format(keys[0]))
                 uri += keys[0] + ".status"
@@ -203,7 +209,7 @@ class FreeCADOnlineObject():
         datakey = self.data.addData(data)
         
         #get the cid!
-        uri = f"ocp.documents.edit.{self.docId}.rawdata.CidByBinary"
+        uri = f"ocp.documents.{self.docId}.raw.CidByBinary"
         cid = await self.connection.session.call(uri, self.data.uri, datakey)
         return cid
         
@@ -218,46 +224,50 @@ class FreeCADOnlineObject():
         self.propChangeCache.clear()
         out = self.propChangeOutlist.copy()
                
-        #get the cids for the binary properties in parallel
-        tasks = []
-        for prop in props:
-            if isinstance(props[prop], bytearray):  
+        try:
                 
-                async def run(props, prop):
-                    cid = await self.__getCidForData(props[prop])
-                    props[prop] = cid
+            #get the cids for the binary properties in parallel
+            tasks = []
+            for prop in props:
+                if isinstance(props[prop], bytearray):  
+                    async def run(props, prop):
+                        cid = await self.__getCidForData(props[prop])
+                        props[prop] = cid
+                        
+                    tasks.append(run(props, prop))
+
+            #also in parallel: query the current outlist
+            if self.objGroup == "Objects":
+                outlist = []
+                async def getOutlist():
+                    uri = f"ocp.documents.{self.docId}.content.Document.DAG.GetObjectOutList"
+                    outlist = await self.connection.session.call(uri, self.obj.Name)
+                    outlist.sort()
                     
-                tasks.append(run(props, prop))
+                tasks.append(getOutlist())
 
-        #also in parallel: query the currently outlist
-        if self.objGroup == "Objects":
-            outlist = []
-            async def getOutlist():
-                uri = f"ocp.documents.edit.{self.docId}.call.Document.DAG.GetObjectOutList"
-                outlist = await self.connection.session.call(uri, self.obj.Name)
-                outlist.sort()
+
+            #execute all parallel tasks
+            if tasks:
+                await asyncio.wait(tasks)
+            
+            #now batchwrite all properties in correct order
+            if len(props) == 1:
+                prop = list(props.keys())[0]
+                await self._asyncWriteProperty(prop, props[prop])
+            else:
+                await self._asyncWriteProperties(list(props.keys()), list(props.values()))
+
+            #finally process the outlist
+            if self.objGroup == "Objects":
+                self.logger.debug(f"Set Outlist")
+                out.sort()
+                if out != outlist:
+                    uri = f"ocp.documents.{self.docId}.content.Document.DAG.SetObjectOutList"
+                    await self.connection.session.call(uri, self.obj.Name, out)
                 
-            tasks.append(getOutlist())
-
-
-        #execute all parallel tasks
-        if tasks:
-            await asyncio.wait(tasks)
-        
-        #now batchwrite all properties in correct order
-        if len(props) == 1:
-            prop = list(props.keys())[0]
-            await self._asyncWriteProperty(prop, props[prop])
-        else:
-            await self._asyncWriteProperties(list(props.keys()), list(props.values()))
-
-        #finally process the outlist
-        if self.objGroup == "Objects":
-            out.sort()
-            if out != outlist:
-                uri = f"ocp.documents.edit.{self.docId}.call.Document.DAG.SetObjectOutList"
-                await self.connection.session.call(uri, self.obj.Name, out)
-                
+        except Exception as e:
+            self.logger.error(f"Batch writing properties for {self.name} failed: {e}")
         
         
     async def _asyncWriteProperty(self, prop, value):
@@ -265,8 +275,7 @@ class FreeCADOnlineObject():
         try:       
             #simple POD property: just add it!
             self.logger.debug(f"Write property {prop}")
-            uri = u"ocp.documents.edit.{0}".format(self.docId)
-            uri += u".call.Document.{0}.{1}.Properties.{2}.SetValue".format(self.objGroup, self.name, prop)
+            uri = f"ocp.documents.{self.docId}.content.Document.{self.objGroup}.{self.name}.Properties.{prop}.SetValue"
             await self.connection.session.call(uri, value)
         
         except Exception as e:
@@ -278,8 +287,9 @@ class FreeCADOnlineObject():
         
         try:
             self.logger.debug("Write batch properties {0}".format(props))
-            uri = u"ocp.documents.edit.{0}.call.Document.{1}.{2}.Properties.SetValues".format(self.docId, self.objGroup, self.name)
+            uri = u"ocp.documents.{0}.content.Document.{1}.{2}.Properties.SetValues".format(self.docId, self.objGroup, self.name)
             await self.connection.session.call(uri, props, values)
+            await self._docPrints()
             
         except Exception as e:
             self.logger.error("Writing property batch error: {0}".format(e))
@@ -288,11 +298,11 @@ class FreeCADOnlineObject():
     async def _asyncAddDynamcExtension(self, extension, props):
         
         try:           
-            uri = f"ocp.documents.edit.{self.docId}"
+            uri = f"ocp.documents.{self.docId}"
             
             #add the extension must be done: a changed property could result in use of the extension
             self.logger.debug("Add extension {0}".format(extension))
-            calluri = uri + u".call.Document.{0}.{1}.Extensions.Append".format(self.objGroup, self.name)
+            calluri = uri + u".content.Document.{0}.{1}.Extensions.Append".format(self.objGroup, self.name)
             await self.connection.session.call(calluri, extension)
             
             #the props can be created by a single call
@@ -300,7 +310,7 @@ class FreeCADOnlineObject():
             for prop in props:
                 infos.append(Property.createPropertyInfo(self.obj, prop))
                 
-            await self._asyncCreateProperties(False, props, infos)            
+            await self.__asyncCreateProperties(False, props, infos)            
 
                 
         except Exception as e:
@@ -310,8 +320,8 @@ class FreeCADOnlineObject():
     async def _asyncRemove(self):
         try:
             self.logger.debug("Remove")
-            uri = u"ocp.documents.edit.{0}".format(self.docId)
-            await self.connection.session.call(uri + u".call.Document.{0}.RemoveObject".format(self.objGroup), self.name)
+            uri = u"ocp.documents.{0}".format(self.docId)
+            await self.connection.session.call(uri + u".content.Document.{0}.RemoveObject".format(self.objGroup), self.name)
         
         except Exception as e:
             self.logger.error("Removing error: {0}".format(e))
@@ -322,6 +332,12 @@ class FreeCADOnlineObject():
         #throws an error on timeout.
         
         await self.runner.waitTillCloseout(timeout)
+        
+    def synchronize(self, syncer):
+        #wait till all current async tasks are finished, call wg.done() and than wait for the event to happen before 
+        #the next tasks are started. 
+        
+        self.runner.sync(syncer)
 
 
 class OnlineObject(FreeCADOnlineObject):
@@ -336,12 +352,16 @@ class OnlineObject(FreeCADOnlineObject):
         self.runner.registerBatchHandler("_addPropertyChange", self._asyncPropertyChangeFromCache)
         
         
-    def setup(self):
+    def setup(self, sync):
         values = {}
         infos = {}
         for prop in self.obj.PropertiesList:
             values[prop] = Property.convertPropertyToWamp(self.obj, prop)
             infos[prop]  = Property.createPropertyInfo(self.obj, prop)
+            
+        #check if we need to handle a syncronisation
+        if sync:
+            self.runner.sync(sync)
             
         self.runner.run(self._asyncSetup, self.obj.TypeId, values, infos)
     
@@ -384,7 +404,7 @@ class OnlineObject(FreeCADOnlineObject):
         
         try:
             self.logger.debug("Recompute")                
-            uri = u"ocp.documents.edit.{0}.call.Document.Objects.{1}.onRecomputed".format(self.docId, self.name)
+            uri = u"ocp.documents.{0}.content.Document.Objects.{1}.onObjectRecomputed".format(self.docId, self.name)
             await self.connection.session.call(uri)
         
         except Exception as e:
@@ -401,7 +421,7 @@ class OnlineViewProvider(FreeCADOnlineObject):
         self.runner.registerBatchHandler("__vpAddPropChange", self._asyncPropertyChangeFromCache)
 
         
-    def setup(self):
+    def setup(self, sync):
         
         if float(".".join(FreeCAD.Version()[0:2])) == 0.18:
             #part of the FC 0.18 no proxy change event workaround
@@ -414,6 +434,10 @@ class OnlineViewProvider(FreeCADOnlineObject):
         for prop in self.obj.PropertiesList:
             values[prop] = Property.convertPropertyToWamp(self.obj, prop)
             infos[prop]  = Property.createPropertyInfo(self.obj, prop)
+            
+        #check if we need to handle a syncronisation
+        if sync:
+            self.runner.sync(sync)
             
         self.runner.run(self._asyncSetup, self.obj.TypeId, values, infos)
     

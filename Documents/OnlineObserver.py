@@ -33,28 +33,28 @@ class OnlineObserver():
         self.runners = {}
         
         self.callbacks = {
-                "Objects.onCreated": self.__newObject,
-                "Objects.onRemoved": self.__removeObject, 
-                "Objects.onPropChanged": self.__changeObject, 
-                "Objects.onPropsChanged": self.__changeMultiObject, 
-                "Objects.onPropStatusChanged": self.__changePropStatus,
-                "Objects.onDynamicPropertyCreated": self.__createObjectDynProperty,
-                "Objects.onDynamicPropertiesCreated": self.__createObjectDynProperties,
-                "Objects.onDynamicPropertyRemoved": self.__removeObjectDynProperty,
-                "Objects.onExtensionCreated": self.__createObjextExtension,
-                "Objects.onExtensionRemoved": self.__removeObjextExtension,
-                "Objects.onObjectRecomputed": self.__objectRecomputed,
-                
-                "ViewProviders.onPropChanged": self.__changeViewProvider,
-                "ViewProviders.onPropsChanged": self.__changeMultiViewProdiver,
-                "ViewProviders.onPropStatusChanged": self.__changeViewProvierPropStatus,
-                "ViewProviders.onDynamicPropertyCreated": self.__createViewProviderDynProperty,
-                "ViewProviders.onDynamicPropertiesCreated": self.__createViewProviderDynProperties,
-                "ViewProviders.onDynamicPropertyRemoved": self.__removeViewProviderDynProperty,
-                "ViewProviders.onExtensionCreated": self.__createViewProviderExtension,
-                "ViewProviders.onExtensionRemoved": self.__removeViewProviderExtension,
-                
-                "Properties.onChangedProperty": self.__changeDocProperty
+                "Objects.onObjectCreated": self.__newObject,
+                "Objects.onObjectRemoved": self.__removeObject,
+                "Objects..onObjectRecomputed": self.__objectRecomputed,
+                "Objects..onExtensionCreated": self.__createObjextExtension,
+                "Objects..onExtensionRemoved": self.__removeObjextExtension,       
+                "Objects...onDynamicPropertyCreated": self.__createObjectDynProperty,
+                "Objects...onDynamicPropertiesCreated": self.__createObjectDynProperties,
+                "Objects...onDynamicPropertyRemoved": self.__removeObjectDynProperty,
+                "Objects...onDatasChanged": self.__changeMultiObject,
+                "Objects....onDataChanged": self.__changeObject, 
+                "Objects....onStatusChanged": self.__changePropStatus,
+                "ViewProviders..onExtensionCreated": self.__createViewProviderExtension,
+                "ViewProviders..onExtensionRemoved": self.__removeViewProviderExtension,
+                "ViewProviders...onDynamicPropertyCreated": self.__createViewProviderDynProperty,
+                "ViewProviders...onDynamicPropertiesCreated": self.__createViewProviderDynProperties,
+                "ViewProviders...onDynamicPropertyRemoved": self.__removeViewProviderDynProperty,
+                "ViewProviders...onDatasChanged": self.__changeMultiViewProdiver,
+                "ViewProviders....onDataChanged": self.__changeViewProvider,
+                "ViewProviders....onStatusChanged": self.__changeViewProvierPropStatus,                
+            }
+        
+        self.docCBs = {
             }
         
         if os.getenv('FC_OCP_SYNC_MODE', "0") == "1":
@@ -63,39 +63,64 @@ class OnlineObserver():
             self.synced = False
         
         try:
-            uri = f"ocp.documents.edit.{odoc.id}.events.Document."
+            uri = f"ocp.documents.{odoc.id}.content.Document."
             
-            #we do not prefix subscribe to uri only as this catches all events on document level, also those we do not handle here
-            odoc.connection.session.subscribe(self.__run, uri+"Objects", options=SubscribeOptions(match="prefix", details_arg="details"))
-            odoc.connection.session.subscribe(self.__run, uri+"ViewProviders", options=SubscribeOptions(match="prefix", details_arg="details"))
-            odoc.connection.session.subscribe(self.__run, uri+"Properties", options=SubscribeOptions(match="prefix", details_arg="details"))
+            for cb in self.callbacks.keys():
+                odoc.connection.session.subscribe(self.__run, uri+cb, options=SubscribeOptions(match="wildcard", details_arg="details"))
+
+            #odoc.connection.session.subscribe(self.__runDocProperties, uri+"Properties", options=SubscribeOptions(match="prefix", details_arg="details"))
            
         except Exception as e:
             self.logger.error("Setup failed: ", e)
-        
-        
+              
     async def __run(self, *args, details=None):
     
-        key = ('.').join(details.topic.split(".")[-2:])
-        if not key in self.callbacks:
+        #the path are all topics after Document.Objects.
+        path = details.topic.split(".")[5:]    
+        #key is the one used in the callback map
+        key = path.pop(0) + "."*len(path) + path[-1]
+        
+        #check if we should handle the callback (last key is callback name)
+        if key not in self.callbacks:
             return
+        
+        #if object and property names are provided, add them to argument list
+        if len(path) == 2 or len(path) == 3:
+            #.MyObject.onEventName  or .MyObject.Properties.onEventName
+            args = (path[0],) + args  #first key is object name
+                
+        elif len(path) == 4:
+            #.MyObject.Properties.MyProperty.onEventName
+            args = (path[0], path[2],) + args  #first key is object name, third key is property name
 
         fnc = self.callbacks[key]
+        self.getRunner(args[0]).run(fnc, *args) #first argument is name
         
-        if "Properties" in key:
-            AsyncRunner.DocumentOrderedRunner.getSenderRunner(self.onlineDoc.id).run(fnc, *args)
-        else:
-            name = args[0] #obj name is always the first argument
-            self.getRunner(name).run(fnc, *args)
-
+    
+    async def __runDocProperties(self, *args, details=None):
+        
+        #keys are all topics after Document.Properties.
+        keys = details.topic.split(".")[6:]
+        
+        if keys[-1] not in self.docCBs:
+            return
+        
+        #if object and property names are provided, add them to argument list
+        if len(keys) == 2:
+            #.MyProperty.onEventName
+            args = (keys[0],) + args #first key is object name
+            
+        fnc = self.docCBs[keys[-1]]
+        AsyncRunner.DocumentOrderedRunner.getSenderRunner(self.onlineDoc.id, self.logger).run(fnc, *args)
+            
 
     def getRunner(self, name):
         
         if not name in self.runners:
             if self.synced:
-                self.runners[name] = AsyncRunner.DocumentOrderedRunner.getSenderRunner(self.onlineDoc.id)
+                self.runners[name] = AsyncRunner.DocumentOrderedRunner.getSenderRunner(self.onlineDoc.id, self.logger)
             else:
-                self.runners[name] = AsyncRunner.OrderedRunner()
+                self.runners[name] = AsyncRunner.OrderedRunner(self.logger)
                 
         return self.runners[name]
 
@@ -157,7 +182,7 @@ class OnlineObserver():
         obj = self.onlineDoc.document.getObject(name)
         if obj is None:
             return
-               
+        
         await self.__setProperty(obj, name, prop, f"Object ({name})")
         
         
@@ -166,7 +191,7 @@ class OnlineObserver():
         obj = self.onlineDoc.document.getObject(name)
         if obj is None:
             return
-               
+        
         await self.__setProperties(obj, name, props, f"Object ({name})")
  
  
@@ -277,11 +302,11 @@ class OnlineObserver():
     async def __changeViewProvierPropStatus(self, name, prop, status):
         
         obj = self.onlineDoc.document.getObject(name)
-        if obj is None:
+        if not obj or not obj.ViewObject:
             return
         
         self.logger.debug(f"ViewProvider ({name}): Change property {prop} status to ({status})")
-        self.__setPropertyStatus(obj.ViewObject, name, prop, status)
+        self.__setPropertyStatus(obj.ViewObject, prop, status)
      
     
     async def __createViewProviderDynProperty(self, name, prop, typeID, group, documentation, status):
@@ -348,14 +373,11 @@ class OnlineObserver():
 
     async def __getPropertyValue(self, group, objname, prop):
         
-        uri = u"ocp.documents.edit.{0}.call.Document.{1}.".format(self.onlineDoc.id, group)
-        
-        calluri = uri + f"{objname}.Properties.{prop}.IsBinary"
-        binary = await self.onlineDoc.connection.session.call(calluri)
-                
+        uri = u"ocp.documents.{0}.content.Document.{1}.".format(self.onlineDoc.id, group)
         calluri = uri + f"{objname}.Properties.{prop}.GetValue"
         val = await self.onlineDoc.connection.session.call(calluri)
-                        
+        binary =  isinstance(val, str) and val.startswith("ocp_cid")
+
         if binary:                    
             class Data():
                 def __init__(self): 
@@ -365,7 +387,7 @@ class OnlineObserver():
                     self.data += bytes(update)
                     
             #get the binary data
-            uri = f"ocp.documents.edit.{self.onlineDoc.id}.rawdata.BinaryByCid"
+            uri = f"ocp.documents.{self.onlineDoc.id}.raw.BinaryByCid"
             dat = Data()
             opt = CallOptions(on_progress=dat.progress)
             val = await self.onlineDoc.connection.session.call(uri, val, options=opt)
@@ -411,7 +433,7 @@ class OnlineObserver():
             else:
                 group = "ViewProviders"
                 
-            uri = u"ocp.documents.edit.{0}.call.Document.{1}.".format(self.onlineDoc.id, group)
+            uri = u"ocp.documents.{0}.content.Document.{1}.".format(self.onlineDoc.id, group)
                         
             #get all the values of the properties
             tasks = []
@@ -526,10 +548,7 @@ class OnlineObserver():
 
 
     def __setPropertyStatus(self, obj, prop, status):
-        
-        if not hasattr(obj, prop):
-            return
-        
+
         try:
             self.docObserver.deactivateFor(self.onlineDoc.document)
             
@@ -539,8 +558,7 @@ class OnlineObserver():
             else:
                 obj.setEditorMode(prop, Property.statusToEditorMode(status))
         
-        finally:
-            
+        finally:            
             self.docObserver.activateFor(self.onlineDoc.document)
             if hasattr(obj, "purgeTouched"):
                 obj.purgeTouched()

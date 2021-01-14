@@ -30,7 +30,36 @@ class TaskContext():
 
     async def __aexit__(self, exc_type, exc, tb):
         pass
+
+class Syncer(object):
+    #Helper class to sync multiple runners:
+    # - one can wait till all num runners are done with their work with waitDone()
+    # - one can allow to restart the runners doing work with restart()
     
+    def __init__(self, num):
+        self.count = num
+        self.cv = asyncio.Condition()
+        self.event = asyncio.Event()
+
+    async def done(self):
+        await self.cv.acquire()
+        self.count -= 1
+        if self.count == 0:
+            self.cv.notify_all()
+        self.cv.release()
+
+    async def waitAllDone(self):
+        await self.cv.acquire()
+        while self.count > 0:
+            await self.cv.wait()
+        self.cv.release()
+        
+    async def waitRestart(self):
+        await self.event.wait()
+        
+    def restart(self):
+        self.event.set()
+        
 
 class DocumentOrderedRunner():
     
@@ -38,16 +67,16 @@ class DocumentOrderedRunner():
     __receiver = {}
     
     @classmethod
-    def getSenderRunner(cls, docId):
+    def getSenderRunner(cls, docId, logger):
         if not docId in DocumentOrderedRunner.__sender:
-            DocumentOrderedRunner.__sender[docId] = OrderedRunner()
+            DocumentOrderedRunner.__sender[docId] = OrderedRunner(logger)
         
         return DocumentOrderedRunner.__sender[docId]
     
     @classmethod
-    def getReceiverRunner(cls, docId):
+    def getReceiverRunner(cls, docId, logger):
         if not docId in DocumentOrderedRunner.__receiver:
-            DocumentOrderedRunner.__receiver[docId] = OrderedRunner()
+            DocumentOrderedRunner.__receiver[docId] = OrderedRunner(logger)
         
         return DocumentOrderedRunner.__receiver[docId]
    
@@ -95,6 +124,15 @@ class __SyncRunner():
         
         self.__tasks.append(awaitable)
         self.__syncEvent.set()
+    
+    
+    def sync(self, syncer):
+        #syncronisation: provide a syncer. The runner calls done() when all currently 
+        #available work is done and afterwards wait for the restart till new things are processed
+        async def doit(syncer):
+            await syncer.done()
+            await syncer.waitRestart()
+        self.run(doit(syncer))
 
 
 class BatchedOrderedRunner():
@@ -104,24 +142,25 @@ class BatchedOrderedRunner():
     #together, this can be done in the following way:
     #1. register batch handler. This is a async function which is called after all batchable functions are executed
     #2. run functions that have a batchhandler assigned. Those functions must not be awaitables, but default functions.
-    
+
     #runns all tasks syncronous and batches tasks together if possible
-    def __init__(self):
-        
+    def __init__(self, logger):
+
+        self.__logger        = logger
         self.__tasks         = []
         self.__syncEvent     = asyncio.Event() 
         self.__finishEvent   = asyncio.Event()
         self.__batchHandler  = {}
-        
+
         asyncio.ensure_future(self.__run())
 
 
     def registerBatchHandler(self, fncName, batchFnc):        
         self.__batchHandler[fncName] = batchFnc;
 
-   
+
     async def waitTillCloseout(self, timeout = 10):
-        
+
         #we need to find the timeslot when tasks is empty
         while self.__tasks:
             await asyncio.sleep(0.1)
@@ -188,6 +227,18 @@ class BatchedOrderedRunner():
         
         self.__tasks.append((fnc, args))
         self.__syncEvent.set()
+        
+    def sync(self, syncer):
+        #syncronisation: provide a syncer. The runner calls done() when all currently 
+        #available work is done and afterwards wait for the restart till new things are processed
+        async def doit(syncer):
+            try:
+                await syncer.done()
+                await syncer.waitRestart()
+            except Exception as e:
+                self.logger.error(f"Unable to sync: {e}")
+                
+        self.run(doit, syncer)
         
 
 class OrderedRunner(BatchedOrderedRunner):

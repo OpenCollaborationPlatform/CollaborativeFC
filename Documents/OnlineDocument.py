@@ -21,6 +21,7 @@ import asyncio, logging
 import Documents.Property as Property
 from Documents.OnlineObserver import OnlineObserver
 from Documents.OnlineObject import OnlineObject, OnlineViewProvider
+from Documents.AsyncRunner import Syncer
 from autobahn.wamp.exception import ApplicationError
 
 class OnlineDocument():
@@ -39,6 +40,7 @@ class OnlineDocument():
         self.objects = {}
         self.viewproviders = {}
         self.logger = logging.getLogger("Document " + id[-5:])
+        self.sync = None
         
         self.logger.debug("Created")
  
@@ -58,7 +60,7 @@ class OnlineDocument():
         #create the async runner for that object
         oobj = OnlineObject(obj, self)
         self.objects[obj.Name] = oobj
-        oobj.setup()
+        oobj.setup(self.sync)
      
      
     def removeObject(self, obj):
@@ -164,7 +166,7 @@ class OnlineDocument():
         #create the online view provider for that object
         ovp = OnlineViewProvider(vp, self.objects[vp.Object.Name], self)
         self.viewproviders[vp.Object.Name] = ovp
-        ovp.setup()
+        ovp.setup(self.sync)
      
      
     def removeViewProvider(self, vp):
@@ -235,12 +237,53 @@ class OnlineDocument():
         
         ovp = self.viewproviders[vp.Object.Name]
         ovp.addDynamicExtension(extension, props)
+        
+        
+    def recomputeDocument(self):
+        
+        #the document has been fully recomputed. That means we have received all object changes that belong to 
+        #a certain transaction. Therefor we can now close this transaction.
+        #This means:
+        # - we need to wait till all online objects finished the changes, they have till now
+        # - we need to make sure no online object processes any new changes before the transaction is closed
+        
+        self.sync = Syncer(len(self.objects))
+        
+        #sync all document objects! (not viewproviders, those are not transactioned)
+        for name in self.objects:
+            self.objects[name].synchronize(self.sync)
+            
+        asyncio.ensure_future(self.__recomputeDocument(self.sync))
+        
+        
+    async def __recomputeDocument(self, sync):
+        
+        #wait till all objects have done their work
+        await sync.waitAllDone()
+        
+        #close the transaction
+        #try:     
+        #    self.logger.debug("Close transaction")
+        #    uri = f"ocp.documents.{self.id}.content.Transaction.Close"
+        #    await self.connection.session.call(uri)           
+
+        #except Exception as e:
+        #    self.logger.error(f"Closing transaction failed: {e}")
+            
+        #finally:
+        sync.restart()
+        self.sync = None
 
 
     async def asyncSetup(self):
-        #loads the freecad doc into the online doc 
-        pass
-    
+        #setup debug message printing
+        def _print(message):
+            self.logger.debug(f"Print statement: {message}")
+            
+        uri = f"ocp.documents.{self.id}.debug.print"
+        self.connection.session.register(_print, uri)
+        
+                   
     async def asyncLoad(self):
         #loads the online doc into the freecad doc
         pass

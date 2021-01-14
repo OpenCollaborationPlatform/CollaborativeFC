@@ -1,157 +1,32 @@
-import "property.dml" as PropertyContainer
 
 Map {
     .name: "ObjectContainer"
     
-    event onCreated                     //name + typeid
-    event onRemoved                     //name
-    event onPropChanged                 //obj name, property name
-    event onPropsChanged                //obj name, [property names]
-    event onPropStatusChanged           //obj name, property name, new status
-    event onDynamicPropertyCreated      //obj name, property name, typeid, group, documentation
-    event onDynamicPropertiesCreated    //obj name, property names, [property infos]
-    event onDynamicPropertyRemoved      //obj name, property name
-    event onExtensionCreated            //obj name, extension name
-    event onExtensionRemoved            //obj name, extension name
-    
-    event onObjectRecomputed            //obj name
+    event onObjectCreated               //name + typeid
+    event onObjectRemoved               //name
     
     function NewObject(name, typeid) {
     
         if (this.Has(name)) {
             throw "Name already taken"
-        }      
-        
-        //set it up in the graph
-        Document.DAG.AddNode(name)
-        
-        //set up the event processing
+        }
+
+        //set up 
         var container = this
         var obj = container.New(name)
-        
+        obj.fcName = name
         obj.typeid = typeid
-        obj.onChangedProperty.RegisterCallback(function(prop) {
-            container.onPropChanged.Emit(name, prop)
-        })
-        obj.onChangedProperties.RegisterCallback(function(props) {
-            container.onPropsChanged.Emit(name, props)
-        })
-        obj.onStatusProperty.RegisterCallback(function(prop, value) {
-            container.onPropStatusChanged.Emit(name, prop, value)
-        })
-        obj.onCreatedDynamicProperty.RegisterCallback(function(prop, typeID, group, documentation, status) {
-            container.onDynamicPropertyCreated.Emit(name, prop, typeID, group, documentation, status)
-        })
-        obj.onCreatedDynamicProperties.RegisterCallback(function(props, infos) {
-            container.onDynamicPropertiesCreated.Emit(name, props, infos)
-        })
-        obj.onRemovedDynamicProperty.RegisterCallback(function(prop) {
-            container.onDynamicPropertyRemoved.Emit(name, prop)
-        })
-        obj.onCreatedExtension.RegisterCallback(function(ext) {
-            container.onExtensionCreated.Emit(name, ext)
-        })
-        obj.onRemovedExtension.RegisterCallback(function(ext) {
-            container.onExtensionRemoved.Emit(name, ext)
-        })
-        obj.onRecomputed.RegisterCallback(function() {
-            container.onObjectRecomputed.Emit(name)
-        })
         
-        container.onCreated.Emit(name, typeid)
+        container.onObjectCreated.Emit(name, typeid)
         return obj
     }
     
     function RemoveObject(name) {
         
         this.Remove(name)
-        Document.DAG.RemoveNode(name)
-        this.onRemoved.Emit(name)
+        this.onObjectRemoved.Emit(name)
     }   
     
     .key: string
-    .value: Data {
-        
-        .name: "Object"
-        
-        property string typeid
-        
-        //events for communication
-        event onChangedProperty
-        event onChangedProperties
-        event onStatusProperty
-        event onCreatedDynamicProperty
-        event onCreatedDynamicProperties
-        event onRemovedDynamicProperty
-        event onCreatedExtension
-        event onRemovedExtension
-        
-        //handling
-        event onRecomputed
-        
-        PropertyContainer {
-            .name: "Properties"
-            
-            .onSingleChanged: function(name) {
-                this.parent.onChangedProperty.Emit(name)
-            }
-            
-            .onMultiChanged: function(names) {
-                this.parent.onChangedProperties.Emit(names)
-            }
-            
-            .onStatusChanged: function(name, value) {
-                this.parent.onStatusProperty.Emit(name, value)
-            }
-            
-            .onCreatedDynamic: function(prop, typeID, group, documentation, status) {
-                this.parent.onCreatedDynamicProperty.Emit(prop, typeID, group, documentation, status)
-            }
-            
-            .onMultiCreatedDynamic: function(names, infos) {
-                this.parent.onCreatedDynamicProperties.Emit(names, infos)
-            }
-            
-            .onRemovedDynamic: function(name) {
-                this.parent.onRemovedDynamicProperty.Emit(name)
-            }
-        }
-        
-        Vector {
-            .name: "Extensions"
-            .type: string
-            
-            .onNewEntry: function(idx) {                
-                var ext = this.Get(idx)
-                this.parent.onCreatedExtension.Emit(ext)
-            }
-            
-            .onDeleteEntry: function(idx) {                
-                var ext = this.Get(idx)
-                this.parent.onRemovedExtension.Emit(ext)
-            }
-            
-            const function Has(name) {
-             
-                var length = this.Length()
-                for (var i=0; i < length; i++) {
-                    if (this.Get(i) == name) {
-                        return true
-                    }
-                }
-                return false
-            }
-            
-            function RemoveByName(name) {
-             
-                for (var i=0; i < this.Length(); i++) {
-                    if (this.Get(i) == name) {
-                        this.Remove(i)
-                        return
-                    }
-                }
-                throw "Cannot remove extension: not available"
-            }
-        }
-    }
+    .value: none
 }

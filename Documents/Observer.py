@@ -231,9 +231,7 @@ class DocumentObserver(ObserverBase):
         
 
     def slotRecomputedObject(self, obj):
-        
-        #print("Observer recomputed object ", obj.Name)
-        
+               
         doc = obj.Document
         if self.isDeactivatedFor(doc):
             return
@@ -271,8 +269,14 @@ class DocumentObserver(ObserverBase):
         
     
     
-    #def slotRecomputedDocument(self, doc):
-        #pass
+    def slotRecomputedDocument(self, doc):
+        
+        if self.isDeactivatedFor(doc):
+            return
+        
+        odoc = self.handler.getOnlineDocument(doc)
+        if odoc:
+            odoc.recomputeDocument()
     
     #def slotUndoDocument(self, doc):
         #pass
