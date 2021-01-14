@@ -13,12 +13,10 @@ Map {
         .name: "Property"
 
         //FreeCAD infos
-        property string fcName
         property string typeid
         property string group
         property string documentation
         property string status
-        property bool   isDefault
         property var    data
         
         //event handling
@@ -33,25 +31,20 @@ Map {
                     break;
             
                 case "data":                
-                    if (this.isDefault) {
-                        this.isDefault = false
-                    };
                     this.onDataChanged.Emit();
                     break;
             }
         }
         
-        function Init(name, typeID, group, documentation, status) {          
+        function Init(typeID, group, documentation, status) {          
                  
             //prevent status property change emiting
             this.onPropertyChanged.Disable()
             try {
-                this.fcName = name
                 this.status = status
                 this.typeid = typeID
                 this.group = group
                 this.documentation = documentation
-                this.isDefault = true
             }
             finally {
                 this.onPropertyChanged.Enable()
@@ -89,7 +82,7 @@ Map {
         }
         
         var prop = this.New(name)       
-        prop.Init(name, typeID, group, documentation, status)    
+        prop.Init(typeID, group, documentation, status)    
                
         return prop
     }

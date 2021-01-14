@@ -242,13 +242,13 @@ class DocumentObserver(ObserverBase):
     
     
     def slotBeforeAddingDynamicExtension(self, obj,  extension):
-        #works for >=0.19
+        #works for >=0.19       
         #store the current properties to figure out later which ones were added by the extension
         self.propertiesBeforeExtension = obj.PropertiesList
-    
+
     
     def slotAddedDynamicExtension(self, obj, extension):
-        #works for >=0.19
+        #works for >=0.19, both DocumentObject and ViewProviders
         
         doc = obj.Document
         if self.isDeactivatedFor(doc):
@@ -257,9 +257,9 @@ class DocumentObserver(ObserverBase):
         odoc = self.handler.getOnlineDocument(doc)
         if not odoc:
             return
-        
+
         #calculate the properties that were added by the extension
-        props = [item for item in obj.PropertiesList if item not in self.propertiesBeforeExtension]
+        props = [item for item in obj.PropertiesList if item not in self.propertiesBeforeExtension]        
         
         #handle it!
         if obj.isDerivedFrom("App::DocumentObject"):
@@ -350,16 +350,13 @@ class GUIDocumentObserver(ObserverBase):
                
         #we need to check if any document has this vp, as accessing it before 
         #creation crashes freecad
-        print("Changed VP callback")
         if not self.handler.hasOnlineViewProvider(vp):
             return
         
-        print("Check Deactivation")
         doc = vp.Document
         if self.isDeactivatedFor(doc):
             return
 
-        print("get doc")
         odoc = self.handler.getOnlineDocument(doc)
         if not odoc:
             return
@@ -372,7 +369,6 @@ class GUIDocumentObserver(ObserverBase):
                 odoc.addViewProviderDynamicExtension(vp, extension, props)
                
         #finally call change object!    
-        print("change online!")
         odoc.changeViewProvider(vp, prop)
       
     def slotInEdit(self, obj):

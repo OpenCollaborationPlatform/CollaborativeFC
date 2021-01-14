@@ -369,9 +369,9 @@ class OnlineObject(FreeCADOnlineObject):
     def remove(self):
         self.runner.run(self._asyncRemove)
         
-    
+
     def createDynamicProperty(self, prop):
-        info = Property.createPropertyInfo(self.obj, prop)        
+        info = Property.createPropertyInfo(self.obj, prop)
         self._addDynamicPropertyCreation(prop, info)
     
     
