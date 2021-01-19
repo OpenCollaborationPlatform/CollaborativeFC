@@ -20,7 +20,7 @@
 
 import asyncio, txaio, os
 from autobahn.asyncio.component import Component
-from asyncqt import QEventLoop
+from qasync import QEventLoop
 from PySide import QtCore
 
 

@@ -180,17 +180,31 @@ class FreeCADOnlineObject():
             
             keys   = list(props.keys())
             values = list(props.values())
-                        
-            uri = f"ocp.documents.{self.docId}.content.Document.{self.objGroup}.{self.name}.Properties."
-            if len(props) == 1:
-                self.logger.debug("Change property status {0}".format(keys[0]))
-                uri += keys[0] + ".status"
-                await self.connection.session.call(uri, values[0])
             
+            uri = f"ocp.documents.{self.docId}.content.Document.{self.objGroup}.{self.name}.Properties."
+            
+            if  float(".".join(FreeCAD.Version()[0:2])) >= 0.19:
+                #0.19 directly supports status
+                if len(props) == 1:
+                    self.logger.debug("Change property status {0}".format(keys[0]))
+                    uri += keys[0] + ".status"
+                    await self.connection.session.call(uri, values[0])
+                
+                else:
+                    self.logger.debug("Change batched property status: {0}".format(keys))
+                    uri += "SetStatus"
+                    await self.connection.session.call(uri, keys, values)
             else:
-                self.logger.debug("Change batched property status: {0}".format(keys))
-                uri += "SetStatus"
-                await self.connection.session.call(uri, keys, values)
+                #0.18 only supports editor mode subset of status
+                if len(props) == 1:
+                    self.logger.debug("Change property status {0}".format(keys[0]))
+                    uri += keys[0] + ".SetEditorMode"
+                    await self.connection.session.call(uri, values[0])
+                
+                else:
+                    self.logger.debug("Change batched property status: {0}".format(keys))
+                    uri += "SetEditorModes"
+                    await self.connection.session.call(uri, keys, values)
                 
         except Exception as e:
             self.logger.error("Change property status from cache failed: {0}".format(e))

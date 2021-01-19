@@ -72,6 +72,30 @@ Map {
             }
             return dict
         }
+        
+        //FC 0.18 compatibility function. As it does not support full 0.19 status we need to handle the two 
+        //dynamic editor modes seperatly, without removing all 0.19 stati it does not know about.
+        function SetEditorMode(mode) {
+        
+            status = this.status.slice()
+            
+            //remove occurances of "ReadOnly" and "Hidden" to allow simple addition of modes afterwards
+            idx = status.indexOf('Hidden')
+            if (idx > -1) {
+                delete status[idx]
+            }
+            idx = status.indexOf('ReadOnly')
+            if (idx > -1) {
+                delete status[idx]
+            }
+            
+            for (var i=0; i<mode.length; i++) {
+                status.push(mode[i])
+            }
+            
+            //set the newly created status
+            this.status = status
+        }
     }
     
     //creates a new property and sets it up correctly. No new property event emitted
@@ -153,6 +177,20 @@ Map {
             
             var obj = this.Get(prop)
             obj.status = values[i]
+        }
+    }
+    
+    function SetEditorModes(props, values) {
+    
+        for (var i=0; i<props.length; i++) {
+            
+            var prop = props[i]
+            if (!this.Has(prop)) {
+                throw "Property " + prop + " does not exist"
+            }
+            
+            var obj = this.Get(prop)
+            obj.SetEditorMode(values[i])
         }
     }
 }

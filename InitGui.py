@@ -23,7 +23,7 @@ import logging, txaio, sys
 #txaio.use_asyncio()
 #txaio.start_logging(level='error') 
 logging.basicConfig(level=logging.DEBUG, stream=sys.stdout, format="[%(levelname)8s] %(name)25s:   %(message)s")
-logging.getLogger('asyncqt').setLevel(logging.ERROR)
+logging.getLogger('qasync').setLevel(logging.ERROR)
 
 
 #import the collaboration infrastructure

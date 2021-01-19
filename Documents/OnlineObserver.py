@@ -563,7 +563,21 @@ class OnlineObserver():
             self.docObserver.deactivateFor(self.onlineDoc.document)
             
             if  float(".".join(FreeCAD.Version()[0:2])) >= 0.19:
-                obj.setPropertyStatus(prop, status)
+                #to set the status multiple things need to happen:
+                # 1. remove all string status entries we do not support
+                supported = obj.getPropertyStatus()
+                filterd = [s for s in status if not isinstance(s, str) or s in supported]
+
+                # 2. check which are to be added, and add those
+                current = obj.getPropertyStatus(prop)
+                add = [s for s in filterd if not s in current]
+                obj.setPropertyStatus(prop, add)
+                
+                # 3. check which are to be removed, and remove those
+                remove = [s for s in current if not s in filterd]
+                signed = [-s for s in remove if isinstance(s, int) ]
+                signed += ["-"+s for s in remove if isinstance(s, str) ]
+                obj.setPropertyStatus(prop, signed)                
             
             else:
                 obj.setEditorMode(prop, Property.statusToEditorMode(status))
