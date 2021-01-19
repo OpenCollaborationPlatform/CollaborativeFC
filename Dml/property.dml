@@ -16,7 +16,7 @@ Map {
         property string typeid
         property string group
         property string documentation
-        property string status
+        property var    status
         property var    data
         
         //event handling

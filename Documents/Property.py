@@ -21,11 +21,11 @@
 import FreeCAD as App
 
 __typeToStatusMap__ = {
-    "NoRecompute": "23",
-    "ReadOnly": "24",
-    "Transient": "25",
-    "Hidden": "26",
-    "Output": "27"
+    "NoRecompute": 23,
+    "ReadOnly": 24,
+    "Transient": 25,
+    "Hidden": 26,
+    "Output": 27
 }
 
 def createPropertyInfo(obj, prop):
@@ -36,9 +36,9 @@ def createPropertyInfo(obj, prop):
     
     status = []
     if  float(".".join(App.Version()[0:2])) >= 0.19:
-        status = [str(e) for e in obj.getPropertyStatus(prop)]
+        status = obj.getPropertyStatus(prop)
     else:
-        #add the types (static status in >=0.19)
+        #add the types (those are static status entries in >=0.19)
         for pt in obj.getTypeOfProperty(prop):
             status.append(__typeToStatusMap__[pt])
             
@@ -46,28 +46,29 @@ def createPropertyInfo(obj, prop):
         for edit in obj.getEditorMode(prop):
             status.append(edit)
 
-    info["status"] = '-'.join(status)
+    info["status"] = status
        
     return info
 
 def statusToType(status):
+    #converts a status list, as returned by "getPropertyStatus", into a attribute bit list as used by property type
     
     statusBitMap = {
-        "24": 1,
-        "25": 2,
-        "26": 4, 
-        "27": 8, 
-        "23": 16,
-        "22": 32
+        24: 1,
+        25: 2,
+        26: 4, 
+        27: 8, 
+        23: 16,
+        22: 32
     }
     
     attributes = 0
-    strs = status.split("-")
-    for stat in strs:
+    for stat in status:
         if stat in statusBitMap:
             attributes  |= statusBitMap[stat]
             
     return attributes
+
 
 def statusToEditorMode(status):
     
@@ -78,18 +79,6 @@ def statusToEditorMode(status):
         modes.append("Hidden")
             
     return modes
-
-def statusToList(status):
-    
-    entries = status.split("-")
-    result = []
-    for entry in entries:
-        if len(entry)>2:
-            result.append(entry)
-        else:
-            result.append(int(entry))
-    
-    return result
 
 
 def convertPropertyToWamp(obj, prop):

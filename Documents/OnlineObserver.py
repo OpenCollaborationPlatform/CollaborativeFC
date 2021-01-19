@@ -483,7 +483,7 @@ class OnlineObserver():
             obj.addProperty(typeID, prop, group, documentation, attributes)
             
             if float(".".join(FreeCAD.Version()[0:2])) >= 0.19:
-                obj.setPropertyStatus(prop, Property.statusToIntList(status))
+                obj.setPropertyStatus(prop, status)
             else:
                 mode = Property.statusToEditorMode(status)
                 if len(mode) > 0:
@@ -524,7 +524,11 @@ class OnlineObserver():
         
         try:      
             self.docObserver.deactivateFor(self.onlineDoc.document)
-            obj.addExtension(ext, None)
+
+            if  float(".".join(FreeCAD.Version()[0:2])) >= 0.19:
+                obj.addExtension(ext)
+            else:
+                obj.addExtension(ext, None)
             
         except Exception as e:
             self.logger.error("Add extension callback failed: ", e)
@@ -559,7 +563,7 @@ class OnlineObserver():
             self.docObserver.deactivateFor(self.onlineDoc.document)
             
             if  float(".".join(FreeCAD.Version()[0:2])) >= 0.19:
-                obj.setPropertyStatus(prop, Property.statusToList(status))
+                obj.setPropertyStatus(prop, status)
             
             else:
                 obj.setEditorMode(prop, Property.statusToEditorMode(status))
