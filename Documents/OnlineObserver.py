@@ -17,7 +17,7 @@
 # *   Suite 330, Boston, MA  02111-1307, USA                             *
 # ************************************************************************
 
-import FreeCAD, logging, os, asyncio
+import FreeCAD, logging, os, asyncio, traceback
 import Documents.Property as Property
 import Documents.AsyncRunner as AsyncRunner
 from Documents.OnlineObject import OnlineObject
@@ -434,6 +434,7 @@ class OnlineObserver():
     async def __setProperties(self, obj, name, props, logentry):
         
         try:      
+            self.logger.debug(f"{logentry}: Set properties {props}")
             if obj.isDerivedFrom("App::DocumentObject"):
                 group = "Objects"
             else:
@@ -447,8 +448,11 @@ class OnlineObserver():
             for prop in props:
                         
                 async def  run(results, group, name, prop):
-                    val = await self.__getPropertyValue(group, name, prop)
-                    results[prop] = val
+                    try:
+                        val = await self.__getPropertyValue(group, name, prop)
+                        results[prop] = val
+                    except Exception as e:
+                        pass
                     
                 tasks.append(run(values, group, name, prop))
                 
@@ -457,9 +461,15 @@ class OnlineObserver():
 
             #set all values
             self.docObserver.deactivateFor(self.onlineDoc.document)   
-            self.logger.debug(f"{logentry}: Set properties {props}")
+            failed = []
             for prop  in props:
-                Property.convertWampToProperty(obj, prop, values[prop])
+                if prop in values:
+                    Property.convertWampToProperty(obj, prop, values[prop])
+                else:
+                    failed.append(prop)
+                    
+            if failed:
+                raise Exception(f"Properties {failed} failed")
 
         except Exception as e:
             self.logger.error(f"{logentry} Set properties {props} error: {e}")
@@ -486,12 +496,13 @@ class OnlineObserver():
                 obj.setPropertyStatus(prop, status)
             else:
                 mode = Property.statusToEditorMode(status)
-                if len(mode) > 0:
+                if mode:
                     obj.setEditorMode(prop, mode)
         
         
         except Exception as e:
             self.logger.error("Dynamic property adding failed: {0}".format(e))
+            traceback.print_exc()
             
         finally:
             self.docObserver.activateFor(self.onlineDoc.document)

@@ -125,7 +125,7 @@ Map {
         if (this.Has(name)) {
             throw "Property already exists"
         }
-        
+               
         //setup and inform!
         var prop = this.SetupProperty(name, typeID, group, documentation, status)
         this.onDynamicPropertyCreated.Emit(name, typeID, group, documentation, status)
@@ -147,11 +147,19 @@ Map {
     
     function SetValues(props, values) {
 
-        for (var i=0; i<props.length; i++) {
+        //we iterate from the back to allow us to remove entries from props and values,
+        //if they do not exist. This adds robustnes: even if one property fails, the others are
+        //written
+
+        var failed = new Array()
+        var writtenProps  = props.slice()
+        for (var i=props.length - 1; i>=0; i--) {
                
             var name = props[i]
             if (!this.Has(name)) {
-                throw "Property " + prop + " does not exist"
+                writtenProps.splice(i, 1);
+                failed.push(name)
+                continue
             }
                 
             prop = this.Get(name)
@@ -159,38 +167,55 @@ Map {
             try {
                 prop.SetValue(values[i])
             }
+            catch(e) {
+                writtenProps.splice(i, 1);
+                failed.push(name)
+            }
             finally {
                 prop.onDataChanged.Enable()
             }
         }
-        this.onDatasChanged.Emit(props)
+        this.onDatasChanged.Emit(writtenProps)
+        
+        return failed
     }
     
     function SetStatus(props, values) {
     
+        var failed = new Array()
         for (var i=0; i<props.length; i++) {
-            
-            var prop = props[i]
-            if (!this.Has(prop)) {
-                throw "Property " + prop + " does not exist"
+               
+            var name = props[i]
+            if (!this.Has(name)) {
+                failed.push(name)
+                continue
             }
             
-            var obj = this.Get(prop)
-            obj.status = values[i]
+            try {
+                var obj = this.Get(name)
+                obj.status = values[i]
+            }
+            catch(e) {
+                failed.push(name)
+            }
         }
+        
+        return failed
     }
     
     function SetEditorModes(props, values) {
     
+        var failed = new Array()
         for (var i=0; i<props.length; i++) {
             
             var prop = props[i]
             if (!this.Has(prop)) {
-                throw "Property " + prop + " does not exist"
+                failed.push(prop)
             }
             
             var obj = this.Get(prop)
             obj.SetEditorMode(values[i])
         }
+        return failed
     }
 }

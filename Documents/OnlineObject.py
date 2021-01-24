@@ -78,14 +78,15 @@ class FreeCADOnlineObject():
         
         try:            
             if dyn:
-                self.logger.debug("Create dynamic property {0} ({1})".format(prop, info["typeid"]))
+                self.logger.debug(f"Create dynamic property {prop}")
                 fnc = "CreateDynamicProperty"
             else:
-                self.logger.debug("Setup default property {0} ({1})".format(prop, info["typeid"]))
+                self.logger.debug(f"Setup default property {prop}")
                 fnc = "SetupProperty"
                 
             uri = f"ocp.documents.{self.docId}.content.Document.{self.objGroup}.{self.name}.Properties.{fnc}"
             await self.connection.session.call(uri, prop, info["typeid"], info["group"], info["docu"], info["status"])
+            await self._docPrints()
         
         except Exception as e:
             self.logger.error("Create property {0} failed: {1}".format(prop, e))
@@ -105,6 +106,7 @@ class FreeCADOnlineObject():
                 
             uri = f"ocp.documents.{self.docId}.content.Document.{self.objGroup}.{self.name}.Properties.{fnc}"
             await self.connection.session.call(uri, props, infos)
+            await self._docPrints()
         
         except Exception as e:
             self.logger.error(f"Setup properties failed: {e}")
@@ -122,22 +124,10 @@ class FreeCADOnlineObject():
     
     def _addDynamicPropertyCreation(self, prop, info):
         #caches the dynamic property creation to be executed as batch later
-        #we can do this way of batching as created properties are not important order wise:
-        #it is only important that they are created before use. As the first dynamic property creation 
-        #is in oder, it is guranteed that all the following ones are earlier than needed, which is ok for this
-        #type of operation
-        
-        #add property with info to the cache. 
         self.dynPropCache[prop] = info
         
-        #if there was no entry before we start a cache processing. If there is something in the cache already
-        #we are sure processing was already startet
-        if len(self.dynPropCache) == 1:
-            #add it to the dyn property creation cache. If it is the first entry we also start the
-            self.runner.run(self.__asyncCreateDynamicPropertiesFromCache)
         
-        
-    async def __asyncCreateDynamicPropertiesFromCache(self):
+    async def _asyncCreateDynamicPropertiesFromCache(self):
         
         if len(self.dynPropCache) == 0:
             return
@@ -159,18 +149,11 @@ class FreeCADOnlineObject():
             
             
     def _addPropertyStatusChange(self, prop, status):
-        
         #add property with status to the cache. 
         self.statusPropCache[prop] = status
         
-        #if there was no entry before we start a cache processing. If there is something in the cache already
-        #we are sure processing was already startet
-        if len(self.statusPropCache) == 1:
-            #add it to the dyn property creation cache. If it is the first entry we also start the 
-            self.runner.run(self.__asyncStatusPropertiesFromCache)
         
-        
-    async def __asyncStatusPropertiesFromCache(self):
+    async def _asyncStatusPropertiesFromCache(self):
         
         if len(self.statusPropCache) == 0:
             return
@@ -193,7 +176,9 @@ class FreeCADOnlineObject():
                 else:
                     self.logger.debug("Change batched property status: {0}".format(keys))
                     uri += "SetStatus"
-                    await self.connection.session.call(uri, keys, values)
+                    failed = await self.connection.session.call(uri, keys, values)
+                    if failed:
+                        raise Exception(f"Properties {failed} failed")
             else:
                 #0.18 only supports editor mode subset of status
                 if len(props) == 1:
@@ -204,7 +189,9 @@ class FreeCADOnlineObject():
                 else:
                     self.logger.debug("Change batched property status: {0}".format(keys))
                     uri += "SetEditorModes"
-                    await self.connection.session.call(uri, keys, values)
+                    failed = await self.connection.session.call(uri, keys, values)
+                    if failed:
+                        raise Exception(f"Properties {failed} failed")
                 
         except Exception as e:
             self.logger.error("Change property status from cache failed: {0}".format(e))
@@ -302,7 +289,10 @@ class FreeCADOnlineObject():
         try:
             self.logger.debug("Write batch properties {0}".format(props))
             uri = u"ocp.documents.{0}.content.Document.{1}.{2}.Properties.SetValues".format(self.docId, self.objGroup, self.name)
-            await self.connection.session.call(uri, props, values)
+            failed = await self.connection.session.call(uri, props, values)
+            if failed:
+                raise Exception(f"Properties {failed} failed")
+            
             await self._docPrints()
             
         except Exception as e:
@@ -364,6 +354,8 @@ class OnlineObject(FreeCADOnlineObject):
         self.obj            = obj
         
         self.runner.registerBatchHandler("_addPropertyChange", self._asyncPropertyChangeFromCache)
+        self.runner.registerBatchHandler("_addDynamicPropertyCreation", self._asyncCreateDynamicPropertiesFromCache)
+        self.runner.registerBatchHandler("_addPropertyStatusChange", self._asyncStatusPropertiesFromCache)
         
         
     def setup(self, sync):
@@ -386,7 +378,7 @@ class OnlineObject(FreeCADOnlineObject):
 
     def createDynamicProperty(self, prop):
         info = Property.createPropertyInfo(self.obj, prop)
-        self._addDynamicPropertyCreation(prop, info)
+        self.runner.run(self._addDynamicPropertyCreation, prop, info)
     
     
     def removeDynamicProperty(self, prop):
@@ -406,7 +398,7 @@ class OnlineObject(FreeCADOnlineObject):
  
     def changePropertyStatus(self, prop):
         info = Property.createPropertyInfo(self.obj, prop)        
-        self._addPropertyStatusChange(prop, info["status"])
+        self.runner.run(self._addPropertyStatusChange, prop, info["status"])
         
     
     def recompute(self):
@@ -431,10 +423,11 @@ class OnlineViewProvider(FreeCADOnlineObject):
         super().__init__(obj.Object.Name, onlinedoc, "ViewProviders", parentOnlineObj=onlineobj)
         self.obj = obj
         self.proxydata = None   #as FreeCAD 0.18 does not forward viewprovider proxy changes we need a way to identify changes
-          
-        self.runner.registerBatchHandler("__vpAddPropChange", self._asyncPropertyChangeFromCache)
-
         
+        self.runner.registerBatchHandler("_addPropertyChangeVP", self._asyncPropertyChangeFromCache)
+        self.runner.registerBatchHandler("_addDynamicPropertyCreationVP", self._asyncCreateDynamicPropertiesFromCache)
+        self.runner.registerBatchHandler("_addPropertyStatusChangeVP", self._asyncStatusPropertiesFromCache)
+          
     def setup(self, sync):
         
         if float(".".join(FreeCAD.Version()[0:2])) == 0.18:
@@ -462,7 +455,7 @@ class OnlineViewProvider(FreeCADOnlineObject):
     
     def createDynamicProperty(self, prop):
         info = Property.createPropertyInfo(self.obj, prop)        
-        self._addDynamicPropertyCreation(prop, info)
+        self.runner.run(self._addDynamicPropertyCreationVP, prop, info)
     
     
     def removeDynamicProperty(self, prop):
@@ -483,17 +476,24 @@ class OnlineViewProvider(FreeCADOnlineObject):
             if hasattr(self.obj, 'Proxy'):
                 if not self.proxydata is self.obj.Proxy:
                     self.proxydata = self.obj.Proxy
-                    self.runner.run(self.__vpAddPropChange, 'Proxy', self.obj.dumpPropertyContent('Proxy'))
+                    self.runner.run(self._addPropertyChangeVP, 'Proxy', self.obj.dumpPropertyContent('Proxy'), [])
             
         
-        self.runner.run(self.__vpAddPropChange, prop, value)
+        self.runner.run(self._addPropertyChangeVP, prop, value, [])
 
 
     def changePropertyStatus(self, prop):
         info = Property.createPropertyInfo(self.obj, prop)        
-        self._addPropertyStatusChange(prop, info["status"])
-    
+        self.runner.run(self._addPropertyStatusChangeVP, prop, info["status"])
 
-    def __vpAddPropChange(self, prop, value):
-        #indirection to have different function name as parent object in runner
-        self._addPropertyChange(prop, value, [])
+
+    #indirections for batch handler, as we use the shared runner with our document object and should not 
+    #override the registered batch handlers there
+    def _addPropertyChangeVP(self, *args):
+        self._addPropertyChange(*args)
+        
+    def _addDynamicPropertyCreationVP(self, *args):
+        self._addDynamicPropertyCreation(*args)
+        
+    def _addPropertyStatusChangeVP(self, *args):
+        self._addPropertyStatusChange(*args)
