@@ -158,8 +158,12 @@ class OnlineObserver():
             if obj.ViewObject:
                 ovp = OnlineViewProvider(obj.ViewObject, oobj, self.onlineDoc)
                 self.onlineDoc.viewproviders[obj.Name] = ovp
-            
-            obj.purgeTouched()
+                       
+            #remove touched status. could happen that other objects like origins have been created automatically
+            for added in self.docObserver.createdObjectsWhileDeactivated(self.onlineDoc.document):
+                if added.TypeId == "App::Origin":
+                    added.recompute() #recompute origin to get viewprovider size correctly (auto updated without change callback)
+                added.purgeTouched()
             
         except Exception as e:
             self.logger.error(f"Object ({name}): Add object online callback failed: {e}")

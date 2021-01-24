@@ -35,6 +35,10 @@ class ObserverManager():
     def deactivateFor(self, doc):
         self.obs.deactivateFor(doc)
         self.uiobs.deactivateFor(FreeCADGui.getDocument(doc.Name))  
+        
+
+    def createdObjectsWhileDeactivated(self, doc):
+        return self.obs.createdWhileDeactivated(doc)
     
     
 class ObserverBase():
@@ -53,17 +57,21 @@ class ObserverBase():
         self.handler = handler
         self.inactive = []
         self.objExtensions = {}
+        self._createdWhileDeactivated = {}
 
 
     def activateFor(self, doc):
        
         while doc in self.inactive:
            self.inactive.remove(doc)
+        
+        self._createdWhileDeactivated.pop(doc)
                 
         
     def deactivateFor(self, doc):
         
         self.inactive.append(doc)
+        self._createdWhileDeactivated[doc] = []
         
         
     def isDeactivatedFor(self, doc):
@@ -72,6 +80,10 @@ class ObserverBase():
             return True 
         
         return False
+    
+    def createdWhileDeactivated(self, doc):
+        return self._createdWhileDeactivated[doc]
+    
     
     def fc018GetNewExtensions(self, obj):
         #this function checks if there are new extensions in the given object and returns them (or empty list if none are new)
@@ -138,6 +150,10 @@ class DocumentObserver(ObserverBase):
         
         doc = obj.Document
         if self.isDeactivatedFor(doc):
+            
+            #if we are deactivated, we collect all new objects. This is required to check if there are auto created objects,
+            #like origins for parts etc.
+            self._createdWhileDeactivated[doc].append(obj)
             return
         
         #print("Observer add document object ", obj.Name)  
@@ -335,6 +351,9 @@ class GUIDocumentObserver(ObserverBase):
         
         doc = vp.Document
         if self.isDeactivatedFor(doc):
+            #if we are deactivated, we collect all new objects. This is required to check if there are auto created objects,
+            #like origins for parts etc.
+            self._createdWhileDeactivated[doc].append(vp)
             return
         
         odoc = self.handler.getOnlineDocument(doc)

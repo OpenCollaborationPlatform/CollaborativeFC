@@ -65,6 +65,10 @@ Data {
             //add all edges that are in the nodelist but not available
             var add = this.subtract(list, edges)
             for(var i=0; i<add.length; i++) {
+                
+                if (!this.HasNode(add[i])) {
+                    continue
+                }
                 this.NewEdge(add[i], name)
                 
                 //we check if the newly connected object is in a Transaction different than 
