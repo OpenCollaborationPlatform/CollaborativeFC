@@ -370,6 +370,11 @@ class OnlineObject(FreeCADOnlineObject):
             self.runner.sync(sync)
             
         self.runner.run(self._asyncSetup, self.obj.TypeId, values, infos)
+        
+        #check if there are properties that need the defult values uploaded
+        props = Property.getNonDefaultValueProperties(self.obj)
+        for prop in props:
+            self.runner.run(self._addPropertyChange, prop, Property.convertPropertyToWamp(self.obj, prop), [])
     
     
     def remove(self):
@@ -447,7 +452,12 @@ class OnlineViewProvider(FreeCADOnlineObject):
             self.runner.sync(sync)
             
         self.runner.run(self._asyncSetup, self.obj.TypeId, values, infos)
-    
+        
+        #check if there are properties that need the defult values uploaded
+        props = Property.getNonDefaultValueProperties(self.obj)
+        for prop in props:
+            self.runner.run(self._addPropertyChange(prop, Property.convertPropertyToWamp(self.obj, prop), []))  
+
     
     def remove(self):
         self.runner.run(self._asyncRemove)

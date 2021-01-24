@@ -28,6 +28,11 @@ __typeToStatusMap__ = {
     "Output": 27
 }
 
+#list of proeprty types which do not have a consistant default value
+__non_default_property_types__ = [
+    "App::PropertyUUID"
+]
+
 def createPropertyInfo(obj, prop):
     info = {}
     info["docu"] = obj.getDocumentationOfProperty(prop)
@@ -83,7 +88,6 @@ def statusToEditorMode(status):
 
 def convertPropertyToWamp(obj, prop):
     #converts the property to a wamp usable form
-    
     typeId = obj.getTypeIdOfProperty(prop)
     converter = __PropertyToWamp.get(typeId, __toRaw)
     result = converter(obj, prop)
@@ -95,6 +99,18 @@ def convertWampToProperty(obj, prop, value):
     typeId = obj.getTypeIdOfProperty(prop)
     converter = __PropertyFromWamp.get(typeId, __fromRaw)
     converter(obj, prop, value)
+
+
+def getNonDefaultValueProperties(obj):
+    
+    result = []
+    
+    #all properties with types that have changing default value
+    for prop in obj.PropertiesList:
+        if obj.getTypeIdOfProperty(prop) in __non_default_property_types__:
+            result.append(prop)   
+     
+    return result
 
 
 def __toFloat(obj, prop):
