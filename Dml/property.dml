@@ -5,7 +5,7 @@ Map {
     event onDynamicPropertyCreated      //name, typeID, group, documentation, status
     event onDynamicPropertiesCreated    //[name], [info]
     event onDynamicPropertyRemoved      //name
-    event onDatasChanged                //[name]
+    event onDatasChanged                //[name], [datas]
     
     .key: string    
     .value: Data {
@@ -30,8 +30,8 @@ Map {
                     this.onStatusChanged.Emit(this.status);
                     break;
             
-                case "data":                
-                    this.onDataChanged.Emit();
+                case "data":              
+                    this.onDataChanged.Emit(this.data);
                     break;
             }
         }
@@ -57,10 +57,6 @@ Map {
         
         const function GetValue() {
             return this.data
-        }
-        
-        const function IsBinary() {
-            return typeof this.data == "object"
         }
         
         const function GetInfo() {
@@ -153,11 +149,13 @@ Map {
 
         var failed = new Array()
         var writtenProps  = props.slice()
+        var writtenVals = values.slice()
         for (var i=props.length - 1; i>=0; i--) {
                
             var name = props[i]
             if (!this.Has(name)) {
                 writtenProps.splice(i, 1);
+                writtenVals.splice(i, 1);
                 failed.push(name)
                 continue
             }
@@ -169,13 +167,14 @@ Map {
             }
             catch(e) {
                 writtenProps.splice(i, 1);
+                writtenVals.splice(i, 1);
                 failed.push(name)
             }
             finally {
                 prop.onDataChanged.Enable()
             }
         }
-        this.onDatasChanged.Emit(writtenProps)
+        this.onDatasChanged.Emit(writtenProps, writtenVals)
         
         return failed
     }

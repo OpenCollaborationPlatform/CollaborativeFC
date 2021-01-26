@@ -18,11 +18,13 @@
 # ************************************************************************
 
 import FreeCAD, logging, os, asyncio, traceback
-import Documents.Property as Property
-import Documents.AsyncRunner as AsyncRunner
+import Documents.Property       as Property
+import Documents.AsyncRunner    as AsyncRunner
+import Documents.Helper         as Helper
 from Documents.OnlineObject import OnlineObject
 from Documents.OnlineObject import OnlineViewProvider
 from autobahn.wamp.types    import SubscribeOptions, CallOptions
+from autobahn.wamp          import ApplicationError
 
 class OnlineObserver():
     
@@ -178,6 +180,9 @@ class OnlineObserver():
             
             self.docObserver.deactivateFor(self.onlineDoc.document)
             self.onlineDoc.document.removeObject(name)
+                           
+            oobj = self.onlineDoc.objects[name]
+            await oobj.waitTillCloseout()
             del(self.onlineDoc.objects[name])
             
         except Exception as e:
@@ -187,22 +192,22 @@ class OnlineObserver():
             self.docObserver.activateFor(self.onlineDoc.document)
         
         
-    async def __changeObject(self, name, prop):
+    async def __changeObject(self, name, prop, value):
         
         obj = self.onlineDoc.document.getObject(name)
         if obj is None:
             return
         
-        await self.__setProperty(obj, name, prop, f"Object ({name})")
+        await self.__setProperty(obj, name, prop, value, f"Object ({name})")
         
         
-    async def __changeMultiObject(self, name, props):
+    async def __changeMultiObject(self, name, props, values):
         
         obj = self.onlineDoc.document.getObject(name)
         if obj is None:
             return
         
-        await self.__setProperties(obj, name, props, f"Object ({name})")
+        await self.__setProperties(obj, name, props, values, f"Object ({name})")
  
  
     async def __changePropStatus(self, name, prop, status):
@@ -291,7 +296,7 @@ class OnlineObserver():
             obj.purgeTouched()
             
         
-    async def __changeViewProvider(self, name, prop):
+    async def __changeViewProvider(self, name, prop, value):
         
         obj = self.onlineDoc.document.getObject(name)
         if obj is None:
@@ -300,13 +305,13 @@ class OnlineObserver():
         await self.__setProperty(obj.ViewObject, name, prop, f"ViewProvider ({name})")
      
     
-    async def __changeMultiViewProdiver(self, name, props):
+    async def __changeMultiViewProdiver(self, name, props, values):
         
         obj = self.onlineDoc.document.getObject(name)
         if obj is None:
             return
                
-        await self.__setProperties(obj.ViewObject, name, props, f"ViewProvider ({name})")
+        await self.__setProperties(obj.ViewObject, name, props, values, f"ViewProvider ({name})")
      
     
     async def __changeViewProvierPropStatus(self, name, prop, status):
@@ -381,36 +386,46 @@ class OnlineObserver():
         print("Changed document property event")
         
 
-    async def __getPropertyValue(self, group, objname, prop):
+    async def __getBinaryValues(self, values):
+        #checks all values for binary Cid's and fetches the real data to replace it with
         
-        uri = u"ocp.documents.{0}.content.Document.{1}.".format(self.onlineDoc.id, group)
-        calluri = uri + f"{objname}.Properties.{prop}.GetValue"
-        val = await self.onlineDoc.connection.session.call(calluri)
-        binary =  isinstance(val, str) and val.startswith("ocp_cid")
-
-        if binary:                    
-            class Data():
-                def __init__(self): 
-                    self.data = bytes()
+        if not isinstance(values, list):
+            values = [values]
+        
+        tasks = []
+        for index, value in enumerate(values):
+            
+            if isinstance(value, str) and value.startswith("ocp_cid"):                   
+                
+                async def worker(index, cid):
+                    class Data():
+                        def __init__(self): 
+                            self.data = bytes()
+                                    
+                        def progress(self, update):
+                            self.data += bytes(update)
                             
-                def progress(self, update):
-                    self.data += bytes(update)
+                    #get the binary data
+                    uri = f"ocp.documents.{self.onlineDoc.id}.raw.BinaryByCid"
+                    dat = Data()
+                    opt = CallOptions(on_progress=dat.progress)
+                    result = await self.onlineDoc.connection.session.call(uri, cid, options=opt)
+                    if result is not None:
+                        dat.progress(result)
+                        
+                    values[index] = dat.data
                     
-            #get the binary data
-            uri = f"ocp.documents.{self.onlineDoc.id}.raw.BinaryByCid"
-            dat = Data()
-            opt = CallOptions(on_progress=dat.progress)
-            val = await self.onlineDoc.connection.session.call(uri, val, options=opt)
-            if val is not None:
-                dat.progress(val)
-                    
-            return dat.data
+                tasks.append(worker(index, value))
         
-        else:
-            return val
+        if tasks:
+            await asyncio.wait([asyncio.create_task(task) for task in tasks])
+        
+        if len(values) == 1:
+            return values[0]
+        return values
 
 
-    async def __setProperty(self, obj, name, prop, logentry):
+    async def __setProperty(self, obj, name, prop,  value, logentry):
         
         try:      
             if obj.isDerivedFrom("App::DocumentObject"):
@@ -418,11 +433,11 @@ class OnlineObserver():
             else:
                 group = "ViewProviders"
                 
-            value = await self.__getPropertyValue(group, name, prop)
-                
             #set it for the property
             self.docObserver.deactivateFor(self.onlineDoc.document)   
             self.logger.debug(f"{logentry}: Set property {prop}")
+            
+            value = await self.__getBinaryValues(value)
             Property.convertWampToProperty(obj, prop, value)
 
         except Exception as e:
@@ -435,7 +450,7 @@ class OnlineObserver():
                 obj.purgeTouched()
     
     
-    async def __setProperties(self, obj, name, props, logentry):
+    async def __setProperties(self, obj, name, props, values, logentry):
         
         try:      
             self.logger.debug(f"{logentry}: Set properties {props}")
@@ -443,38 +458,16 @@ class OnlineObserver():
                 group = "Objects"
             else:
                 group = "ViewProviders"
-                
-            uri = u"ocp.documents.{0}.content.Document.{1}.".format(self.onlineDoc.id, group)
-                        
-            #get all the values of the properties
-            tasks = []
-            values = {}
-            for prop in props:
-                        
-                async def  run(results, group, name, prop):
-                    try:
-                        val = await self.__getPropertyValue(group, name, prop)
-                        results[prop] = val
-                    except Exception as e:
-                        pass
-                    
-                tasks.append(run(values, group, name, prop))
-                
-            if tasks:
-                await asyncio.wait(tasks)
 
             #set all values
             self.docObserver.deactivateFor(self.onlineDoc.document)   
+            
+            values = await self.__getBinaryValues(values)
+            
             failed = []
-            for prop  in props:
-                if prop in values:
-                    Property.convertWampToProperty(obj, prop, values[prop])
-                else:
-                    failed.append(prop)
-                    
-            if failed:
-                raise Exception(f"Properties {failed} failed")
-
+            for index, prop in enumerate(props):
+                Property.convertWampToProperty(obj, prop, values[index])
+           
         except Exception as e:
             self.logger.error(f"{logentry} Set properties {props} error: {e}")
 

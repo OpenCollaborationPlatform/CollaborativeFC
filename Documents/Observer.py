@@ -177,7 +177,7 @@ class DocumentObserver(ObserverBase):
     def slotChangedObject(self, obj, prop):
         
         doc = obj.Document
-        if self.isDeactivatedFor(doc):
+        if self.isDeactivatedFor(doc) or obj.Removing:
             return                
         
         #print("Observer changed document object ( ", obj.Name, ", ", prop, " ) into state ", obj.State)
@@ -199,7 +199,7 @@ class DocumentObserver(ObserverBase):
     def slotAppendDynamicProperty(self, obj, prop):    
                
         doc = obj.Document
-        if self.isDeactivatedFor(doc):
+        if self.isDeactivatedFor(doc) or obj.Removing:
             return
                 
         odoc = self.handler.getOnlineDocument(doc)
@@ -249,7 +249,7 @@ class DocumentObserver(ObserverBase):
     def slotRecomputedObject(self, obj):
                
         doc = obj.Document
-        if self.isDeactivatedFor(doc):
+        if self.isDeactivatedFor(doc) or obj.Removing:
             return
         
         odoc = self.handler.getOnlineDocument(doc)
@@ -268,7 +268,7 @@ class DocumentObserver(ObserverBase):
         
         doc = obj.Document
         if self.isDeactivatedFor(doc):
-            return          
+            return
         
         odoc = self.handler.getOnlineDocument(doc)
         if not odoc:
@@ -350,7 +350,7 @@ class GUIDocumentObserver(ObserverBase):
     def slotCreatedObject(self, vp):
         
         doc = vp.Document
-        if self.isDeactivatedFor(doc):
+        if self.isDeactivatedFor(doc) or vp.Object.Removing:
             #if we are deactivated, we collect all new objects. This is required to check if there are auto created objects,
             #like origins for parts etc.
             self._createdWhileDeactivated[doc].append(vp)
@@ -373,7 +373,7 @@ class GUIDocumentObserver(ObserverBase):
             return
         
         doc = vp.Document
-        if self.isDeactivatedFor(doc):
+        if self.isDeactivatedFor(doc) or vp.Object.Removing:
             return
 
         odoc = self.handler.getOnlineDocument(doc)

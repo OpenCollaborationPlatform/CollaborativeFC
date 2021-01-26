@@ -68,7 +68,6 @@ class FreeCADOnlineObject():
             await self.__asyncCreateProperties(False, list(values.keys()), list(infos.values()))
         
         except Exception as e:
-            await self._docPrints()
             self.logger.error("Setup error: {0}".format(e))
            
     
@@ -86,7 +85,6 @@ class FreeCADOnlineObject():
                 
             uri = f"ocp.documents.{self.docId}.content.Document.{self.objGroup}.{self.name}.Properties.{fnc}"
             await self.connection.session.call(uri, prop, info["typeid"], info["group"], info["docu"], info["status"])
-            await self._docPrints()
         
         except Exception as e:
             self.logger.error("Create property {0} failed: {1}".format(prop, e))
@@ -106,7 +104,6 @@ class FreeCADOnlineObject():
                 
             uri = f"ocp.documents.{self.docId}.content.Document.{self.objGroup}.{self.name}.Properties.{fnc}"
             await self.connection.session.call(uri, props, infos)
-            await self._docPrints()
         
         except Exception as e:
             self.logger.error(f"Setup properties failed: {e}")
@@ -230,7 +227,8 @@ class FreeCADOnlineObject():
             #get the cids for the binary properties in parallel
             tasks = []
             for prop in props:
-                if isinstance(props[prop], bytearray):  
+                if isinstance(props[prop], bytearray): 
+                    
                     async def run(props, prop):
                         cid = await self.__getCidForData(props[prop])
                         props[prop] = cid
@@ -242,7 +240,7 @@ class FreeCADOnlineObject():
                 outlist = []
                 async def getOutlist():
                     uri = f"ocp.documents.{self.docId}.content.Document.DAG.GetObjectOutList"
-                    outlist = await self.connection.session.call(uri, self.obj.Name)
+                    outlist = await self.connection.session.call(uri, self.name)
                     outlist.sort()
                     
                 tasks.append(getOutlist())
@@ -261,11 +259,11 @@ class FreeCADOnlineObject():
 
             #finally process the outlist
             if self.objGroup == "Objects":
-                self.logger.debug(f"Set Outlist")
                 out.sort()
                 if out != outlist:
+                    self.logger.debug(f"Set Outlist")
                     uri = f"ocp.documents.{self.docId}.content.Document.DAG.SetObjectOutList"
-                    await self.connection.session.call(uri, self.obj.Name, out)
+                    await self.connection.session.call(uri, self.name, out)
                 
         except Exception as e:
             self.logger.error(f"Batch writing properties for {self.name} failed: {e}")
@@ -277,7 +275,7 @@ class FreeCADOnlineObject():
             #simple POD property: just add it!
             self.logger.debug(f"Write property {prop}")
             uri = f"ocp.documents.{self.docId}.content.Document.{self.objGroup}.{self.name}.Properties.{prop}.SetValue"
-            await self.connection.session.call(uri, value)
+            await self.connection.session.call(uri, value)           
         
         except Exception as e:
             self.logger.error("Writing property error ({1}, {2}): {0}".format(e, self.name, prop))
@@ -292,8 +290,6 @@ class FreeCADOnlineObject():
             failed = await self.connection.session.call(uri, props, values)
             if failed:
                 raise Exception(f"Properties {failed} failed")
-            
-            await self._docPrints()
             
         except Exception as e:
             self.logger.error("Writing property batch error: {0}".format(e))
