@@ -329,9 +329,11 @@ class FreeCADOnlineObject():
     
     async def waitTillCloseout(self, timeout = 10):
         #wait till all current async tasks are finished. Note that it also wait for task added during the wait period.
-        #throws an error on timeout.
-        
+        #throws an error on timeout.        
         await self.runner.waitTillCloseout(timeout)
+        
+    async def close(self):   
+        await self.runner.close()
         
     def synchronize(self, syncer):
         #wait till all current async tasks are finished, call wg.done() and than wait for the event to happen before 
@@ -375,6 +377,14 @@ class OnlineObject(FreeCADOnlineObject):
     
     def remove(self):
         self.runner.run(self._asyncRemove)
+        
+        #we cannot use the runner to run close on itself, because it would wait for itself till it finishs: 
+        #that is a guaranteed timeout
+        async def __closeout():
+            #waits till runner finished all tasks and than closes it
+            await self.runner.close()
+            
+        asyncio.ensure_future(__closeout())
         
 
     def createDynamicProperty(self, prop):

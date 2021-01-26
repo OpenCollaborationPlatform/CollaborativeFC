@@ -91,12 +91,16 @@ class __SyncRunner():
         self.__syncEvent     = asyncio.Event() 
         self.__finishEvent   = asyncio.Event()
         
-        asyncio.ensure_future(self.__run())
+        self.task = asyncio.ensure_future(self.__run())
 
    
     async def waitTillCloseout(self, timeout = 10):
         await asyncio.wait_for(self.__finishEvent.wait(), timeout)
          
+    async def close(self):
+        await self.waitTillCloseout()
+        self.task.cancel()
+        await self.task
 
     async def __run(self):
         
@@ -152,21 +156,26 @@ class BatchedOrderedRunner():
         self.__finishEvent   = asyncio.Event()
         self.__batchHandler  = {}
 
-        asyncio.ensure_future(self.__run())
+        self.maintask = asyncio.ensure_future(self.__run())
 
 
     def registerBatchHandler(self, fncName, batchFnc):        
         self.__batchHandler[fncName] = batchFnc;
 
 
-    async def waitTillCloseout(self, timeout = 10):
-
-        #we need to find the timeslot when tasks is empty
-        while self.__tasks:
-            await asyncio.sleep(0.1)
-            
+    async def waitTillCloseout(self, timeout = 10):           
         await asyncio.wait_for(self.__finishEvent.wait(), timeout)
-         
+     
+
+    async def close(self):
+        await self.waitTillCloseout()
+        try:
+            self.maintask.cancel()
+            await self.maintask
+        except asyncio.CancelledError:
+            pass
+        
+        self.__finishEvent.set()
 
     async def __run(self):
         

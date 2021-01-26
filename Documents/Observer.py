@@ -199,7 +199,7 @@ class DocumentObserver(ObserverBase):
     def slotAppendDynamicProperty(self, obj, prop):    
                
         doc = obj.Document
-        if self.isDeactivatedFor(doc) or obj.Removing:
+        if self.isDeactivatedFor(doc):
             return
                 
         odoc = self.handler.getOnlineDocument(doc)

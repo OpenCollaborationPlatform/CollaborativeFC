@@ -68,7 +68,7 @@ class OnlineDocument():
         if self.shouldExcludeTypeId(obj.TypeId):
             return
         
-        #create the async runner for that object
+        #remove the async runner for that object
         oobj = self.objects[obj.Name]
         del(self.objects[obj.Name])
         oobj.remove()

@@ -180,10 +180,17 @@ class OnlineObserver():
             
             self.docObserver.deactivateFor(self.onlineDoc.document)
             self.onlineDoc.document.removeObject(name)
-                           
+                   
+            #remove object
             oobj = self.onlineDoc.objects[name]
-            await oobj.waitTillCloseout()
+            await oobj.close()
             del(self.onlineDoc.objects[name])
+            
+            #remove viewprovider (we do not intercept the special viewprovider romved event)
+            ovp = self.onlineDoc.viewproviders[name]
+            if ovp:
+                del(self.onlineDoc.viewproviders[name])
+                
             
         except Exception as e:
             self.logger.error(f"Object ({name}): Remove object online callback failed: {e}")
