@@ -17,7 +17,7 @@
 # *   Suite 330, Boston, MA  02111-1307, USA                             *
 # ************************************************************************
 
-import asyncio, logging
+import asyncio, logging, os
 import Documents.Property as Property
 from Documents.OnlineObserver import OnlineObserver
 from Documents.OnlineObject import OnlineObject, OnlineViewProvider
@@ -41,6 +41,11 @@ class OnlineDocument():
         self.viewproviders = {}
         self.logger = logging.getLogger("Document " + id[-5:])
         self.sync = None
+        
+        if os.getenv('FC_OCP_SYNC_MODE', "0") == "1":
+            self.synced = True
+        else:
+            self.synced = False
         
         self.logger.debug("Created")
  
@@ -80,6 +85,7 @@ class OnlineDocument():
             return
         
         if obj.Name not in self.objects:
+            self.logger.error(f"OnlineDocument called for object {obj.Name}, but is not setup")
             return
         
         oobj = self.objects[obj.Name]
@@ -92,6 +98,7 @@ class OnlineDocument():
             return
         
         if obj.Name not in self.objects:
+            self.logger.error(f"OnlineDocument called for object {obj.Name}, but is not setup")
             return
         
         oobj = self.objects[obj.Name]
@@ -104,6 +111,7 @@ class OnlineDocument():
             return
         
         if obj.Name not in self.objects:
+            self.logger.error(f"OnlineDocument called for object {obj.Name}, but is not setup")
             return
         
         oobj = self.objects[obj.Name]
@@ -116,6 +124,7 @@ class OnlineDocument():
             return
         
         if obj.Name not in self.objects:
+            self.logger.error(f"OnlineDocument called for object {obj.Name}, but is not setup")
             return
         
         oobj = self.objects[obj.Name]
@@ -127,6 +136,7 @@ class OnlineDocument():
             return
         
         if obj.Name not in self.objects:
+            self.logger.error(f"OnlineDocument called for object {obj.Name}, but is not setup")
             return
         
         oobj = self.objects[obj.Name]
@@ -139,6 +149,7 @@ class OnlineDocument():
             return
         
         if obj.Name not in self.objects:
+            self.logger.error(f"OnlineDocument called for object {obj.Name}, but is not setup")
             return
         
         oobj = self.objects[obj.Name]
@@ -187,6 +198,7 @@ class OnlineDocument():
             return
         
         if vp.Object.Name not in self.viewproviders:
+            self.logger.error(f"OnlineDocument called for viewprovider {vp.Object.Name}, but is not setup")
             return
         
         ovp = self.viewproviders[vp.Object.Name]
@@ -199,6 +211,7 @@ class OnlineDocument():
             return
         
         if vp.Object.Name not in self.viewproviders:
+            self.logger.error(f"OnlineDocument called for viewprovider {vp.Object.Name}, but is not setup")
             return
         
         ovp = self.viewproviders[vp.Object.Name]
@@ -211,6 +224,7 @@ class OnlineDocument():
             return
         
         if vp.Object.Name not in self.viewproviders:
+            self.logger.error(f"OnlineDocument called for viewprovider {vp.Object.Name}, but is not setup")
             return
         
         ovp = self.viewproviders[vp.Object.Name]
@@ -223,6 +237,7 @@ class OnlineDocument():
             return
         
         if vp.Object.Name not in self.viewproviders:
+            self.logger.error(f"OnlineDocument called for viewprovider {vp.Object.Name}, but is not setup")
             return
         
         ovp = self.viewproviders[vp.Object.Name]
@@ -234,6 +249,7 @@ class OnlineDocument():
             return
         
         if vp.Object.Name not in self.viewproviders:
+            self.logger.error(f"OnlineDocument called for viewprovider {vp.Object.Name}, but is not setup")
             return
         
         ovp = self.viewproviders[vp.Object.Name]
@@ -247,12 +263,15 @@ class OnlineDocument():
         #This means:
         # - we need to wait till all online objects finished the changes, they have till now
         # - we need to make sure no online object processes any new changes before the transaction is closed
-        
-        self.sync = Syncer(len(self.objects))
-        
+               
         #sync all document objects! (not viewproviders, those are not transactioned)
-        for name in self.objects:
-            self.objects[name].synchronize(self.sync)
+        if not self.synced:
+            self.sync = Syncer(len(self.objects))
+            for name in self.objects:
+                self.objects[name].synchronize(self.sync)
+        elif self.objects:
+            self.sync = Syncer(1)
+            next(iter(self.objects.values())).synchronize(self.sync)
             
         asyncio.ensure_future(self.__recomputeDocument(self.sync))
         
@@ -304,15 +323,15 @@ class OnlineDocument():
     async def waitTillCloseout(self, timeout = 10):
         #wait till all current async tasks are finished. Note that it also wait for task added during the wait period.
         #throws an error on timeout.
-        
+          
         coros = []
         for obj in list(self.objects.values()):
             coros.append(obj.waitTillCloseout(timeout))
             
         for obj in list(self.viewproviders.values()):
             coros.append(obj.waitTillCloseout(timeout))
- 
+
         coros.append(self.onlineObs.waitTillCloseout(timeout))
- 
+
         if len(coros)>0:
             await asyncio.wait(coros)

@@ -95,6 +95,15 @@ def convertPropertyToWamp(obj, prop):
 
 
 def convertWampToProperty(obj, prop, value):
+    
+    #we do not set read-only properties
+    if  float(".".join(App.Version()[0:2])) >= 0.19:
+        if "Immutable" in obj.getPropertyStatus(prop) or 24 in obj.getPropertyStatus(prop):
+            return
+    else:
+        if "ReadOnly" in obj.getTypeOfProperty(prop):
+            return
+    
     #converts the wamp data in usable form and assigns it to the property
     typeId = obj.getTypeIdOfProperty(prop)
     converter = __PropertyFromWamp.get(typeId, __fromRaw)
@@ -186,6 +195,9 @@ def __fromLinkString(obj, prop, value):
         return
     
     doc = obj.Document 
+    if not hasattr(doc, value):
+        raise Exception(f"Document has no object {value}")
+    
     linked = doc.getObject(value)
     setattr(obj, prop, linked)
     

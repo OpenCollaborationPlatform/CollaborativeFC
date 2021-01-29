@@ -27,13 +27,17 @@ class ObserverManager():
         self.uiobs = uiobs 
         
         
-    def activateFor(self, doc):       
+    def activateFor(self, doc):  
+        #obs is App document observer, but also gets the UI document. This is required
+        #as some viewprovider callbacks like extensions will be observed also by app observer
         self.obs.activateFor(doc)
+        self.obs.activateFor(FreeCADGui.getDocument(doc.Name))
         self.uiobs.activateFor(FreeCADGui.getDocument(doc.Name))        
         
         
     def deactivateFor(self, doc):
         self.obs.deactivateFor(doc)
+        self.obs.deactivateFor(FreeCADGui.getDocument(doc.Name))
         self.uiobs.deactivateFor(FreeCADGui.getDocument(doc.Name))  
         
 
@@ -65,7 +69,8 @@ class ObserverBase():
         while doc in self.inactive:
            self.inactive.remove(doc)
         
-        self._createdWhileDeactivated.pop(doc)
+        if doc in self._createdWhileDeactivated:
+            self._createdWhileDeactivated.pop(doc)
                 
         
     def deactivateFor(self, doc):
@@ -175,7 +180,7 @@ class DocumentObserver(ObserverBase):
 
 
     def slotChangedObject(self, obj, prop):
-        
+                             
         doc = obj.Document
         if self.isDeactivatedFor(doc) or obj.Removing:
             return                
@@ -267,9 +272,10 @@ class DocumentObserver(ObserverBase):
         #works for >=0.19, both DocumentObject and ViewProviders
         
         doc = obj.Document
+        
         if self.isDeactivatedFor(doc):
             return
-        
+               
         odoc = self.handler.getOnlineDocument(doc)
         if not odoc:
             return

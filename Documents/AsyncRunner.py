@@ -61,86 +61,117 @@ class Syncer(object):
         self.event.set()
         
 
-class DocumentOrderedRunner():
+class DocumentRunner():
+    #Generates sender and receiver DocumentBatchedOrderedRunner for a whole document where all actions on all 
+    #individual runners are executed in order
     
     __sender   = {}
     __receiver = {}
     
     @classmethod
     def getSenderRunner(cls, docId, logger):
-        if not docId in DocumentOrderedRunner.__sender:
-            DocumentOrderedRunner.__sender[docId] = OrderedRunner(logger)
+        if not docId in DocumentRunner.__sender:
+            DocumentRunner.__sender[docId] = OrderedRunner(logger)
         
-        return DocumentOrderedRunner.__sender[docId]
+        return DocumentBatchedOrderedRunner(DocumentRunner.__sender[docId])
     
     @classmethod
     def getReceiverRunner(cls, docId, logger):
-        if not docId in DocumentOrderedRunner.__receiver:
-            DocumentOrderedRunner.__receiver[docId] = OrderedRunner(logger)
+        if not docId in DocumentRunner.__receiver:
+            DocumentRunner.__receiver[docId] = OrderedRunner(logger)
         
-        return DocumentOrderedRunner.__receiver[docId]
+        return DocumentBatchedOrderedRunner(DocumentRunner.__receiver[docId])
    
 
     
-class __SyncRunner():
+class OrderedRunner():
+    #AsyncRunner which runs task in order
    
     #runns all tasks syncronous
-    def __init__(self):
+    def __init__(self, logger):
         
+        self.__logger        = logger
         self.__tasks         = []
         self.__syncEvent     = asyncio.Event() 
         self.__finishEvent   = asyncio.Event()
+        self.__current       = ""
         
-        self.task = asyncio.ensure_future(self.__run())
+        self.__maintask = asyncio.ensure_future(self.__run())
 
    
     async def waitTillCloseout(self, timeout = 10):
-        await asyncio.wait_for(self.__finishEvent.wait(), timeout)
+        try:
+            await asyncio.wait_for(self.__finishEvent.wait(), timeout)
+            
+        except asyncio.TimeoutError as e:
+            remaining = self.queued()
+            self.__logger.error(f"Runner closeout timed out while working ({not self.__maintask.done()}) on {self.__current}. Remaining: \n{remaining}")     
          
+
     async def close(self):
         await self.waitTillCloseout()
-        self.task.cancel()
-        await self.task
+        try:
+            self.__shutdown = True
+            if not self.maintask.cancelled():
+                self.maintask.cancel()
+                await self.maintask
+        except asyncio.CancelledError:
+            pass
+        
+        self.__finishEvent.set()       
 
     async def __run(self):
         
-        while True:
-            
-            self.__finishEvent.clear()
-            
-            #we grap the currently available tasks
-            tasks = self.__tasks.copy()
-            self.__tasks.clear()
-            self.__syncEvent.clear()
-        
-            #work the tasks syncronous
-            for task in tasks:
-                await task
+        try:
+            self.__finishEvent.set()
+            while True:
                 
-            if len(self.__tasks) == 0:
+                await self.__syncEvent.wait()
+                self.__finishEvent.clear()
+                        
+                #work the tasks syncronous
+                task = self.__tasks.pop(0)
+                while task:
+                    self.__current = task[0].__name__
+                    await task[0](*task[1])
+                    if self.__tasks:
+                        task = self.__tasks.pop(0)
+                    else:
+                        task = None
+                    
                 self.__finishEvent.set()
-            
-            #wait till new tasks are given
-            await self.__syncEvent.wait()
+                self.__syncEvent.clear()
+                
+        except Exception as e:
+            self.__logger.error(f"Main loop of sync runner closed: {e}")
         
            
-    def run(self, awaitable):
+    def run(self, fnc, *args):
         
-        self.__tasks.append(awaitable)
+        self.__tasks.append((fnc, args))
         self.__syncEvent.set()
+        
+        
+    def queued(self):
+        #returns the names of all currently queued tasks
+        return [task[0].__name__ for task in self.__tasks]
     
     
     def sync(self, syncer):
         #syncronisation: provide a syncer. The runner calls done() when all currently 
         #available work is done and afterwards wait for the restart till new things are processed
-        async def doit(syncer):
+        async def syncronize(syncer):
             await syncer.done()
             await syncer.waitRestart()
-        self.run(doit(syncer))
+            
+        try:
+            self.run(syncronize, syncer)
+        except Exception as e:
+            self.__logger.error(f"Unable to sync: {e}")
 
 
 class BatchedOrderedRunner():
-    #batched execution of tasks
+    #batched ordered execution of tasks
     #Normally run received a function object of an async function and its arguments.
     #The functions are than processed in order one by one (each one awaited). If functions can be batched
     #together, this can be done in the following way:
@@ -155,6 +186,8 @@ class BatchedOrderedRunner():
         self.__syncEvent     = asyncio.Event() 
         self.__finishEvent   = asyncio.Event()
         self.__batchHandler  = {}
+        self.__current       = ""
+        self.__shutdown      = False
 
         self.maintask = asyncio.ensure_future(self.__run())
 
@@ -163,73 +196,87 @@ class BatchedOrderedRunner():
         self.__batchHandler[fncName] = batchFnc;
 
 
-    async def waitTillCloseout(self, timeout = 10):           
-        await asyncio.wait_for(self.__finishEvent.wait(), timeout)
-     
+    async def waitTillCloseout(self, timeout = 10):     
+        try:
+            await asyncio.wait_for(self.__finishEvent.wait(), timeout)
+            
+        except asyncio.TimeoutError as e:
+            remaining = self.queued()
+            self.__logger.error(f"Runner closeout timed out while working ({not self.maintask.done()}) on {self.__current}. Remaining: \n{remaining}")     
+
 
     async def close(self):
+               
         await self.waitTillCloseout()
         try:
-            self.maintask.cancel()
-            await self.maintask
+            self.__shutdown = True
+            if not self.maintask.cancelled():
+                self.maintask.cancel()
+                await self.maintask
         except asyncio.CancelledError:
             pass
         
         self.__finishEvent.set()
+        
 
     async def __run(self):
         
-        #initially we have no work
-        self.__finishEvent.set()
-        
-        while True:
+        try:
             
-            #wait till new tasks are given
-            await self.__syncEvent.wait()
+            #initially we have no work
+            self.__finishEvent.set()
             
-            #inform that we are working
-            self.__finishEvent.clear()
-            
-            #we grap the currently available tasks
-            tasks = self.__tasks.copy()
-            self.__tasks.clear()
-            self.__syncEvent.clear()
-                   
-            #work the tasks in order
-            task = tasks.pop(0)
-            while task is not None:
+            while True:
                 
-                #check if we can batch tasks
-                if task[0].__name__ in self.__batchHandler:
+                #wait till new tasks are given.
+                await self.__syncEvent.wait()
+                
+                #inform that we are working
+                self.__finishEvent.clear()            
                     
-                    #execute all batchable functions of this type
-                    batchtask = task
-                    while batchtask and batchtask[0].__name__ == task[0].__name__:
+                #work the tasks in order
+                task = self.__tasks.pop(0)
+                while task:
+                    
+                    self.__current = task[0].__name__
+                    
+                    #check if we can batch tasks
+                    if self.__current in self.__batchHandler:
                         
-                        batchtask[0](*batchtask[1])
-                        if tasks:
-                            batchtask = tasks.pop(0)
-                        else:
-                            batchtask = None
-                            break
+                        #execute all batchable functions of this type
+                        batchtask = task
+                        while batchtask and batchtask[0].__name__ == self.__current:
+                            
+                            batchtask[0](*batchtask[1])
+                            if self.__tasks:
+                                batchtask = self.__tasks.pop(0)
+                            else:
+                                batchtask = None
+                                break
+                        
+                        #rund the batch handler
+                        await self.__batchHandler[self.__current]()
+                        
+                        #reset the outer loop
+                        task = batchtask
+                        continue
                     
-                    #rund the batch handler
-                    await self.__batchHandler[task[0].__name__]()
-                    
-                    #reset the outer loop
-                    task = batchtask
-                    continue
-                
-                else:
-                    #not batchable, normal operation
-                    await task[0](*task[1])
-                    if tasks:
-                        task = tasks.pop(0)
                     else:
-                        task = None
-            
-            if not self.__tasks:
+                        #not batchable, normal operation
+                        await task[0](*task[1])
+                        if self.__tasks:
+                            task = self.__tasks.pop(0)
+                        else:
+                            task = None
+                
+                self.__current = ""
                 self.__finishEvent.set()
+                self.__syncEvent.clear()
+
+                            
+        except Exception as e:
+            if not self.__shutdown:            
+                self.logger.error(f"Unexpected excetion in BatchedOrderedRunner: {e}")
         
            
     def run(self, fnc, *args):
@@ -237,47 +284,70 @@ class BatchedOrderedRunner():
         self.__tasks.append((fnc, args))
         self.__syncEvent.set()
         
+    def queued(self):
+        #returns the names of all currently queued tasks
+        return [task[0].__name__ for task in self.__tasks]
+        
     def sync(self, syncer):
         #syncronisation: provide a syncer. The runner calls done() when all currently 
         #available work is done and afterwards wait for the restart till new things are processed
-        async def doit(syncer):
+        async def syncronize(syncer):
             try:
                 await syncer.done()
                 await syncer.waitRestart()
             except Exception as e:
                 self.logger.error(f"Unable to sync: {e}")
                 
-        self.run(doit, syncer)
+        self.run(syncronize, syncer)
         
 
-class OrderedRunner(BatchedOrderedRunner):
+class DocumentBatchedOrderedRunner():
+    #A Async runner that syncronizes over the whole document, and has the same API as the BatchedOrderedRunner to be 
+    #compatible replacement
     
-    async def __run(self):
+    def __init__(self, runner):
+        self.__docRunner = runner
+        self.__batchHandler = {}
         
-        while True:
-            
-            self.__finishEvent.clear()
-            
-            #we grap the currently available tasks
-            tasks = self.__tasks.copy()
-            self.__tasks.clear()
-            self.__syncEvent.clear()
         
-            #work the tasks in order
-            #work the tasks syncronous
-            for task in tasks:
+    def registerBatchHandler(self, fncName, batchFnc):        
+        self.__batchHandler[fncName] = batchFnc;
+        
+    
+    def run(self, fnc, *args):
+        
+        #check if this function needs to be handled by batch function, and 
+        #build a wrapper if so
+        if fnc.__name__ in self.__batchHandler:
+            
+            handler = self.__batchHandler[fnc.__name__ ]
+            
+            async def wrapper(*args):
+                fnc(*args)
+                await handler()
                 
-                #execute the batch handler after each single comman
-                if task[0].__name__ in self.__batchHandler:
-                    task[0](*task[1])
-                    await self.__batchHandler[task[0].__name__]()
-                    
-                else:
-                    await task
+            self.__docRunner.run(wrapper, *args)
+            
+        else:
+            self.__docRunner.run(fnc, *args)
                 
+                
+    def queued(self):
+        #returns the names of all currently queued tasks
+        return self.__docRunner.queued()
+        
+    def sync(self, syncer):
+        #syncronisation: provide a syncer. The runner calls done() when all currently 
+        #available work is done and afterwards wait for the restart till new things are processed
+        return self.__docRunner.sync(syncer)
+                
+                
+    async def waitTillCloseout(self, timeout = 10):
+        #Returns when all active tasks are finished. Also waits for tasks added after the call to this function
+        return await self.__docRunner.waitTillCloseout(timeout)
 
-            if len(self.__tasks) == 0:
-                self.__finishEvent.set()
-            
-            #wait till new tasks are given
-            await self.__syncEvent.wait()
+
+    async def close(self):
+        return await self.__docRunner.close()
+           
+

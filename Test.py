@@ -17,7 +17,7 @@
 # *   Suite 330, Boston, MA  02111-1307, USA                             *
 # ************************************************************************
 
-import asyncio, os
+import asyncio, os, logging
 from autobahn.asyncio.component import Component
 from autobahn.wamp.types import SubscribeOptions
 
@@ -32,6 +32,7 @@ class Handler():
           
         self.__manager = manager  
         self.__session = None
+        self.__logger  = logging.getLogger("Test handler")
         
         asyncio.ensure_future(self._startup(connection))
         
@@ -91,35 +92,55 @@ class Handler():
 
 
     async def synchronize(self, docId, numFCs):
+        #Syncronize all other involved FC instances. When this returns one can call waitForSync on the TestServer. The numFCs must not 
+        #include the FC instance it is called on, only the remaining ones
+        #Note:
+        #   We trigger the FC instances to sync themself via the DML doc. This is to make sure that the sync is called only after all 
+        #   operations have been received by the FC instance. 
+        #   1. Do all known opeations
+        #   2. Emit sync event in DML document
+        
+        self.__logger.debug(f"Start syncronisation for: {docId[:6]}")
                 
         #we wait till all tasks are finished
-        coros =  []
-        for entity in self.__manager.getEntities():
-            if entity.onlinedoc != None:
-                coros.append(entity.onlinedoc.waitTillCloseout(20))
-                
-        await asyncio.wait(coros)
+        try:
+            for entity in self.__manager.getEntities():
+                if entity.onlinedoc != None and entity.id == docId:
+                    await entity.onlinedoc.waitTillCloseout(30)   
+                    
+        except Exception as e: 
+            print(f"Trigger syncronize failed, cannot wait for closeout of current actions: {e}")
+            return
  
         #register the sync with the testserver
         await self.__session.call("ocp.test.registerSync", docId, numFCs)
         
-        #and now issue the event
+        #and now issue the event that all FC instances know that they should sync.
+        self.__logger.debug(f"Work done, trigger sync events via dml: {docId[:6]}")
         uri = f"ocp.documents.{docId}.content.Document.sync"
         await self.__connection.session.call(uri, docId)
 
      
     async def  __receiveSync(self, docId):
+        #received a sync event from DML document
+        # 1. Wait till all actions are finished
+        # 2. Inform the TestServer, that we are finished
+        
+        self.__logger.debug(f"Request for sync received: {docId[:6]}")
         
         #wait till everything is done!
-        entities = self.__manager.getEntities()
-        for entity in entities:
-            if entity.id == docId:
-                await entity.onlinedoc.waitTillCloseout(20)
-                
-        #wait for online observer as well
-        
+        try:
+            entities = self.__manager.getEntities()
+            for entity in entities:
+                if entity.id == docId:
+                    await entity.onlinedoc.waitTillCloseout(30)
+                    
+        except Exception as e: 
+            print(f"Participation in syncronize failed, cannot wait for closeout of current actions: {e}")
+            return
 
         #call testserver that we received and executed the sync!
+        self.__logger.debug("Work done, send sync event")
         await self.__session.call("ocp.test.sync", docId)
 
     

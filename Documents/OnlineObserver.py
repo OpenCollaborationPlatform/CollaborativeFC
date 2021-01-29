@@ -36,25 +36,25 @@ class OnlineObserver():
         self.runners = {}
         
         self.callbacks = {
-                "Objects.onObjectCreated": self.__newObject,
-                "Objects.onObjectRemoved": self.__removeObject,
-                "Objects..onObjectRecomputed": self.__objectRecomputed,
-                "Objects..onExtensionCreated": self.__createObjextExtension,
-                "Objects..onExtensionRemoved": self.__removeObjextExtension,       
-                "Objects...onDynamicPropertyCreated": self.__createObjectDynProperty,
-                "Objects...onDynamicPropertiesCreated": self.__createObjectDynProperties,
-                "Objects...onDynamicPropertyRemoved": self.__removeObjectDynProperty,
-                "Objects...onDatasChanged": self.__changeMultiObject,
-                "Objects....onDataChanged": self.__changeObject, 
-                "Objects....onStatusChanged": self.__changePropStatus,
-                "ViewProviders..onExtensionCreated": self.__createViewProviderExtension,
-                "ViewProviders..onExtensionRemoved": self.__removeViewProviderExtension,
-                "ViewProviders...onDynamicPropertyCreated": self.__createViewProviderDynProperty,
-                "ViewProviders...onDynamicPropertiesCreated": self.__createViewProviderDynProperties,
-                "ViewProviders...onDynamicPropertyRemoved": self.__removeViewProviderDynProperty,
-                "ViewProviders...onDatasChanged": self.__changeMultiViewProdiver,
-                "ViewProviders....onDataChanged": self.__changeViewProvider,
-                "ViewProviders....onStatusChanged": self.__changeViewProvierPropStatus,                
+                "Objects.onObjectCreated": self.__cbNewObject,
+                "Objects.onObjectRemoved": self.__cbRemoveObject,
+                "Objects..onObjectRecomputed": self.__cbObjectRecomputed,
+                "Objects..onExtensionCreated": self.__cbCreateObjextExtension,
+                "Objects..onExtensionRemoved": self.__cbRemoveObjextExtension,       
+                "Objects...onDynamicPropertyCreated": self.__cbCreateObjectDynProperty,
+                "Objects...onDynamicPropertiesCreated": self.__cbCreateObjectDynProperties,
+                "Objects...onDynamicPropertyRemoved": self.__cbRemoveObjectDynProperty,
+                "Objects...onDatasChanged": self.__cbChangeMultiObject,
+                "Objects....onDataChanged": self.__cbChangeObject, 
+                "Objects....onStatusChanged": self.__cbChangePropStatus,
+                "ViewProviders..onExtensionCreated": self.__cbCreateViewProviderExtension,
+                "ViewProviders..onExtensionRemoved": self.__cbRemoveViewProviderExtension,
+                "ViewProviders...onDynamicPropertyCreated": self.__cbCreateViewProviderDynProperty,
+                "ViewProviders...onDynamicPropertiesCreated": self.__cbCreateViewProviderDynProperties,
+                "ViewProviders...onDynamicPropertyRemoved": self.__cbRemoveViewProviderDynProperty,
+                "ViewProviders...onDatasChanged": self.__cbChangeMultiViewProdiver,
+                "ViewProviders....onDataChanged": self.__cbChangeViewProvider,
+                "ViewProviders....onStatusChanged": self.__cbChangeViewProvierPropStatus,                
             }
         
         self.docCBs = {
@@ -114,14 +114,14 @@ class OnlineObserver():
             args = (keys[0],) + args #first key is object name
             
         fnc = self.docCBs[keys[-1]]
-        AsyncRunner.DocumentOrderedRunner.getSenderRunner(self.onlineDoc.id, self.logger).run(fnc, *args)
+        AsyncRunner.DocumentRunner.getReceiverRunner(self.onlineDoc.id, self.logger).run(fnc, *args)
             
 
     def getRunner(self, name):
         
         if not name in self.runners:
             if self.synced:
-                self.runners[name] = AsyncRunner.DocumentOrderedRunner.getSenderRunner(self.onlineDoc.id, self.logger)
+                self.runners[name] = AsyncRunner.DocumentRunner.getReceiverRunner(self.onlineDoc.id, self.logger)
             else:
                 self.runners[name] = AsyncRunner.OrderedRunner(self.logger)
                 
@@ -135,8 +135,11 @@ class OnlineObserver():
         if coros:
             await asyncio.wait(coros)
 
-        
-    async def __newObject(self, name, typeID):
+     
+    #Callbacks for DML events
+    #******************************************************************************************************************************************************
+     
+    async def __cbNewObject(self, name, typeID):
         try:
             self.logger.debug(f"Object ({name}): New ({typeID})")
             
@@ -174,7 +177,8 @@ class OnlineObserver():
             self.docObserver.activateFor(self.onlineDoc.document)
     
     
-    async def __removeObject(self, name):
+    async def __cbRemoveObject(self, name):
+        
         try:
             self.logger.debug(f"Object ({name}): Remove")
             
@@ -199,7 +203,7 @@ class OnlineObserver():
             self.docObserver.activateFor(self.onlineDoc.document)
         
         
-    async def __changeObject(self, name, prop, value):
+    async def __cbChangeObject(self, name, prop, value):
         
         obj = self.onlineDoc.document.getObject(name)
         if obj is None:
@@ -208,7 +212,7 @@ class OnlineObserver():
         await self.__setProperty(obj, name, prop, value, f"Object ({name})")
         
         
-    async def __changeMultiObject(self, name, props, values):
+    async def __cbChangeMultiObject(self, name, props, values):
         
         obj = self.onlineDoc.document.getObject(name)
         if obj is None:
@@ -217,7 +221,7 @@ class OnlineObserver():
         await self.__setProperties(obj, name, props, values, f"Object ({name})")
  
  
-    async def __changePropStatus(self, name, prop, status):
+    async def __cbChangePropStatus(self, name, prop, status):
         
         obj = self.onlineDoc.document.getObject(name)
         if obj is None:
@@ -227,7 +231,7 @@ class OnlineObserver():
         self.__setPropertyStatus(obj, prop, status)
  
  
-    async def __createObjectDynProperty(self, name, prop, typeID, group, documentation, status):
+    async def __cbCreateObjectDynProperty(self, name, prop, typeID, group, documentation, status):
         obj = self.onlineDoc.document.getObject(name)
         if obj is None:
             self.logger.error(f"Object ({name}): Should add dynamic property {prop} for not existing object")
@@ -237,7 +241,7 @@ class OnlineObserver():
         self.__createDynProperty(obj, prop, typeID, group, documentation, status)
         
     
-    async def __createObjectDynProperties(self, name, props, infos):
+    async def __cbCreateObjectDynProperties(self, name, props, infos):
 
         obj = self.onlineDoc.document.getObject(name)
         if obj is None:
@@ -251,7 +255,7 @@ class OnlineObserver():
         
     
     
-    async def __removeObjectDynProperty(self, name, prop):
+    async def __cbRemoveObjectDynProperty(self, name, prop):
         
         obj = self.onlineDoc.document.getObject(name)
         if obj is None:
@@ -262,7 +266,7 @@ class OnlineObserver():
         self.__removeDynProperty(obj, prop)
 
     
-    async def __createObjextExtension(self, name, ext):
+    async def __cbCreateObjextExtension(self, name, ext):
         
         obj = self.onlineDoc.document.getObject(name)
         if obj is None:
@@ -273,7 +277,7 @@ class OnlineObserver():
         self.__createExtension(obj, ext)
     
     
-    async def __removeObjextExtension(self, name, ext):
+    async def __cbRemoveObjextExtension(self, name, ext):
         
         obj = self.onlineDoc.document.getObject(name)
         if obj is None:
@@ -284,7 +288,7 @@ class OnlineObserver():
         self.__removeExtension(obj, ext)
     
     
-    async def __objectRecomputed(self, name):
+    async def __cbObjectRecomputed(self, name):
         
         obj = self.onlineDoc.document.getObject(name)
         if obj is None:
@@ -303,16 +307,16 @@ class OnlineObserver():
             obj.purgeTouched()
             
         
-    async def __changeViewProvider(self, name, prop, value):
+    async def __cbChangeViewProvider(self, name, prop, value):
         
         obj = self.onlineDoc.document.getObject(name)
         if obj is None:
             return
  
-        await self.__setProperty(obj.ViewObject, name, prop, f"ViewProvider ({name})")
+        await self.__setProperty(obj.ViewObject, name, prop, value, f"ViewProvider ({name})")
      
     
-    async def __changeMultiViewProdiver(self, name, props, values):
+    async def __cbChangeMultiViewProdiver(self, name, props, values):
         
         obj = self.onlineDoc.document.getObject(name)
         if obj is None:
@@ -321,7 +325,7 @@ class OnlineObserver():
         await self.__setProperties(obj.ViewObject, name, props, values, f"ViewProvider ({name})")
      
     
-    async def __changeViewProvierPropStatus(self, name, prop, status):
+    async def __cbChangeViewProvierPropStatus(self, name, prop, status):
         
         obj = self.onlineDoc.document.getObject(name)
         if not obj or not obj.ViewObject:
@@ -331,18 +335,18 @@ class OnlineObserver():
         self.__setPropertyStatus(obj.ViewObject, prop, status)
      
     
-    async def __createViewProviderDynProperty(self, name, prop, typeID, group, documentation, status):
+    async def __cbCreateViewProviderDynProperty(self, name, prop, typeID, group, documentation, status):
         
         obj = self.onlineDoc.document.getObject(name)
         if obj is None:
             self.logger.error(f"ViewProvider ({name}): Should add dynamic property {prop} for not existing viewprovider")
             return
         
-        self.logger.debug(f"ViewProvider ({name}): Change property {prop}")
+        self.logger.debug(f"ViewProvider ({name}): Add dynamic property {prop}")
         self.__createDynProperty(obj.ViewObject, prop, typeID, group, documentation, status)
     
     
-    async def __createViewProviderDynProperties(self, name, props, infos):
+    async def __cbCreateViewProviderDynProperties(self, name, props, infos):
 
         obj = self.onlineDoc.document.getObject(name)
         if obj is None:
@@ -356,7 +360,7 @@ class OnlineObserver():
             self.__createDynProperty(obj.ViewObject, props[i], info["typeid"], info["group"], info["docu"], info["status"])
             
     
-    async def __removeViewProviderDynProperty(self, name, prop):
+    async def __cbRemoveViewProviderDynProperty(self, name, prop):
         
         obj = self.onlineDoc.document.getObject(name)
         if obj is None:
@@ -367,7 +371,7 @@ class OnlineObserver():
         self.__removeDynProperty(obj.ViewObject, prop)    
     
 
-    async def __createViewProviderExtension(self, name, ext):
+    async def __cbCreateViewProviderExtension(self, name, ext):
         
         obj = self.onlineDoc.document.getObject(name)
         if obj is None:
@@ -378,7 +382,7 @@ class OnlineObserver():
         self.__createExtension(obj.ViewObject, ext)
     
     
-    async def __removeViewProviderExtension(self, name, ext):
+    async def __cbRemoveViewProviderExtension(self, name, ext):
         
         obj = self.onlineDoc.document.getObject(name)
         if obj is None:
@@ -389,9 +393,13 @@ class OnlineObserver():
         self.__removeExtension(obj.ViewObject, ext)
 
 
-    async def __changeDocProperty(self, name):
+    async def __cbChangeDocProperty(self, name):
         print("Changed document property event")
-        
+     
+     
+     
+    #Internal functions for the online oberser
+    #******************************************************************************************************************************************************
 
     async def __getBinaryValues(self, values):
         #checks all values for binary Cid's and fetches the real data to replace it with
@@ -425,7 +433,12 @@ class OnlineObserver():
                 tasks.append(worker(index, value))
         
         if tasks:
-            await asyncio.wait([asyncio.create_task(task) for task in tasks])
+            tasks = [asyncio.create_task(task) for task in tasks]
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+            exceptions = [i for i in results if isinstance(i, Exception)]
+            if exceptions:
+                self.logger.error(f"Getting binary data from node failed: {exceptions[0]}")
+                raise exceptions[0]
         
         if len(values) == 1:
             return values[0]
@@ -487,10 +500,10 @@ class OnlineObserver():
     
     def __createDynProperty(self, obj, prop, typeID, group, documentation, status):
         
-        if hasattr(obj, prop):
-            return
-        
-        try:                 
+        try: 
+            if hasattr(obj, prop):
+                return
+                
             self.docObserver.deactivateFor(self.onlineDoc.document)
             
             attributes = Property.statusToType(status)            
@@ -516,15 +529,15 @@ class OnlineObserver():
     
     def __removeDynProperty(self, obj, prop):
         
-        if not hasattr(obj, prop):
-            return
-        
-        try:                   
+        try: 
+            if not hasattr(obj, prop):
+                return
+                    
             self.docObserver.deactivateFor(self.onlineDoc.document)
             obj.removeProperty(prop)
             
         except Exception as e:
-            self.logger.error("Dyn property removing callback failed: ", e)
+            self.logger.error(f"Dyn property removing callback failed: {e.message}")
             
         finally:
             self.docObserver.activateFor(self.onlineDoc.document)
@@ -534,10 +547,10 @@ class OnlineObserver():
     
     def __createExtension(self, obj, ext):
         
-        if obj.hasExtension(ext):
-            return
-        
-        try:      
+        try:
+            if obj.hasExtension(ext):
+                return
+    
             self.docObserver.deactivateFor(self.onlineDoc.document)
 
             if  float(".".join(FreeCAD.Version()[0:2])) >= 0.19:
@@ -556,10 +569,10 @@ class OnlineObserver():
     
     def __removeExtension(self, obj, ext):
               
-        if not obj.hasExtension(ext):
-            return
+        try:
+            if not obj.hasExtension(ext):
+                return
         
-        try:      
             self.docObserver.deactivateFor(self.onlineDoc.document)
             obj.removeExtension(ext, None)
             

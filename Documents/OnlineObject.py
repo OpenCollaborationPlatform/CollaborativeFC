@@ -19,7 +19,7 @@
 
 import asyncio, logging
 import FreeCAD, os
-from Documents.AsyncRunner import BatchedOrderedRunner, DocumentOrderedRunner
+from Documents.AsyncRunner import BatchedOrderedRunner, DocumentRunner
 import Documents.Property as Property
 
 class FreeCADOnlineObject():
@@ -31,7 +31,7 @@ class FreeCADOnlineObject():
         #check which type of runner to use 
         if os.getenv('FC_OCP_SYNC_MODE', "0") == "1":
             self.logger.info('Use non-default sync mode "Document-Sync"')
-            self.runner     = DocumentOrderedRunner.getSenderRunner(onlinedoc.id, self.logger)
+            self.runner     = DocumentRunner.getSenderRunner(onlinedoc.id, self.logger)
         
         else:
             if parentOnlineObj is None:
@@ -412,8 +412,7 @@ class OnlineObject(FreeCADOnlineObject):
         self.runner.run(self._addPropertyStatusChange, prop, info["status"])
         
     
-    def recompute(self):
-      
+    def recompute(self):      
         self.runner.run(self.__asyncRecompute)
                
             
