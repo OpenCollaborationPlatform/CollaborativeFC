@@ -62,6 +62,7 @@ class ObserverBase():
         self.inactive = []
         self.objExtensions = {}
         self._createdWhileDeactivated = {}
+        self._removing = []
 
 
     def activateFor(self, doc):
@@ -88,6 +89,14 @@ class ObserverBase():
     
     def createdWhileDeactivated(self, doc):
         return self._createdWhileDeactivated[doc]
+    
+    
+    def isRemoving(self, obj):
+        if float(".".join(FreeCAD.Version()[0:2])) >= 0.19:
+            return obj.Removing
+        else:
+            #no equivalent in 0.18
+            return obj in self._removing
     
     
     def fc018GetNewExtensions(self, obj):
@@ -128,6 +137,7 @@ class DocumentObserver(ObserverBase):
     
     def __init__(self, handler):
         super().__init__(handler)
+        self.removing = []
         
     def slotCreatedDocument(self, doc):
         
@@ -173,6 +183,15 @@ class DocumentObserver(ObserverBase):
         if self.isDeactivatedFor(doc):
             return
         
+        #0.18 workaround: we cannot access the Removing object status, and hence not detect if a OriginGroupExtension object is removed
+        #this leads to a stranding Origin. Let's try to detect if we currently remove a part
+        if float(".".join(FreeCAD.Version()[0:2])) == 0.18:
+            if obj.TypeId == "App::Origin":
+                self._removing += obj.InList
+                
+            if obj in self._removing:
+                self._removing.remove(obj)
+        
         #print("Observer remove document object ", obj.Name)        
         odoc = self.handler.getOnlineDocument(doc)
         if odoc:
@@ -182,7 +201,7 @@ class DocumentObserver(ObserverBase):
     def slotChangedObject(self, obj, prop):
                              
         doc = obj.Document
-        if self.isDeactivatedFor(doc) or obj.Removing:
+        if self.isDeactivatedFor(doc) or self.isRemoving(obj):
             return                
         
         #print("Observer changed document object ( ", obj.Name, ", ", prop, " ) into state ", obj.State)
@@ -254,7 +273,7 @@ class DocumentObserver(ObserverBase):
     def slotRecomputedObject(self, obj):
                
         doc = obj.Document
-        if self.isDeactivatedFor(doc) or obj.Removing:
+        if self.isDeactivatedFor(doc) or self.isRemoving(obj):
             return
         
         odoc = self.handler.getOnlineDocument(doc)
@@ -356,7 +375,7 @@ class GUIDocumentObserver(ObserverBase):
     def slotCreatedObject(self, vp):
         
         doc = vp.Document
-        if self.isDeactivatedFor(doc) or vp.Object.Removing:
+        if self.isDeactivatedFor(doc) or self.isRemoving(vp.Object):
             #if we are deactivated, we collect all new objects. This is required to check if there are auto created objects,
             #like origins for parts etc.
             self._createdWhileDeactivated[doc].append(vp)
@@ -379,7 +398,7 @@ class GUIDocumentObserver(ObserverBase):
             return
         
         doc = vp.Document
-        if self.isDeactivatedFor(doc) or vp.Object.Removing:
+        if self.isDeactivatedFor(doc) or self.isRemoving(vp.Object):
             return
 
         odoc = self.handler.getOnlineDocument(doc)

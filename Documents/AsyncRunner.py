@@ -112,9 +112,9 @@ class OrderedRunner():
         await self.waitTillCloseout()
         try:
             self.__shutdown = True
-            if not self.maintask.cancelled():
-                self.maintask.cancel()
-                await self.maintask
+            if not self.__maintask.cancelled():
+                self.__maintask.cancel()
+                await self.__maintask
         except asyncio.CancelledError:
             pass
         
@@ -189,7 +189,7 @@ class BatchedOrderedRunner():
         self.__current       = ""
         self.__shutdown      = False
 
-        self.maintask = asyncio.ensure_future(self.__run())
+        self.__maintask = asyncio.ensure_future(self.__run())
 
 
     def registerBatchHandler(self, fncName, batchFnc):        
@@ -202,7 +202,7 @@ class BatchedOrderedRunner():
             
         except asyncio.TimeoutError as e:
             remaining = self.queued()
-            self.__logger.error(f"Runner closeout timed out while working ({not self.maintask.done()}) on {self.__current}. Remaining: \n{remaining}")     
+            self.__logger.error(f"Runner closeout timed out while working ({not self.__maintask.done()}) on {self.__current}. Remaining: \n{remaining}")     
 
 
     async def close(self):
@@ -210,9 +210,9 @@ class BatchedOrderedRunner():
         await self.waitTillCloseout()
         try:
             self.__shutdown = True
-            if not self.maintask.cancelled():
-                self.maintask.cancel()
-                await self.maintask
+            if not self.__maintask.cancelled():
+                self.__maintask.cancel()
+                await self.__maintask
         except asyncio.CancelledError:
             pass
         

@@ -78,6 +78,9 @@ class OnlineDocument():
         del(self.objects[obj.Name])
         oobj.remove()
         
+        #aswell as the online observer one
+        asyncio.ensure_future(self.onlineObs.closeRunner(obj.Name))
+        
         
     def changeObject(self, obj, prop):
                
@@ -85,7 +88,7 @@ class OnlineDocument():
             return
         
         if obj.Name not in self.objects:
-            self.logger.error(f"OnlineDocument called for object {obj.Name}, but is not setup")
+            #No error here: the label change callback comes always before the new object callback
             return
         
         oobj = self.objects[obj.Name]

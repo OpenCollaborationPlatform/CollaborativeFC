@@ -23,6 +23,16 @@ from autobahn.wamp.types import SubscribeOptions
 
 import FreeCAD, FreeCADGui
 
+class ErrorFilter(logging.Filter):
+    #Logging filter that raises exception when Error occurs
+
+    def filter(self, record):
+        if record.levelname == "ERROR":
+            raise Exception(f"Error was logged for {record.name}: {record.getMessage()}")
+        
+        return True
+    
+
 class Handler():
     
     def __init__(self, connection, manager):
@@ -34,6 +44,11 @@ class Handler():
         self.__session = None
         self.__logger  = logging.getLogger("Test handler")
         
+        #register the Error raise filter to ensure that during testing all errror messages lead to test stop
+        #Note: Attach to handler, as adding to logger itself does not propagate to child loggers
+        logging.getLogger().handlers[0].addFilter(ErrorFilter())
+        
+        #run the handler
         asyncio.ensure_future(self._startup(connection))
         
           

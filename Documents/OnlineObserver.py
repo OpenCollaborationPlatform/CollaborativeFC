@@ -126,6 +126,14 @@ class OnlineObserver():
                 self.runners[name] = AsyncRunner.OrderedRunner(self.logger)
                 
         return self.runners[name]
+    
+    
+    async def closeRunner(self, name):
+        
+        if name in self.runners and not self.synced:
+            await self.runners[name].close()
+            del self.runners[name]
+
 
     async def waitTillCloseout(self, timeout = 10):
         coros = []
@@ -182,19 +190,21 @@ class OnlineObserver():
         try:
             self.logger.debug(f"Object ({name}): Remove")
             
+            #remove FC object first
             self.docObserver.deactivateFor(self.onlineDoc.document)
             self.onlineDoc.document.removeObject(name)
                    
-            #remove object
+            #remove online object
             oobj = self.onlineDoc.objects[name]
             await oobj.close()
             del(self.onlineDoc.objects[name])
             
-            #remove viewprovider (we do not intercept the special viewprovider romved event)
-            ovp = self.onlineDoc.viewproviders[name]
-            if ovp:
-                del(self.onlineDoc.viewproviders[name])
+            #remove online viewprovider (we do not intercept the special viewprovider removed event)
+            if name in self.onlineDoc.viewproviders:
+                del self.onlineDoc.viewproviders[name]
                 
+            #and our own runner. cannot call from here, as we are running in this runner ourself. hence waitTillCloseout would block
+            asyncio.ensure_future(self.closeRunner(name))
             
         except Exception as e:
             self.logger.error(f"Object ({name}): Remove object online callback failed: {e}")
