@@ -59,7 +59,7 @@ class ObserverBase():
     def __init__(self, handler):
         
         self.handler = handler
-        self.inactive = []
+        self.inactive = {}
         self.objExtensions = {}
         self._createdWhileDeactivated = {}
         self._removing = []
@@ -67,8 +67,10 @@ class ObserverBase():
 
     def activateFor(self, doc):
        
-        while doc in self.inactive:
-           self.inactive.remove(doc)
+        if doc in self.inactive:
+            self.inactive[doc] -= 1
+            if self.inactive[doc] <= 0:
+                del self.inactive[doc]
         
         if doc in self._createdWhileDeactivated:
             self._createdWhileDeactivated.pop(doc)
@@ -76,7 +78,11 @@ class ObserverBase():
         
     def deactivateFor(self, doc):
         
-        self.inactive.append(doc)
+        if doc in self.inactive:
+            self.inactive[doc] += 1
+        else:
+            self.inactive[doc] = 1 
+
         self._createdWhileDeactivated[doc] = []
         
         

@@ -19,9 +19,9 @@
 
 import asyncio, logging, os
 import Documents.Property as Property
+import Documents.AsyncRunner as AsyncRunner
 from Documents.OnlineObserver import OnlineObserver
 from Documents.OnlineObject import OnlineObject, OnlineViewProvider
-from Documents.AsyncRunner import Syncer
 from autobahn.wamp.exception import ApplicationError
 
 class OnlineDocument():
@@ -61,11 +61,29 @@ class OnlineDocument():
         
         if self.shouldExcludeTypeId(obj.TypeId):
             return
+        
+        #create the syncer that blocks all runners till this object is created. This is required to ensure no property access the object
+        #before its creation
+        if not self.synced:
+            block = AsyncRunner.BlockSyncer()
+            for entry in self.objects.values():
+                entry.synchronize(block)
+        else: 
+            block = None
                 
         #create the async runner for that object
         oobj = OnlineObject(obj, self)
         self.objects[obj.Name] = oobj
-        oobj.setup(self.sync)
+        
+        if self.sync:
+            #we need to block till the last document recompute is done.
+            #Note:  Do not use full syncer, as this includes an AcknowledgeSyncer which is setup for the amount of objects.
+            #       Adding it to the new obect adds an additional Acknowledge, which may lead to the fact that the recompute happens
+            #       before all othe rrunners are done
+            oobj.setup(self.sync.Block, restart = block)
+            
+        else:
+            oobj.setup(restart = block)
      
      
     def removeObject(self, obj):
@@ -181,8 +199,8 @@ class OnlineDocument():
         #create the online view provider for that object
         ovp = OnlineViewProvider(vp, self.objects[vp.Object.Name], self)
         self.viewproviders[vp.Object.Name] = ovp
-        ovp.setup(self.sync)
-     
+        ovp.setup() #no sync, as it uses the OnlineObjct runner, which is synced
+        
      
     def removeViewProvider(self, vp):
         
@@ -269,12 +287,9 @@ class OnlineDocument():
                
         #sync all document objects! (not viewproviders, those are not transactioned)
         if not self.synced:
-            self.sync = Syncer(len(self.objects))
-            for name in self.objects:
-                self.objects[name].synchronize(self.sync)
-        elif self.objects:
-            self.sync = Syncer(1)
-            next(iter(self.objects.values())).synchronize(self.sync)
+            self.sync = AsyncRunner.AcknowledgeBlockSyncer(len(self.objects))
+            for obj in self.objects.values():
+                obj.synchronize(self.sync)
             
         asyncio.ensure_future(self.__recomputeDocument(self.sync))
         
@@ -282,7 +297,8 @@ class OnlineDocument():
     async def __recomputeDocument(self, sync):
         
         #wait till all objects have done their work
-        await sync.waitAllDone()
+        if sync:
+            await sync.wait()
         
         #close the transaction
         #try:     
@@ -294,8 +310,9 @@ class OnlineDocument():
         #    self.logger.error(f"Closing transaction failed: {e}")
             
         #finally:
-        sync.restart()
-        self.sync = None
+        if sync:
+            sync.restart()
+            self.sync = None
 
 
     async def asyncSetup(self):

@@ -31,35 +31,61 @@ class TaskContext():
     async def __aexit__(self, exc_type, exc, tb):
         pass
 
-class Syncer(object):
-    #Helper class to sync multiple runners:
-    # - one can wait till all num runners are done with their work with waitDone()
-    # - one can allow to restart the runners doing work with restart()
+#Syncers are classs to achieve syncronisation with multiple runners and an outside process.
+#They are intended to be used with Asyncrunners "syncronize" methods, which adds their "excecute" method
+#to the current task list
+    
+class AcknowledgeSyncer():
+    #Allows to wait till num synced runners have excecuted the syncer. 
+    #waitAllAchnowledge blocks till this happens. The runners are not blocked, 
+    #they directly execute their tasks after the syncer.
     
     def __init__(self, num):
         self.count = num
-        self.cv = asyncio.Condition()
         self.event = asyncio.Event()
 
-    async def done(self):
-        await self.cv.acquire()
+    async def excecute(self):
         self.count -= 1
-        if self.count == 0:
-            self.cv.notify_all()
-        self.cv.release()
+        if self.count <= 0:
+            self.event.set()
 
-    async def waitAllDone(self):
-        await self.cv.acquire()
-        while self.count > 0:
-            await self.cv.wait()
-        self.cv.release()
+    async def waitAllAchnowledge(self, timeout = 60):
+        await asyncio.wait_for(self.event.wait(), timeout)
         
-    async def waitRestart(self):
+
+class BlockSyncer():
+    #Blocks all synced runners until the restart method is called
+    
+    def __init__(self):
+        self.event = asyncio.Event()
+
+    async def excecute(self):
         await self.event.wait()
-        
+
     def restart(self):
         self.event.set()
         
+    async def asyncRestart(self):
+        self.restart()
+
+
+class AcknowledgeBlockSyncer():
+    #Allows to wait for num runners to execute and than blocks then till restart is called
+       
+    def __init__(self, num):
+        self.Acknowledge = AcknowledgeSyncer(num)
+        self.Block = BlockSyncer()
+       
+    async def excecute(self):
+        await self.Acknowledge.excecute()
+        await self.Block.excecute()
+            
+    async def wait(self):
+        await self.Acknowledge.waitAllAchnowledge()
+        
+    def restart(self):
+        self.Block.restart()
+            
 
 class DocumentRunner():
     #Generates sender and receiver DocumentBatchedOrderedRunner for a whole document where all actions on all 
@@ -158,16 +184,7 @@ class OrderedRunner():
     
     
     def sync(self, syncer):
-        #syncronisation: provide a syncer. The runner calls done() when all currently 
-        #available work is done and afterwards wait for the restart till new things are processed
-        async def syncronize(syncer):
-            await syncer.done()
-            await syncer.waitRestart()
-            
-        try:
-            self.run(syncronize, syncer)
-        except Exception as e:
-            self.__logger.error(f"Unable to sync: {e}")
+        self.run(syncer.excecute)
 
 
 class BatchedOrderedRunner():
@@ -289,16 +306,7 @@ class BatchedOrderedRunner():
         return [task[0].__name__ for task in self.__tasks]
         
     def sync(self, syncer):
-        #syncronisation: provide a syncer. The runner calls done() when all currently 
-        #available work is done and afterwards wait for the restart till new things are processed
-        async def syncronize(syncer):
-            try:
-                await syncer.done()
-                await syncer.waitRestart()
-            except Exception as e:
-                self.logger.error(f"Unable to sync: {e}")
-                
-        self.run(syncronize, syncer)
+        self.run(syncer.excecute)
         
 
 class DocumentBatchedOrderedRunner():

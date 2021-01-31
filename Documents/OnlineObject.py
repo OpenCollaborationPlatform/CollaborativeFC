@@ -336,9 +336,6 @@ class FreeCADOnlineObject():
         await self.runner.close()
         
     def synchronize(self, syncer):
-        #wait till all current async tasks are finished, call wg.done() and than wait for the event to happen before 
-        #the next tasks are started. 
-        
         self.runner.sync(syncer)
 
 
@@ -356,18 +353,21 @@ class OnlineObject(FreeCADOnlineObject):
         self.runner.registerBatchHandler("_addPropertyStatusChange", self._asyncStatusPropertiesFromCache)
         
         
-    def setup(self, sync):
+    def setup(self, syncer=None, restart=None):
         values = {}
         infos = {}
         for prop in self.obj.PropertiesList:
             values[prop] = Property.convertPropertyToWamp(self.obj, prop)
             infos[prop]  = Property.createPropertyInfo(self.obj, prop)
             
-        #check if we need to handle a syncronisation
-        if sync:
-            self.runner.sync(sync)
+        #check if we need to handle a document syncronisation
+        if syncer:
+            self.runner.sync(syncer)
             
         self.runner.run(self._asyncSetup, self.obj.TypeId, values, infos)
+        
+        if restart:
+            self.runner.run(restart.asyncRestart)
         
         #check if there are properties that need the defult values uploaded
         props = Property.getNonDefaultValueProperties(self.obj)
@@ -438,7 +438,7 @@ class OnlineViewProvider(FreeCADOnlineObject):
         self.runner.registerBatchHandler("_addDynamicPropertyCreationVP", self._asyncCreateDynamicPropertiesFromCache)
         self.runner.registerBatchHandler("_addPropertyStatusChangeVP", self._asyncStatusPropertiesFromCache)
           
-    def setup(self, sync):
+    def setup(self, sync=None):
         
         if float(".".join(FreeCAD.Version()[0:2])) == 0.18:
             #part of the FC 0.18 no proxy change event workaround
