@@ -46,7 +46,7 @@ class Handler():
         
         #register the Error raise filter to ensure that during testing all errror messages lead to test stop
         #Note: Attach to handler, as adding to logger itself does not propagate to child loggers
-        logging.getLogger().handlers[0].addFilter(ErrorFilter())
+        #logging.getLogger().handlers[0].addFilter(ErrorFilter())
         
         #run the handler
         asyncio.ensure_future(self._startup(connection))

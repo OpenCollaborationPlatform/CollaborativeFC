@@ -96,6 +96,9 @@ def convertPropertyToWamp(obj, prop):
 
 def convertWampToProperty(obj, prop, value):
     
+    if not prop in obj.PropertiesList:
+        raise Exception(f"Object {obj.Name} does not have property {prop}")
+    
     #we do not set read-only properties
     if  float(".".join(App.Version()[0:2])) >= 0.19:
         if "Immutable" in obj.getPropertyStatus(prop) or 24 in obj.getPropertyStatus(prop):

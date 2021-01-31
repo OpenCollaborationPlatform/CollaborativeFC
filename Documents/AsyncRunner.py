@@ -148,10 +148,9 @@ class OrderedRunner():
 
     async def __run(self):
         
-        try:
-            self.__finishEvent.set()
-            while True:
-                
+        self.__finishEvent.set()
+        while True:
+            try:
                 await self.__syncEvent.wait()
                 self.__finishEvent.clear()
                         
@@ -168,8 +167,11 @@ class OrderedRunner():
                 self.__finishEvent.set()
                 self.__syncEvent.clear()
                 
-        except Exception as e:
-            self.__logger.error(f"Main loop of sync runner closed: {e}")
+            except Exception as e:
+                self.__logger.error(f"{e}")
+                
+        if not self.__shutdown:
+            self.__logger.error(f"Main loop of sync runner closed unexpectedly: {e}")
         
            
     def run(self, fnc, *args):
@@ -237,14 +239,13 @@ class BatchedOrderedRunner():
         
 
     async def __run(self):
-        
-        try:
+                  
+        #initially we have no work
+        self.__finishEvent.set()
             
-            #initially we have no work
-            self.__finishEvent.set()
+        while True:
             
-            while True:
-                
+            try:
                 #wait till new tasks are given.
                 await self.__syncEvent.wait()
                 
@@ -291,9 +292,11 @@ class BatchedOrderedRunner():
                 self.__syncEvent.clear()
 
                             
-        except Exception as e:
-            if not self.__shutdown:            
-                self.logger.error(f"Unexpected excetion in BatchedOrderedRunner: {e}")
+            except Exception as e:
+                self.logger.error(f"{e}")
+                
+        if not self.__shutdown:            
+            self.logger.error(f"Unexpected shutdown in BatchedOrderedRunner: {e}")
         
            
     def run(self, fnc, *args):

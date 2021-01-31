@@ -67,7 +67,8 @@ class OnlineDocument():
         if not self.synced:
             block = AsyncRunner.BlockSyncer()
             for entry in self.objects.values():
-                entry.synchronize(block)
+                if not entry.isSettingUp():
+                    entry.synchronize(block)
         else: 
             block = None
                 

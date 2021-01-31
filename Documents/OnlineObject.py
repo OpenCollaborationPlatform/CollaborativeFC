@@ -48,6 +48,7 @@ class FreeCADOnlineObject():
         self.statusPropCache = {}
         self.propChangeCache = {}
         self.propChangeOutlist = []
+        self._setupStage    = True
 
     async def _docPrints(self):
         uri = u"ocp.documents.{0}.prints".format(self.docId)
@@ -66,6 +67,8 @@ class FreeCADOnlineObject():
             
             #create all properties that need setup           
             await self.__asyncCreateProperties(False, list(values.keys()), list(infos.values()))
+            
+            self._setupStage = False
         
         except Exception as e:
             self.logger.error("Setup error: {0}".format(e))
@@ -373,7 +376,10 @@ class OnlineObject(FreeCADOnlineObject):
         props = Property.getNonDefaultValueProperties(self.obj)
         for prop in props:
             self.runner.run(self._addPropertyChange, prop, Property.convertPropertyToWamp(self.obj, prop), [])
+
     
+    def isSettingUp(self):
+        return self._setupStage
     
     def remove(self):
         self.runner.run(self._asyncRemove)
