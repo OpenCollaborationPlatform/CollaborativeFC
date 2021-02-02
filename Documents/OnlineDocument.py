@@ -19,7 +19,7 @@
 
 import asyncio, logging, os
 import Documents.Property as Property
-import Documents.AsyncRunner as AsyncRunner
+import Documents.Syncer as Syncer
 from Documents.OnlineObserver import OnlineObserver
 from Documents.OnlineObject import OnlineObject, OnlineViewProvider
 from autobahn.wamp.exception import ApplicationError
@@ -65,7 +65,7 @@ class OnlineDocument():
         #create the syncer that blocks all runners till this object is created. This is required to ensure no property access the object
         #before its creation
         if not self.synced:
-            block = AsyncRunner.BlockSyncer()
+            block = Syncer.BlockSyncer()
             for entry in self.objects.values():
                 if not entry.isSettingUp():
                     entry.synchronize(block)
@@ -200,7 +200,7 @@ class OnlineDocument():
         #create the online view provider for that object
         ovp = OnlineViewProvider(vp, self.objects[vp.Object.Name], self)
         self.viewproviders[vp.Object.Name] = ovp
-        ovp.setup() #no sync, as it uses the OnlineObjct runner, which is synced
+        ovp.setup() #no sync, as it uses the OnlineObject runner, which is synced
         
      
     def removeViewProvider(self, vp):
@@ -288,7 +288,7 @@ class OnlineDocument():
                
         #sync all document objects! (not viewproviders, those are not transactioned)
         if not self.synced:
-            self.sync = AsyncRunner.AcknowledgeBlockSyncer(len(self.objects))
+            self.sync = Syncer.AcknowledgeBlockSyncer(len(self.objects))
             for obj in self.objects.values():
                 obj.synchronize(self.sync)
             

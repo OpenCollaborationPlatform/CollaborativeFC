@@ -20,6 +20,7 @@
 import asyncio, logging
 import FreeCAD, os
 from Documents.AsyncRunner import BatchedOrderedRunner, DocumentRunner
+import Documents.Batcher as Batcher
 import Documents.Property as Property
 
 class FreeCADOnlineObject():
@@ -351,9 +352,31 @@ class OnlineObject(FreeCADOnlineObject):
         self.odoc           = onlinedoc
         self.obj            = obj
         
-        self.runner.registerBatchHandler("_addPropertyChange", self._asyncPropertyChangeFromCache)
-        self.runner.registerBatchHandler("_addDynamicPropertyCreation", self._asyncCreateDynamicPropertiesFromCache)
-        self.runner.registerBatchHandler("_addPropertyStatusChange", self._asyncStatusPropertiesFromCache)
+        batchers = [Batcher.EquallityBatcher("OnlineObject._addPropertyChange", self._asyncPropertyChangeFromCache),
+                    Batcher.EquallityBatcher("OnlineObject._addDynamicPropertyCreation", self._asyncCreateDynamicPropertiesFromCache),
+                    Batcher.EquallityBatcher("OnlineObject._addPropertyStatusChange", self._asyncStatusPropertiesFromCache)
+        ]
+        
+        for batcher in batchers:
+            self.runner.registerBatcher(batcher)
+
+        #The FrameBatcher to manage the finalization event
+        async def handler():
+            print("Run handler for frame batcher")
+            event = f"ocp.documents.{self.docId}.content.Document.Objects.{self.name}.onSetupFinished"
+            await self.connection.session.call(event)
+        
+        self.runner.registerBatcher(Batcher.FrameBatcher(lambda x: x.name()=="OnlineObject._asyncSetup",
+                                                         lambda x: "OnlineViewProvider" in x.name(),
+                                                         batchers, handler))
+        
+        ##TODO:  This does not keep the order of operations. This could be a problem when a python modules uses the "dynPropCreated" callbacks of the oberserver.
+        ##       and assumes a earlier property is correctly written already. No such case is known however.
+        #async def handler():
+        #    await self._asyncCreateDynamicPropertiesFromCache()
+        #    await self._asyncPropertyChangeFromCache()
+        #    
+        #self.runner.registerBatcher(Batcher.PatternBatcher(handler, "_addDynamicPropertyCreation", "_addPropertyChange"))
         
         
     def setup(self, syncer=None, restart=None):
@@ -440,9 +463,30 @@ class OnlineViewProvider(FreeCADOnlineObject):
         self.obj = obj
         self.proxydata = None   #as FreeCAD 0.18 does not forward viewprovider proxy changes we need a way to identify changes
         
-        self.runner.registerBatchHandler("_addPropertyChangeVP", self._asyncPropertyChangeFromCache)
-        self.runner.registerBatchHandler("_addDynamicPropertyCreationVP", self._asyncCreateDynamicPropertiesFromCache)
-        self.runner.registerBatchHandler("_addPropertyStatusChangeVP", self._asyncStatusPropertiesFromCache)
+        batchers = [Batcher.EquallityBatcher("OnlineViewProvider._addPropertyChange", self._asyncPropertyChangeFromCache),
+                    Batcher.EquallityBatcher("OnlineViewProvider._addDynamicPropertyCreation", self._asyncCreateDynamicPropertiesFromCache),
+                    Batcher.EquallityBatcher("OnlineViewProvider._addPropertyStatusChange", self._asyncStatusPropertiesFromCache)
+        ]
+        
+        for batcher in batchers:
+            self.runner.registerBatcher(batcher)
+            
+        #The FrameBatcher to manage the finalization event
+        async def handler():
+            event = f"ocp.documents.{self.docId}.content.Document.ViewProviders.{self.name}.onSetupFinished"
+            await self.connection.session.call(event)
+        
+        self.runner.registerBatcher(Batcher.FrameBatcher(lambda x: x.name()=="OnlineViewProvider._asyncSetup",
+                                                         lambda x: "OnlineObject" in x.name(),
+                                                         batchers, handler, True))
+        
+        ##TODO:  This does not keep the order of operations. This could be a problem when a python modules uses the "dynPropCreated" callbacks of the oberserver.
+        ##       and assumes a earlier property is correctly written already. No such case is known however.
+        #async def handler():
+        #    await self._asyncCreateDynamicPropertiesFromCache()
+        #    await self._asyncPropertyChangeFromCache()
+        #    
+        #self.runner.registerBatcher(Batcher.PatternBatcher(handler, "_addDynamicPropertyCreationVP", "_addPropertyChangeVP"))
           
     def setup(self, sync=None):
         
@@ -461,7 +505,8 @@ class OnlineViewProvider(FreeCADOnlineObject):
         #check if we need to handle a syncronisation
         if sync:
             self.runner.sync(sync)
-            
+         
+        #setup ourself
         self.runner.run(self._asyncSetup, self.obj.TypeId, values, infos)
         
         #check if there are properties that need the defult values uploaded
@@ -476,7 +521,7 @@ class OnlineViewProvider(FreeCADOnlineObject):
     
     def createDynamicProperty(self, prop):
         info = Property.createPropertyInfo(self.obj, prop)        
-        self.runner.run(self._addDynamicPropertyCreationVP, prop, info)
+        self.runner.run(self._addDynamicPropertyCreation, prop, info)
     
     
     def removeDynamicProperty(self, prop):
@@ -497,24 +542,12 @@ class OnlineViewProvider(FreeCADOnlineObject):
             if hasattr(self.obj, 'Proxy'):
                 if not self.proxydata is self.obj.Proxy:
                     self.proxydata = self.obj.Proxy
-                    self.runner.run(self._addPropertyChangeVP, 'Proxy', self.obj.dumpPropertyContent('Proxy'), [])
+                    self.runner.run(self._addPropertyChange, 'Proxy', self.obj.dumpPropertyContent('Proxy'), [])
             
         
-        self.runner.run(self._addPropertyChangeVP, prop, value, [])
+        self.runner.run(self._addPropertyChange, prop, value, [])
 
 
     def changePropertyStatus(self, prop):
         info = Property.createPropertyInfo(self.obj, prop)        
-        self.runner.run(self._addPropertyStatusChangeVP, prop, info["status"])
-
-
-    #indirections for batch handler, as we use the shared runner with our document object and should not 
-    #override the registered batch handlers there
-    def _addPropertyChangeVP(self, *args):
-        self._addPropertyChange(*args)
-        
-    def _addDynamicPropertyCreationVP(self, *args):
-        self._addDynamicPropertyCreation(*args)
-        
-    def _addPropertyStatusChangeVP(self, *args):
-        self._addPropertyStatusChange(*args)
+        self.runner.run(self._addPropertyStatusChange, prop, info["status"])

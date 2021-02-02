@@ -38,6 +38,7 @@ class OnlineObserver():
         self.callbacks = {
                 "Objects.onObjectCreated": self.__cbNewObject,
                 "Objects.onObjectRemoved": self.__cbRemoveObject,
+                "Objects..onSetupFinished": self.__cbObjectOnSetupFinished,
                 "Objects..onObjectRecomputed": self.__cbObjectRecomputed,
                 "Objects..onExtensionCreated": self.__cbCreateObjextExtension,
                 "Objects..onExtensionRemoved": self.__cbRemoveObjextExtension,       
@@ -47,6 +48,7 @@ class OnlineObserver():
                 "Objects...onDatasChanged": self.__cbChangeMultiObject,
                 "Objects....onDataChanged": self.__cbChangeObject, 
                 "Objects....onStatusChanged": self.__cbChangePropStatus,
+                "ViewProviders..onSetupFinished": self.__cbViewProviderOnSetupFinished,
                 "ViewProviders..onExtensionCreated": self.__cbCreateViewProviderExtension,
                 "ViewProviders..onExtensionRemoved": self.__cbRemoveViewProviderExtension,
                 "ViewProviders...onDynamicPropertyCreated": self.__cbCreateViewProviderDynProperty,
@@ -184,7 +186,7 @@ class OnlineObserver():
         finally:           
             self.docObserver.activateFor(self.onlineDoc.document)
     
-    
+
     async def __cbRemoveObject(self, name):
         
         try:
@@ -316,6 +318,36 @@ class OnlineObserver():
         if hasattr(obj, "purgeTouched"):
             obj.purgeTouched()
             
+            
+    async def __cbObjectOnSetupFinished(self, name):
+        #FreeCAD python object often get new properties with new versions. This is usually handled in the 
+        #"onDocumentRestored" by checking if all properties are available and adding them if not. To enable 
+        #cross version compatibility we need to call this function to ensure all relevant properties are avaiable
+        #Note:  ideally we would not disable the the doc observer to just catch the new probs. However, it is highly 
+        #       likely that some other parallel running coroutine did this. Hence we need to figure out the new properties
+        #       ourself
+        try:
+            obj = self.onlineDoc.document.getObject(name)
+            self.logger.debug(f"Object ({name}): Finish Setup")
+            
+            if hasattr(obj, "Proxy") and hasattr(obj.Proxy, "onDocumentRestored"):
+                self.docObserver.deactivateFor(self.onlineDoc.document)
+                props = obj.PropertiesList
+                obj.Proxy.onDocumentRestored(obj)
+                newprops = set(obj.PropertiesList) - set(props)
+                
+                oobj = self.onlineDoc.objects[name]
+                for prop in newprops:
+                    oobj.createDynamicProperty(prop)
+                    oobj.changeProperty(prop)
+            
+        except Exception as e:
+            self.logger.error(f"Object ({name}): Version upgade after setup failed: {e}")
+            
+        finally:           
+            self.docObserver.activateFor(self.onlineDoc.document)
+
+            
         
     async def __cbChangeViewProvider(self, name, prop, value):
         
@@ -402,6 +434,28 @@ class OnlineObserver():
         self.logger.debug(f"ViewProvider ({name}): Remove extension {ext}")
         self.__removeExtension(obj.ViewObject, ext)
 
+
+    async def __cbViewProviderOnSetupFinished(self, name):
+        #see object equivalent for explanaiton
+        try:
+            obj = self.onlineDoc.document.getObject(name).ViewObject
+            self.logger.debug(f"ViewProvider ({name}): Finish Setup")
+            if hasattr(obj, "Proxy") and hasattr(obj.Proxy, "onDocumentRestored"):
+                self.docObserver.deactivateFor(self.onlineDoc.document)
+                props = obj.PropertiesList
+                obj.Proxy.onDocumentRestored(obj)
+                newprops = set(obj.PropertiesList) - set(props)
+                
+                ovp = self.onlineDoc.viewproviders[name]
+                for prop in newprops:
+                    ovp.createDynamicProperty(prop)
+                    ovp.changeProperty(prop)
+            
+        except Exception as e:
+            self.logger.error(f"Object ({name}): Version upgade after setup failed: {e}")
+            
+        finally:           
+            self.docObserver.activateFor(self.onlineDoc.document)
 
     async def __cbChangeDocProperty(self, name):
         print("Changed document property event")
