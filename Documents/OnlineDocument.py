@@ -61,30 +61,33 @@ class OnlineDocument():
         
         if self.shouldExcludeTypeId(obj.TypeId):
             return
-        
-        #create the syncer that blocks all runners till this object is created. This is required to ensure no property access the object
-        #before its creation
-        if not self.synced:
-            block = Syncer.BlockSyncer()
-            for entry in self.objects.values():
-                if not entry.isSettingUp():
-                    entry.synchronize(block)
-        else: 
-            block = None
                 
         #create the async runner for that object
         oobj = OnlineObject(obj, self)
         self.objects[obj.Name] = oobj
         
-        if self.sync:
-            #we need to block till the last document recompute is done.
+        if not self.synced:
+            #create the syncer that blocks all runners till this object is created. This is required to ensure no property access the object
+            #before its creation
+            block = Syncer.BlockSyncer()
+            for entry in self.objects.values():
+                if not entry.isSettingUp():
+                    entry.synchronize(block)
+                    
+            #we need to block till the last document recompute is done, to ensure that we are not part of that recompute cycle
             #Note:  Do not use full syncer, as this includes an AcknowledgeSyncer which is setup for the amount of objects.
             #       Adding it to the new obect adds an additional Acknowledge, which may lead to the fact that the recompute happens
             #       before all othe rrunners are done
-            oobj.setup(self.sync.Block, restart = block)
+            if self.sync:
+                oobj.setup(self.sync.Block)
+            else:
+                oobj.setup()
+            
+            #release all other online objects after setup finished
+            oobj.synchronize(Syncer.RestartBlockSyncer(block))
             
         else:
-            oobj.setup(restart = block)
+            oobj.setup()
      
      
     def removeObject(self, obj):
@@ -92,9 +95,19 @@ class OnlineDocument():
         if self.shouldExcludeTypeId(obj.TypeId):
             return
         
-        #remove the async runner for that object
+        if not obj.Name in self.objects:
+            self.logger.error(f"Should remove object {obj.Name} but is not part of online document")
+        
+        #ensure all other objects are finished before we remove, as it could be that one of those objects has a property change that refers to the object to be removed
+        ackno = Syncer.AcknowledgeSyncer(len(self.objects)-1)
+        for name, entry in self.objects.items():
+            if name != obj.Name:
+                entry.synchronize(ackno)
+        
+        #remove the async runner for that object after all other current objects are done
         oobj = self.objects[obj.Name]
         del(self.objects[obj.Name])
+        oobj.synchronize(Syncer.WaitAcknowledgeSyncer(ackno))
         oobj.remove()
         
         #aswell as the online observer one

@@ -379,7 +379,7 @@ class OnlineObject(FreeCADOnlineObject):
         #self.runner.registerBatcher(Batcher.PatternBatcher(handler, "_addDynamicPropertyCreation", "_addPropertyChange"))
         
         
-    def setup(self, syncer=None, restart=None):
+    def setup(self, syncer=None):
         values = {}
         infos = {}
         for prop in self.obj.PropertiesList:
@@ -391,9 +391,6 @@ class OnlineObject(FreeCADOnlineObject):
             self.runner.sync(syncer)
             
         self.runner.run(self._asyncSetup, self.obj.TypeId, values, infos)
-        
-        if restart:
-            self.runner.run(restart.asyncRestart)
         
         #check if there are properties that need the defult values uploaded
         props = Property.getNonDefaultValueProperties(self.obj)
