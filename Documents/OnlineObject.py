@@ -361,14 +361,14 @@ class OnlineObject(FreeCADOnlineObject):
             self.runner.registerBatcher(batcher)
 
         #The FrameBatcher to manage the finalization event
-        async def handler():
-            print("Run handler for frame batcher")
-            event = f"ocp.documents.{self.docId}.content.Document.Objects.{self.name}.onSetupFinished"
-            await self.connection.session.call(event)
+        #async def handler():
+        #    print("Run handler for frame batcher")
+        #    event = f"ocp.documents.{self.docId}.content.Document.Objects.{self.name}.onSetupFinished"
+        #    await self.connection.session.call(event)
         
-        self.runner.registerBatcher(Batcher.FrameBatcher(lambda x: x.name()=="OnlineObject._asyncSetup",
-                                                         lambda x: "OnlineViewProvider" in x.name(),
-                                                         batchers, handler))
+        #self.runner.registerBatcher(Batcher.FrameBatcher(lambda x: x.name()=="OnlineObject._asyncSetup",
+        #                                                 lambda x: "OnlineViewProvider" in x.name(),
+        #                                                 batchers, handler))
         
         ##TODO:  This does not keep the order of operations. This could be a problem when a python modules uses the "dynPropCreated" callbacks of the oberserver.
         ##       and assumes a earlier property is correctly written already. No such case is known however.
@@ -472,13 +472,13 @@ class OnlineViewProvider(FreeCADOnlineObject):
             self.runner.registerBatcher(batcher)
             
         #The FrameBatcher to manage the finalization event
-        async def handler():
-            event = f"ocp.documents.{self.docId}.content.Document.ViewProviders.{self.name}.onSetupFinished"
-            await self.connection.session.call(event)
+        #async def handler():
+        #    event = f"ocp.documents.{self.docId}.content.Document.ViewProviders.{self.name}.onSetupFinished"
+        #    await self.connection.session.call(event)
         
-        self.runner.registerBatcher(Batcher.FrameBatcher(lambda x: x.name()=="OnlineViewProvider._asyncSetup",
-                                                         lambda x: "OnlineObject" in x.name(),
-                                                         batchers, handler, True))
+        #self.runner.registerBatcher(Batcher.FrameBatcher(lambda x: x.name()=="OnlineViewProvider._asyncSetup",
+        #                                                 lambda x: "OnlineObject" in x.name(),
+        #                                                 batchers, handler, True))
         
         ##TODO:  This does not keep the order of operations. This could be a problem when a python modules uses the "dynPropCreated" callbacks of the oberserver.
         ##       and assumes a earlier property is correctly written already. No such case is known however.

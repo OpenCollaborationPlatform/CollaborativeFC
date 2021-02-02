@@ -21,6 +21,7 @@ import FreeCAD, logging, os, asyncio, traceback
 import Documents.Property       as Property
 import Documents.AsyncRunner    as AsyncRunner
 import Documents.Helper         as Helper
+from Documents.Observer     import BlockedObserver
 from Documents.OnlineObject import OnlineObject
 from Documents.OnlineObject import OnlineViewProvider
 from autobahn.wamp.types    import SubscribeOptions, CallOptions
@@ -164,27 +165,27 @@ class OnlineObserver():
                 return
                        
             #add the object we want
-            self.docObserver.deactivateFor(self.onlineDoc.document)
-            obj = self.onlineDoc.document.addObject(typeID, name)
+            with self.docObserver.blocked(self.onlineDoc.document):
+                obj = self.onlineDoc.document.addObject(typeID, name)
+                
+                #remove touched status. could happen that other objects like origins have been created automatically
+                for added in self.docObserver.createdObjectsWhileDeactivated(self.onlineDoc.document):
+                    if added.TypeId == "App::Origin":
+                        added.recompute() #recompute origin to get viewprovider size correctly (auto updated without change callback)
+                    added.purgeTouched()
+            
+            
             oobj = OnlineObject(obj, self.onlineDoc)
             self.onlineDoc.objects[obj.Name] = oobj
             
             #create the online view provider for that object
             if obj.ViewObject:
                 ovp = OnlineViewProvider(obj.ViewObject, oobj, self.onlineDoc)
-                self.onlineDoc.viewproviders[obj.Name] = ovp
-                       
-            #remove touched status. could happen that other objects like origins have been created automatically
-            for added in self.docObserver.createdObjectsWhileDeactivated(self.onlineDoc.document):
-                if added.TypeId == "App::Origin":
-                    added.recompute() #recompute origin to get viewprovider size correctly (auto updated without change callback)
-                added.purgeTouched()
+                self.onlineDoc.viewproviders[obj.Name] = ovp                       
+
             
         except Exception as e:
             self.logger.error(f"Object ({name}): Add object online callback failed: {e}")
-            
-        finally:           
-            self.docObserver.activateFor(self.onlineDoc.document)
     
 
     async def __cbRemoveObject(self, name):
@@ -193,8 +194,8 @@ class OnlineObserver():
             self.logger.debug(f"Object ({name}): Remove")
             
             #remove FC object first
-            self.docObserver.deactivateFor(self.onlineDoc.document)
-            self.onlineDoc.document.removeObject(name)
+            with self.docObserver.blocked(self.onlineDoc.document):
+                self.onlineDoc.document.removeObject(name)
                    
             #remove online object
             oobj = self.onlineDoc.objects[name]
@@ -210,9 +211,6 @@ class OnlineObserver():
             
         except Exception as e:
             self.logger.error(f"Object ({name}): Remove object online callback failed: {e}")
-            
-        finally:           
-            self.docObserver.activateFor(self.onlineDoc.document)
         
         
     async def __cbChangeObject(self, name, prop, value):
@@ -518,18 +516,16 @@ class OnlineObserver():
                 group = "ViewProviders"
                 
             #set it for the property
-            self.docObserver.deactivateFor(self.onlineDoc.document)   
             self.logger.debug(f"{logentry}: Set property {prop}")
             
             value = await self.__getBinaryValues(value)
-            Property.convertWampToProperty(obj, prop, value)
+            with self.docObserver.blocked(self.onlineDoc.document):
+                Property.convertWampToProperty(obj, prop, value)
 
         except Exception as e:
             self.logger.error(f"{logentry} Set property {prop} error: {e}")
 
-        finally:            
-            self.docObserver.activateFor(self.onlineDoc.document)
-            
+        finally:           
             if hasattr(obj, "purgeTouched"):
                 obj.purgeTouched()
     
@@ -542,22 +538,16 @@ class OnlineObserver():
                 group = "Objects"
             else:
                 group = "ViewProviders"
-
-            #set all values
-            self.docObserver.deactivateFor(self.onlineDoc.document)   
             
             values = await self.__getBinaryValues(values)
-            
-            failed = []
-            for index, prop in enumerate(props):
-                Property.convertWampToProperty(obj, prop, values[index])
+            with self.docObserver.blocked(self.onlineDoc.document):
+                for index, prop in enumerate(props):
+                    Property.convertWampToProperty(obj, prop, values[index])
            
         except Exception as e:
             self.logger.error(f"{logentry} Set properties {props} error: {e}")
 
-        finally:            
-            self.docObserver.activateFor(self.onlineDoc.document)
-            
+        finally:           
             if hasattr(obj, "purgeTouched"):
                 obj.purgeTouched()
            
@@ -568,17 +558,17 @@ class OnlineObserver():
             if hasattr(obj, prop):
                 return
                 
-            self.docObserver.deactivateFor(self.onlineDoc.document)
-            
-            attributes = Property.statusToType(status)            
-            obj.addProperty(typeID, prop, group, documentation, attributes)
-            
-            if float(".".join(FreeCAD.Version()[0:2])) >= 0.19:
-                obj.setPropertyStatus(prop, status)
-            else:
-                mode = Property.statusToEditorMode(status)
-                if mode:
-                    obj.setEditorMode(prop, mode)
+            with self.docObserver.blocked(self.onlineDoc.document):
+                
+                attributes = Property.statusToType(status)            
+                obj.addProperty(typeID, prop, group, documentation, attributes)
+                
+                if float(".".join(FreeCAD.Version()[0:2])) >= 0.19:
+                    obj.setPropertyStatus(prop, status)
+                else:
+                    mode = Property.statusToEditorMode(status)
+                    if mode:
+                        obj.setEditorMode(prop, mode)
         
         
         except Exception as e:
@@ -586,7 +576,6 @@ class OnlineObserver():
             traceback.print_exc()
             
         finally:
-            self.docObserver.activateFor(self.onlineDoc.document)
             if hasattr(obj, "purgeTouched"):
                 obj.purgeTouched()
     
@@ -597,14 +586,13 @@ class OnlineObserver():
             if not hasattr(obj, prop):
                 return
                     
-            self.docObserver.deactivateFor(self.onlineDoc.document)
-            obj.removeProperty(prop)
+            with self.docObserver.blocked(self.onlineDoc.document):
+                obj.removeProperty(prop)
             
         except Exception as e:
             self.logger.error(f"Dyn property removing callback failed: {e.message}")
             
         finally:
-            self.docObserver.activateFor(self.onlineDoc.document)
             if hasattr(obj, "purgeTouched"):
                 obj.purgeTouched()
             
@@ -615,18 +603,18 @@ class OnlineObserver():
             if obj.hasExtension(ext):
                 return
     
-            self.docObserver.deactivateFor(self.onlineDoc.document)
+            with self.docObserver.blocked(self.onlineDoc.document):
 
-            if  float(".".join(FreeCAD.Version()[0:2])) >= 0.19:
-                obj.addExtension(ext)
-            else:
-                obj.addExtension(ext, None)
-            
+                if  float(".".join(FreeCAD.Version()[0:2])) >= 0.19:
+                    obj.addExtension(ext)
+                else:
+                    obj.addExtension(ext, None)
+        
+        
         except Exception as e:
-            self.logger.error("Add extension callback failed: ", e)
+            self.logger.error(f"Add extension callback failed: {e}")
             
         finally:
-            self.docObserver.activateFor(self.onlineDoc.document)
             if hasattr(obj, "purgeTouched"):
                 obj.purgeTouched()
     
@@ -637,14 +625,13 @@ class OnlineObserver():
             if not obj.hasExtension(ext):
                 return
         
-            self.docObserver.deactivateFor(self.onlineDoc.document)
-            obj.removeExtension(ext, None)
+            with self.docObserver.blocked(self.onlineDoc.document):
+                obj.removeExtension(ext, None)
             
         except Exception as e:
             self.logger.error("Remove extension callback failed: ", e)
             
         finally:
-            self.docObserver.activateFor(self.onlineDoc.document)
             if hasattr(obj, "purgeTouched"):
                 obj.purgeTouched()
 
@@ -652,29 +639,28 @@ class OnlineObserver():
     def __setPropertyStatus(self, obj, prop, status):
 
         try:
-            self.docObserver.deactivateFor(self.onlineDoc.document)
+            with self.docObserver.blocked(self.onlineDoc.document):
             
-            if  float(".".join(FreeCAD.Version()[0:2])) >= 0.19:
-                #to set the status multiple things need to happen:
-                # 1. remove all string status entries we do not support
-                supported = obj.getPropertyStatus()
-                filterd = [s for s in status if not isinstance(s, str) or s in supported]
+                if  float(".".join(FreeCAD.Version()[0:2])) >= 0.19:
+                    #to set the status multiple things need to happen:
+                    # 1. remove all string status entries we do not support
+                    supported = obj.getPropertyStatus()
+                    filterd = [s for s in status if not isinstance(s, str) or s in supported]
 
-                # 2. check which are to be added, and add those
-                current = obj.getPropertyStatus(prop)
-                add = [s for s in filterd if not s in current]
-                obj.setPropertyStatus(prop, add)
+                    # 2. check which are to be added, and add those
+                    current = obj.getPropertyStatus(prop)
+                    add = [s for s in filterd if not s in current]
+                    obj.setPropertyStatus(prop, add)
+                    
+                    # 3. check which are to be removed, and remove those
+                    remove = [s for s in current if not s in filterd]
+                    signed = [-s for s in remove if isinstance(s, int) ]
+                    signed += ["-"+s for s in remove if isinstance(s, str) ]
+                    obj.setPropertyStatus(prop, signed)                
                 
-                # 3. check which are to be removed, and remove those
-                remove = [s for s in current if not s in filterd]
-                signed = [-s for s in remove if isinstance(s, int) ]
-                signed += ["-"+s for s in remove if isinstance(s, str) ]
-                obj.setPropertyStatus(prop, signed)                
-            
-            else:
-                obj.setEditorMode(prop, Property.statusToEditorMode(status))
+                else:
+                    obj.setEditorMode(prop, Property.statusToEditorMode(status))
         
         finally:            
-            self.docObserver.activateFor(self.onlineDoc.document)
             if hasattr(obj, "purgeTouched"):
                 obj.purgeTouched()

@@ -18,7 +18,23 @@
 # ************************************************************************
 
 import asyncio
+from contextlib import contextmanager 
 import FreeCAD, FreeCADGui
+
+
+#Context manager for easy usage
+class BlockedObserver():
+    
+    def __init__(self, mngr, docId):
+        self.__mngr = mngr
+        self.__docId = docId
+        
+    def __enter__(self): 
+        self.__mngr.activateFor(self.__docId)
+        
+    def __exit__(self): 
+        self.__mngr.deactivateFor(self.__docId)
+
 
 class ObserverManager():
     
@@ -44,6 +60,14 @@ class ObserverManager():
     def createdObjectsWhileDeactivated(self, doc):
         return self.obs.createdWhileDeactivated(doc)
     
+    @contextmanager
+    def blocked(self, doc):
+        try: 
+            self.deactivateFor(doc)
+            yield
+        finally: 
+            self.activateFor(doc)
+    
     
 class ObserverBase():
     
@@ -59,7 +83,7 @@ class ObserverBase():
     def __init__(self, handler):
         
         self.handler = handler
-        self.inactive = {}
+        self.inactive = []
         self.objExtensions = {}
         self._createdWhileDeactivated = {}
         self._removing = []
@@ -67,10 +91,8 @@ class ObserverBase():
 
     def activateFor(self, doc):
        
-        if doc in self.inactive:
-            self.inactive[doc] -= 1
-            if self.inactive[doc] <= 0:
-                del self.inactive[doc]
+        while doc in self.inactive:
+           self.inactive.remove(doc)
         
         if doc in self._createdWhileDeactivated:
             self._createdWhileDeactivated.pop(doc)
@@ -78,11 +100,15 @@ class ObserverBase():
         
     def deactivateFor(self, doc):
         
+        # we do not allow double deactivation. Reason is simple:
+        # deactivation should be used when some change to document is done that triggers the observer. This is always
+        # bound to a single coroutine, and then the doc is activated again for normal processing. Double deactivation means
+        # a coroutine keeps the doc blocked while annother coroutin is working. That is an error as all kind of actions can happen on the 
+        # doc while the initial routine is awaited. Loosing al this info is faulty. Hence double deactivation marks a implementation error
         if doc in self.inactive:
-            self.inactive[doc] += 1
-        else:
-            self.inactive[doc] = 1 
-
+            raise Exception(f"Document {doc} already deactivated: not allowed to happen")
+        
+        self.inactive.append(doc)
         self._createdWhileDeactivated[doc] = []
         
         
