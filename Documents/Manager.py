@@ -271,7 +271,7 @@ class Manager():
             self.__blockLocalEvents = False
             entity.fcdoc = doc
             entity.onlinedoc = OnlineDocument(entity.id, doc, obs, self.__connection, self.__dataservice)
-            await entity.onlinedoc.asyncUnload() 
+            await entity.onlinedoc.asyncLoad() 
 
         entity.status = Entity.Status.shared
         self.__update()

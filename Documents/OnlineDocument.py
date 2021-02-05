@@ -46,6 +46,9 @@ class OnlineDocument():
             self.synced = True
         else:
             self.synced = False
+            
+        #Online documents cannot use the FreeCAD Transaction framework
+        doc.UndoMode = 0
         
         self.logger.debug("Created")
  
@@ -120,8 +123,12 @@ class OnlineDocument():
             return
         
         if obj.Name not in self.objects:
-            #No error here: the label change callback comes always before the new object callback
-            return
+            if prop == "Label":
+                #No error here: the label change callback comes always before the new object callback
+                return
+            else:
+                self.logger.error(f"Property {prop} change but object does not exist in online document")
+                return
         
         oobj = self.objects[obj.Name]
         oobj.changeProperty(prop)
