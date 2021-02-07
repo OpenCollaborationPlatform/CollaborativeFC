@@ -21,22 +21,40 @@ import asyncio
 from contextlib import contextmanager 
 import FreeCAD, FreeCADGui
 
+#Global variable to allow observer activation/deactivation handing for other parts of the code
+__Observer = None
 
-#Context manager for easy usage
-class BlockedObserver():
+def initialize(docManager):
     
-    def __init__(self, mngr, docId):
-        self.__mngr = mngr
-        self.__docId = docId
-        
-    def __enter__(self): 
-        self.__mngr.activateFor(self.__docId)
-        
-    def __exit__(self): 
-        self.__mngr.deactivateFor(self.__docId)
+    global __Observer
+    
+    #we only initialize ones
+    if __Observer:
+        return 
+    
+    #add the freecad observer 
+    __observer = __DocumentObserver(docManager)
+    __guiObserver = __GUIDocumentObserver(docManager)
+    FreeCAD.addDocumentObserver(__observer)
+    FreeCADGui.addDocumentObserver(__guiObserver)
+    
+    __Observer = __ObserverManager(__guiObserver, __observer)
 
 
-class ObserverManager():
+@contextmanager
+def blocked(doc):
+    try: 
+        __Observer.deactivateFor(doc)
+        yield
+    finally: 
+        __Observer.activateFor(doc)
+
+
+def createdObjectsWhileDeactivated(doc):
+        return __Observer.obs.createdWhileDeactivated(doc)
+
+
+class __ObserverManager():
     
     def __init__(self, uiobs, obs):
         self.obs = obs 
@@ -46,30 +64,32 @@ class ObserverManager():
     def activateFor(self, doc):  
         #obs is App document observer, but also gets the UI document. This is required
         #as some viewprovider callbacks like extensions will be observed also by app observer
-        self.obs.activateFor(doc)
-        self.obs.activateFor(FreeCADGui.getDocument(doc.Name))
-        self.uiobs.activateFor(FreeCADGui.getDocument(doc.Name))        
+        if doc.isDerivedFrom("App::Document"):
+            self.obs.activateFor(doc)
+            self.obs.activateFor(FreeCADGui.getDocument(doc.Name))
+            self.uiobs.activateFor(FreeCADGui.getDocument(doc.Name))
+        else:
+            self.uiobs.activateFor(doc)
+            self.obs.activateFor(doc)
+            self.obs.activateFor(doc.Document)
         
         
     def deactivateFor(self, doc):
-        self.obs.deactivateFor(doc)
-        self.obs.deactivateFor(FreeCADGui.getDocument(doc.Name))
-        self.uiobs.deactivateFor(FreeCADGui.getDocument(doc.Name))  
+        if doc.isDerivedFrom("App::Document"):
+            self.obs.deactivateFor(doc)
+            self.obs.deactivateFor(FreeCADGui.getDocument(doc.Name))
+            self.uiobs.deactivateFor(FreeCADGui.getDocument(doc.Name))
+        else:
+            self.uiobs.deactivateFor(doc)
+            self.obs.deactivateFor(doc)
+            self.obs.deactivateFor(doc.Document)
         
 
     def createdObjectsWhileDeactivated(self, doc):
         return self.obs.createdWhileDeactivated(doc)
     
-    @contextmanager
-    def blocked(self, doc):
-        try: 
-            self.deactivateFor(doc)
-            yield
-        finally: 
-            self.activateFor(doc)
     
-    
-class ObserverBase():
+class __ObserverBase():
     
     __fc018_extensions = {"App::GroupExtensionPython": ["ExtensionProxy", "Group"], 
                           "App::GeoFeatureGroupExtensionPython": ["ExtensionProxy", "Group"],
@@ -165,7 +185,7 @@ class ObserverBase():
         return self.__fc018_extensions[extension]
 
 
-class DocumentObserver(ObserverBase):
+class __DocumentObserver(__ObserverBase):
     
     def __init__(self, handler):
         super().__init__(handler)
@@ -383,7 +403,7 @@ class DocumentObserver(ObserverBase):
         #pass
 
 
-class GUIDocumentObserver(ObserverBase):
+class __GUIDocumentObserver(__ObserverBase):
     
     def __init__(self, handler):
         super().__init__(handler)

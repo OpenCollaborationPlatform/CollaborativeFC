@@ -30,13 +30,13 @@ class OnlineDocument():
         Changes to the online doc do not change anything on the local one. The intenion is to mirror all user changes 
         done to the local document'''
 
-    def __init__(self, id, doc, observer, connection, dataservice):
+    def __init__(self, id, doc, connection, dataservice):
         self.id = id
         self.document = doc
         self.connection = connection 
         self.objIds = {}
         self.data = dataservice
-        self.onlineObs = OnlineObserver(observer, self)
+        self.onlineObs = OnlineObserver(self)
         self.objects = {}
         self.viewproviders = {}
         self.logger = logging.getLogger("Document " + id[-5:])
@@ -337,17 +337,23 @@ class OnlineDocument():
 
 
     async def asyncSetup(self):
-        #setup debug message printing
-        def _print(message):
-            self.logger.debug(f"Print statement: {message}")
-            
-        uri = f"ocp.documents.{self.id}.debug.print"
-        self.connection.session.register(_print, uri)
-        
+        pass
+                    
                    
     async def asyncLoad(self):
         #loads the online doc into the freecad doc
-        pass
+        
+        try:
+            #first we need to get into view mode for the document, to have a steady picture of the current state of things and
+            #to not get interupted
+            await self.connection.session.call(f"ocp.documents.{self.id}.view", True)
+            
+            #create all document objects!
+            
+            
+        finally:
+            await self.connection.session.call(f"ocp.documents.{self.id}.view", False)
+        
     
     async def asyncUnload(self):
         pass

@@ -312,7 +312,7 @@ class FreeCADOnlineObject():
             #the props can be created by a single call
             infos = []
             for prop in props:
-                infos.append(Property.createPropertyInfo(self.obj, prop))
+                infos.append(Property.createInformation(self.obj, prop))
                 
             await self.__asyncCreateProperties(False, props, infos)            
 
@@ -369,7 +369,7 @@ class OnlineObject(FreeCADOnlineObject):
         infos = {}
         for prop in self.obj.PropertiesList:
             values[prop] = Property.convertPropertyToWamp(self.obj, prop)
-            infos[prop]  = Property.createPropertyInfo(self.obj, prop)
+            infos[prop]  = Property.createInformation(self.obj, prop)
             
         #check if we need to handle a document syncronisation
         if syncer:
@@ -399,7 +399,7 @@ class OnlineObject(FreeCADOnlineObject):
         
 
     def createDynamicProperty(self, prop):
-        info = Property.createPropertyInfo(self.obj, prop)
+        info = Property.createInformation(self.obj, prop)
         self.runner.run(self._addDynamicPropertyCreation, prop, info)
     
     
@@ -419,7 +419,7 @@ class OnlineObject(FreeCADOnlineObject):
 
  
     def changePropertyStatus(self, prop):
-        info = Property.createPropertyInfo(self.obj, prop)        
+        info = Property.createInformation(self.obj, prop)        
         self.runner.run(self._addPropertyStatusChange, prop, info["status"])
         
     
@@ -469,7 +469,7 @@ class OnlineViewProvider(FreeCADOnlineObject):
         infos = {}
         for prop in self.obj.PropertiesList:
             values[prop] = Property.convertPropertyToWamp(self.obj, prop)
-            infos[prop]  = Property.createPropertyInfo(self.obj, prop)
+            infos[prop]  = Property.createInformation(self.obj, prop)
             
         #check if we need to handle a syncronisation
         if sync:
@@ -489,7 +489,7 @@ class OnlineViewProvider(FreeCADOnlineObject):
         
     
     def createDynamicProperty(self, prop):
-        info = Property.createPropertyInfo(self.obj, prop)        
+        info = Property.createInformation(self.obj, prop)        
         self.runner.run(self._addDynamicPropertyCreation, prop, info)
     
     
@@ -518,5 +518,5 @@ class OnlineViewProvider(FreeCADOnlineObject):
 
 
     def changePropertyStatus(self, prop):
-        info = Property.createPropertyInfo(self.obj, prop)        
+        info = Property.createInformation(self.obj, prop)        
         self.runner.run(self._addPropertyStatusChange, prop, info["status"])

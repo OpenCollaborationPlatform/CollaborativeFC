@@ -24,8 +24,10 @@ __url__ = "http://www.freecadweb.org"
 import os
 from PySide import QtCore
 from Documents.Manager import Manager
+import Documents.Observer as Observer
 from Interface.Widget import UIWidget
 from Connection import OCPConnection
+
 
 #handle the resources required
 #*******************************************************
@@ -37,6 +39,9 @@ QtCore.QResource.registerResource(os.path.join(os.path.dirname(__file__), 'Resou
 manager     = Manager(os.path.dirname(__file__))
 widget      = UIWidget(manager)
 connection  = OCPConnection(manager, widget)
+
+#initialize the global FreeCAD document observer
+Observer.initialize(manager)
 
 if os.getenv('OCP_TEST_RUN', "0") == "1":
     #connect to test server

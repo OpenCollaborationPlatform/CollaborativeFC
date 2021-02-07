@@ -16,7 +16,12 @@
 # *   write to the Free Software Foundation, Inc., 59 Temple Place,      *
 # *   Suite 330, Boston, MA  02111-1307, USA                             *
 # ************************************************************************
+
+# Set of functions to unify interaction with properties
 #
+# 1. Status handling needs some translation between 0.18 and 0.19 versions
+# 2. Properties need to be translated into serializable and storable types
+
 
 import FreeCAD as App
 
@@ -33,7 +38,7 @@ __non_default_property_types__ = [
     "App::PropertyUUID"
 ]
 
-def createPropertyInfo(obj, prop):
+def createInformation(obj, prop):
     info = {}
     info["docu"] = obj.getDocumentationOfProperty(prop)
     info["group"] = obj.getGroupOfProperty(prop)

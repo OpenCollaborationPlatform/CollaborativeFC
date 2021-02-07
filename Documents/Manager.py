@@ -20,7 +20,6 @@
 import FreeCAD, FreeCADGui, asyncio, os
 
 from Documents.Dataservice      import DataService
-from Documents.Observer         import DocumentObserver, GUIDocumentObserver, ObserverManager
 from Documents.OnlineDocument   import OnlineDocument
 
 import uuid
@@ -65,13 +64,7 @@ class Manager():
         self.__uuid = uuid.uuid4()
         self.__dataservice = None
         
-        #add the freecad observer 
-        self.__observer = DocumentObserver(self)
-        self.__guiObserver = GUIDocumentObserver(self)
-        FreeCAD.addDocumentObserver(self.__observer)
-        FreeCADGui.addDocumentObserver(self.__guiObserver)
 
-    
     #component API
     #**********************************************************************
     
@@ -240,9 +233,7 @@ class Manager():
     
         if not self.__connection:
             raise Exception("Currently not connected, cannot collaborate")
-        
-        obs = ObserverManager(self.__guiObserver, self.__observer)
-            
+                   
         if entity.status == Entity.Status.local:
             dmlpath = os.path.join(self.__collab_path, "Dml")
             res = await self.__connection.session.call(u"ocp.documents.create", dmlpath)
@@ -253,7 +244,7 @@ class Manager():
                 self.__entities.remove(self.getEntity("id", res))
             
             entity.id = res
-            entity.onlinedoc = OnlineDocument(res, entity.fcdoc, obs, self.__connection, self.__dataservice)
+            entity.onlinedoc = OnlineDocument(res, entity.fcdoc, self.__connection, self.__dataservice)
             await entity.onlinedoc.asyncSetup()
                 
         elif entity.status == Entity.Status.node:
@@ -261,7 +252,7 @@ class Manager():
             doc = FreeCAD.newDocument(documentname)
             self.__blockLocalEvents = False
             entity.fcdoc = doc
-            entity.onlinedoc = OnlineDocument(entity.id, doc, obs, self.__connection, self.__dataservice)
+            entity.onlinedoc = OnlineDocument(entity.id, doc, self.__connection, self.__dataservice)
             await entity.onlinedoc.asyncLoad() 
                 
         elif entity.status == Entity.Status.invited:
@@ -270,7 +261,7 @@ class Manager():
             doc = FreeCAD.newDocument(documentname)
             self.__blockLocalEvents = False
             entity.fcdoc = doc
-            entity.onlinedoc = OnlineDocument(entity.id, doc, obs, self.__connection, self.__dataservice)
+            entity.onlinedoc = OnlineDocument(entity.id, doc, self.__connection, self.__dataservice)
             await entity.onlinedoc.asyncLoad() 
 
         entity.status = Entity.Status.shared
