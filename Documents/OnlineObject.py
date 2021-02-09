@@ -23,11 +23,13 @@
 
 
 import FreeCAD
-import asyncio, logging, os
-import Documents.Batcher as Batcher
+import asyncio, logging, os, traceback
+import Documents.Batcher  as Batcher
 import Documents.Property as Property
+import Documents.Object   as Object
 from Documents.AsyncRunner import BatchedOrderedRunner, DocumentRunner
 from Documents.Writer import OCPObjectWriter
+from Documents.Reader import OCPObjectReader
 
 
 class FreeCADOnlineObject():
@@ -48,6 +50,7 @@ class FreeCADOnlineObject():
                 self._runner     = parentOnlineObj._runner
 
         self.Writer = OCPObjectWriter(name, objGroup, onlinedoc, self.logger)
+        self.Reader = OCPObjectReader(name, objGroup, onlinedoc, self.logger)
 
 
     async def _docPrints(self):
@@ -69,6 +72,52 @@ class FreeCADOnlineObject():
         
     def synchronize(self, syncer):
         self._runner.sync(syncer)
+        
+    
+    async def load(self, obj):
+        # Loads the OCP node data for this object into the FreeCAD one. If changes exist 
+        # the local version will be overridden
+        # Note: this fuction works async, but cannot handle any changes during execution,
+        #       neither on the node nor in the FC object
+        
+        try:
+            #first check if we are available online to setup. Could happen that e.g. we load before the viewprovider was uploaded
+            if not await self.Reader.isAvailable():
+                return
+            
+            #add the extensions (do that before properties, as extensions adds props too)
+            extensions = await self.Reader.extensions()
+            for extension in extensions:
+                Object.createExtension(obj, extension)
+            
+            oProps = await self.Reader.propertyList()
+            if not oProps:
+                #no properties mean we loaded directly after object creation, before default property setup. Nothing is written yet
+                return
+            props = self.obj.PropertiesList
+            
+            # check if we need to remove some local props
+            remove = set(props) - set(oProps)
+            Object.removeDynamicProperties(obj, remove)
+                    
+            # create the dynamic properties
+            add = set(oProps) - set(props)
+            infos = await self.Reader.propertiesInfos(add)
+            Object.createDynamicProperties(obj, props, infos)
+            
+            # set all property values. Note that data can be None in case the property was never written (default value)
+            values = await self.Reader.properties(oProps)
+            writeProps  = writeValues = []
+            for prop, value in zip(oProps, values):
+                if value:
+                    writeProps.append(prop)
+                    writeValues.append(value)
+
+            Object.setProperties(obj, writeProps, writeValues)
+            
+        except Exception as e:
+            self.logger.error(f"Loading object failed: {e}")
+            traceback.print_stack()
 
 
 class OnlineObject(FreeCADOnlineObject):
@@ -92,6 +141,8 @@ class OnlineObject(FreeCADOnlineObject):
         
         
     def setup(self, syncer=None):
+        # setup the FC object on the OCP node including all properties
+        
         values = {}
         infos = {}
         for prop in self.obj.PropertiesList:

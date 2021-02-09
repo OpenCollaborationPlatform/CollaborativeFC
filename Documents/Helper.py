@@ -14,7 +14,7 @@ def isOCPError(error, errclass=None, source=None, reason=None):
     
     comps = uri.split(".")
     if errclass and comps[2] != errclass:
-            return False
+        return False
         
     if source and comps[3] != source:
         return False

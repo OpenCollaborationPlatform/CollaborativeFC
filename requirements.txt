@@ -1,4 +1,3 @@
-quamash
 msgpack
 autobahn[serialization]
-asyncqt
+qasync

@@ -106,6 +106,21 @@ class Handler():
         await session.call("ocp.test.triggerEvent", os.getenv('OCP_TEST_RPC_ADDRESS', ''), False)
 
 
+    async def waitTillCloseout(self, docId, timeout=30):
+        # wait till all tasks in the document with given ID are finished
+        try:
+            for entity in self.__manager.getEntities():
+                if entity.onlinedoc != None and entity.id == docId:
+                    await entity.onlinedoc.waitTillCloseout(timeout)
+                    return True
+            
+            return False
+                    
+        except Exception as e: 
+            print(f"Trigger syncronize failed, cannot wait for closeout of current actions: {e}")
+            return False
+
+
     async def synchronize(self, docId, numFCs):
         #Syncronize all other involved FC instances. When this returns one can call waitForSync on the TestServer. The numFCs must not 
         #include the FC instance it is called on, only the remaining ones
@@ -118,13 +133,7 @@ class Handler():
         self.__logger.debug(f"Start syncronisation for: {docId[:6]}")
                 
         #we wait till all tasks are finished
-        try:
-            for entity in self.__manager.getEntities():
-                if entity.onlinedoc != None and entity.id == docId:
-                    await entity.onlinedoc.waitTillCloseout(30)   
-                    
-        except Exception as e: 
-            print(f"Trigger syncronize failed, cannot wait for closeout of current actions: {e}")
+        if not await self.waitTillCloseout(docId):
             return
  
         #register the sync with the testserver

@@ -22,129 +22,137 @@
 
 import Documents.Property as Property
 import Documents.Observer as Observer
-
 import FreeCAD, FreeCADGui
+from contextlib import contextmanager
+
+#Simplify object cleanup by making it a context
+@contextmanager
+def __fcobject_cleanup(obj):
+    try: 
+        yield
+    finally: 
+        if hasattr(obj, "purgeTouched"):
+            obj.purgeTouched()
+
+# Simplify object handling by combining observer blockingand object cleanup
+@contextmanager
+def __fcobject_processing(obj):
+    with Observer.blocked(obj.Document) as a, __fcobject_cleanup(obj) as b:
+        yield (a, b)
+
+
 
 def createDynamicProperty(obj, prop, typeID, group, documentation, status):
         
-    try: 
-        if hasattr(obj, prop):
-            return
-            
-        with Observer.blocked(obj.Document):
-            
-            attributes = Property.statusToType(status)            
-            obj.addProperty(typeID, prop, group, documentation, attributes)
+    if hasattr(obj, prop):
+        return
+        
+    with __fcobject_processing(obj):
+        
+        attributes = Property.statusToType(status)            
+        obj.addProperty(typeID, prop, group, documentation, attributes)
+        
+        if float(".".join(FreeCAD.Version()[0:2])) >= 0.19:
+            obj.setPropertyStatus(prop, status)
+        else:
+            mode = Property.statusToEditorMode(status)
+            if mode:
+                obj.setEditorMode(prop, mode)
+
+
+def createDynamicProperties(obj, props, infos):
+    
+    with __fcobject_processing(obj):
+        for prop, info in zip(props, infos):
+            if hasattr(obj, prop):
+                continue
+                            
+            attributes = Property.statusToType(info["status"])            
+            obj.addProperty(info["id"], prop, info["group"], info["docu"], attributes)
             
             if float(".".join(FreeCAD.Version()[0:2])) >= 0.19:
-                obj.setPropertyStatus(prop, status)
+                obj.setPropertyStatus(prop, info["status"])
             else:
-                mode = Property.statusToEditorMode(status)
+                mode = Property.statusToEditorMode(info["status"])
                 if mode:
                     obj.setEditorMode(prop, mode)
-        
-    finally:
-        if hasattr(obj, "purgeTouched"):
-            obj.purgeTouched()
-
+   
 
 def removeDynamicProperty(obj, prop):
     
-    try: 
-        if not hasattr(obj, prop):
-            return
-                
-        with Observer.blocked(obj.Document):
+    if not hasattr(obj, prop):
+        return
+            
+    with __fcobject_processing(obj):
+        obj.removeProperty(prop)
+
+            
+def removeDynamicProperties(obj, props):
+    
+    with __fcobject_processing(obj):
+        for prop in props:
+            if not hasattr(obj, prop):
+                continue
+    
             obj.removeProperty(prop)
-        
-        
-    finally:
-        if hasattr(obj, "purgeTouched"):
-            obj.purgeTouched()
         
 
 def createExtension(obj, ext):
     
-    try:
-        if obj.hasExtension(ext):
-            return
+    if obj.hasExtension(ext):
+        return
 
-        with Observer.blocked(obj.Document):
+    with __fcobject_processing(obj):
 
-            if  float(".".join(FreeCAD.Version()[0:2])) >= 0.19:
-                obj.addExtension(ext)
-            else:
-                obj.addExtension(ext, None)
-
-    finally:
-        if hasattr(obj, "purgeTouched"):
-            obj.purgeTouched()
+        if  float(".".join(FreeCAD.Version()[0:2])) >= 0.19:
+            obj.addExtension(ext)
+        else:
+            obj.addExtension(ext, None)
 
 
 def removeExtension(obj, ext):
             
-    try:
-        if not obj.hasExtension(ext):
-            return
-    
-        with Observer.blocked(obj.Document):
-            obj.removeExtension(ext, None)
-        
-    finally:
-        if hasattr(obj, "purgeTouched"):
-            obj.purgeTouched()
+    if not obj.hasExtension(ext):
+        return
 
+    with __fcobject_processing(obj):
+        obj.removeExtension(ext, None)
 
 
 def setProperty(obj, prop, value):
         
-    try:      
-        with Observer.blocked(obj.Document):
-            Property.convertWampToProperty(obj, prop, value)
-
-    finally:           
-        if hasattr(obj, "purgeTouched"):
-            obj.purgeTouched()
+    with __fcobject_processing(obj):
+        Property.convertWampToProperty(obj, prop, value)
 
     
 def setProperties(obj, props, values):
         
-    try:      
-       with Observer.blocked(obj.Document):
-           for index, prop in enumerate(props):
-               Property.convertWampToProperty(obj, prop, values[index])
-
-    finally:           
-        if hasattr(obj, "purgeTouched"):
-            obj.purgeTouched()
+    with __fcobject_processing(obj):
+        for index, prop in enumerate(props):
+            Property.convertWampToProperty(obj, prop, values[index])
            
 
 def setPropertyStatus(obj, prop, status):
 
-    try:
-        with Observer.blocked(obj.Document):
-        
-            if  float(".".join(FreeCAD.Version()[0:2])) >= 0.19:
-                #to set the status multiple things need to happen:
-                # 1. remove all string status entries we do not support
-                supported = obj.getPropertyStatus()
-                filterd = [s for s in status if not isinstance(s, str) or s in supported]
-
-                # 2. check which are to be added, and add those
-                current = obj.getPropertyStatus(prop)
-                add = [s for s in filterd if not s in current]
-                obj.setPropertyStatus(prop, add)
-                
-                # 3. check which are to be removed, and remove those
-                remove = [s for s in current if not s in filterd]
-                signed = [-s for s in remove if isinstance(s, int) ]
-                signed += ["-"+s for s in remove if isinstance(s, str) ]
-                obj.setPropertyStatus(prop, signed)                
-            
-            else:
-                obj.setEditorMode(prop, Property.statusToEditorMode(status))
+    with __fcobject_processing(obj):
     
-    finally:            
-        if hasattr(obj, "purgeTouched"):
-            obj.purgeTouched()
+        if  float(".".join(FreeCAD.Version()[0:2])) >= 0.19:
+            #to set the status multiple things need to happen:
+            # 1. remove all string status entries we do not support
+            supported = obj.getPropertyStatus()
+            filterd = [s for s in status if not isinstance(s, str) or s in supported]
+
+            # 2. check which are to be added, and add those
+            current = obj.getPropertyStatus(prop)
+            add = [s for s in filterd if not s in current]
+            obj.setPropertyStatus(prop, add)
+            
+            # 3. check which are to be removed, and remove those
+            remove = [s for s in current if not s in filterd]
+            signed = [-s for s in remove if isinstance(s, int) ]
+            signed += ["-"+s for s in remove if isinstance(s, str) ]
+            obj.setPropertyStatus(prop, signed)                
+        
+        else:
+            obj.setEditorMode(prop, Property.statusToEditorMode(status))
 

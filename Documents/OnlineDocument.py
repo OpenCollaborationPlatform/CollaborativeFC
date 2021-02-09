@@ -17,12 +17,13 @@
 # *   Suite 330, Boston, MA  02111-1307, USA                             *
 # ************************************************************************
 
-import asyncio, logging, os
-import Documents.Property as Property
-import Documents.Syncer as Syncer
-from Documents.OnlineObserver import OnlineObserver
-from Documents.OnlineObject import OnlineObject, OnlineViewProvider
-from autobahn.wamp.exception import ApplicationError
+import asyncio, logging, os, traceback
+import Documents.Property   as Property
+import Documents.Syncer     as Syncer
+import Documents.Observer   as Observer
+from Documents.OnlineObserver   import OnlineObserver
+from Documents.OnlineObject     import OnlineObject, OnlineViewProvider
+from autobahn.wamp.exception    import ApplicationError
 
 class OnlineDocument():
     ''' Describing a FreeCAD document in the OCP framework. Properties can be changed or objects added/removed 
@@ -338,7 +339,13 @@ class OnlineDocument():
 
     async def asyncSetup(self):
         pass
-                    
+     
+    async def _docPrints(self):
+        uri = f"ocp.documents.{self.id}.prints"
+        vals = await self.connection.session.call(uri)
+        for val in vals:
+            self.logger.debug(val)
+            
                    
     async def asyncLoad(self):
         #loads the online doc into the freecad doc
@@ -349,7 +356,42 @@ class OnlineDocument():
             await self.connection.session.call(f"ocp.documents.{self.id}.view", True)
             
             #create all document objects!
-            
+            uri = f"ocp.documents.{self.id}.content.Document.Objects.GetObjectTypes"
+            objs = await self.connection.session.call(uri)
+            if not objs:
+                self.logger.error(f"Cannot inquery object types: {objs}")
+                return
+
+            tasks = []              
+            with Observer.blocked(self.document):
+                for name, objtype in objs.items():
+                    
+                    if hasattr(self.document, name):
+                        self.document.removeObject(name)
+                    
+                    # create the FC object
+                    fcobj = self.document.addObject(objtype, name)
+                    if fcobj.Name != name:
+                        raise Exception("Cannot setup object, name wrong")
+
+                    # create and load the online object
+                    oobj = OnlineObject(fcobj, self)
+                    self.objects[name] = oobj
+                    tasks.append(oobj.load(fcobj))
+                    
+                    # create and load the online viewprovider
+                    if fcobj.ViewObject:
+                        ovp = OnlineViewProvider(fcobj.ViewObject, self.objects[name], self)
+                        self.viewproviders[name] = ovp
+                        tasks.append(ovp.load(fcobj.ViewObject))
+                
+            # we do this outside of the observer blocking context, as the object loads block themself
+            if tasks:
+                await asyncio.gather(*tasks)
+        
+        except Exception as e:
+            self.logger.error(f"Unable to load object: {e}")
+            traceback.print_stack()
             
         finally:
             await self.connection.session.call(f"ocp.documents.{self.id}.view", False)
