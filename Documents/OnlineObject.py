@@ -74,7 +74,7 @@ class FreeCADOnlineObject():
         self._runner.sync(syncer)
         
     
-    async def load(self, obj):
+    async def download(self, obj):
         # Loads the OCP node data for this object into the FreeCAD one. If changes exist 
         # the local version will be overridden
         # Note: this fuction works async, but cannot handle any changes during execution,
@@ -98,7 +98,9 @@ class FreeCADOnlineObject():
             
             # check if we need to remove some local props
             remove = set(props) - set(oProps)
-            Object.removeDynamicProperties(obj, remove)
+            if remove:
+                self.logger.debug(f"Local object has too many properties, remove {remove}")
+                Object.removeDynamicProperties(obj, remove)
                     
             # create the dynamic properties
             add = set(oProps) - set(props)
@@ -107,18 +109,61 @@ class FreeCADOnlineObject():
             
             # set all property values. Note that data can be None in case the property was never written (default value)
             values = await self.Reader.properties(oProps)
-            writeProps  = writeValues = []
+            writeProps  = []
+            writeValues = []
             for prop, value in zip(oProps, values):
                 if value:
                     writeProps.append(prop)
                     writeValues.append(value)
 
+            self.logger.debug(f"Read properties {writeProps}")
             Object.setProperties(obj, writeProps, writeValues)
             
         except Exception as e:
-            self.logger.error(f"Loading object failed: {e}")
-            traceback.print_stack()
+            self.logger.error(f"Downloading object failed: {e}")
+            traceback.print_exc()
+        
+        
+    async def upload(self, obj):
+        # Creates and uploads the object data into the ocp node
+        # Note: this fuction works async, but cannot handle any changes during execution,
+        #       neither on the node nor in the FC object
+        
+        try:
+            #first check if we are available online.
+            if await self.Writer.isAvailable():
+                raise Exception("Object already setup, cannot upload")
+            
+            #setup object and all properties
+            infos = []
+            for prop in obj.PropertiesList:
+                infos.append(Property.createInformation(obj, prop))
+            
+            await self.Writer.setup(obj.TypeId, obj.PropertiesList, infos)
+            
+            #we process the other tasks in parallel
+            tasks = []
+            
+            #upload all extenions
+            ext = Object.getExtensions(obj)
+            for e in ext:
+                tasks.append(self.Writer.addExtension(e))
+            
+            #write all properties.
+            props = obj.PropertiesList
+            for prop in props:
+                value = Property.convertPropertyToWamp(obj, prop)
+                self.Writer.changeProperty(prop, value, obj.OutList)
+            
+            tasks.append(self.Writer.processPropertyChanges())
 
+            if tasks:
+                await asyncio.gather(*tasks)
+      
+        except Exception as e:
+            self.logger.error(f"Uploading object failed: {e}")
+            traceback.print_exc()
+            
 
 class OnlineObject(FreeCADOnlineObject):
     
@@ -143,17 +188,15 @@ class OnlineObject(FreeCADOnlineObject):
     def setup(self, syncer=None):
         # setup the FC object on the OCP node including all properties
         
-        values = {}
-        infos = {}
+        infos = []
         for prop in self.obj.PropertiesList:
-            values[prop] = Property.convertPropertyToWamp(self.obj, prop)
-            infos[prop]  = Property.createInformation(self.obj, prop)
+            infos.append(Property.createInformation(self.obj, prop))
             
         #check if we need to handle a document syncronisation
         if syncer:
             self._runner.sync(syncer)
             
-        self._runner.run(self.Writer.setup, self.obj.TypeId, values, infos)
+        self._runner.run(self.Writer.setup, self.obj.TypeId, self.obj.PropertiesList, infos)
         
         #check if there are properties that need the defult values uploaded
         props = Property.getNonDefaultValueProperties(self.obj)
@@ -248,18 +291,16 @@ class OnlineViewProvider(FreeCADOnlineObject):
                 self.proxydata = self.obj.Proxy
         
         #collect all property values and infos
-        values = {}
-        infos = {}
+        infos = []
         for prop in self.obj.PropertiesList:
-            values[prop] = Property.convertPropertyToWamp(self.obj, prop)
-            infos[prop]  = Property.createInformation(self.obj, prop)
+            infos.append(Property.createInformation(self.obj, prop))
             
         #check if we need to handle a syncronisation
         if sync:
             self._runner.sync(sync)
          
         #setup ourself
-        self._runner.run(self.Writer.setup, self.obj.TypeId, values, infos)
+        self._runner.run(self.Writer.setup, self.obj.TypeId, self.obj.PropertiesList, infos)
         
         #check if there are properties that need the defult values uploaded
         props = Property.getNonDefaultValueProperties(self.obj)

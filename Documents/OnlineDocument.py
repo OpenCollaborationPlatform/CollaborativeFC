@@ -337,18 +337,46 @@ class OnlineDocument():
             self.sync = None
 
 
-    async def asyncSetup(self):
-        pass
-     
     async def _docPrints(self):
         uri = f"ocp.documents.{self.id}.prints"
         vals = await self.connection.session.call(uri)
         for val in vals:
             self.logger.debug(val)
+
+
+    async def asyncSetup(self):
+        # Loads the existing FreeCAD doc into the ocp node
+        try:                
+            for fcobj in self.document.Objects:
+                
+                if self.shouldExcludeTypeId(fcobj.TypeId):
+                    continue
+                
+                tasks = []
+                
+                #create and setup the online object
+                oobj = OnlineObject(fcobj, self)
+                self.objects[fcobj.Name] = oobj
+                tasks.append(oobj.upload(fcobj))
+                    
+                if fcobj.ViewObject:
+                    ovp = OnlineViewProvider(fcobj.ViewObject, self.objects[fcobj.Name], self)
+                    self.viewproviders[fcobj.Name] = ovp
+                    tasks.append(ovp.upload(fcobj.ViewObject))
+
+                # TODO: setup document properties
+                
+                if tasks:
+                    await asyncio.gather(*tasks)
+            
+        except Exception as e:
+            self.logger.error(f"Unable to setup document: {e}")
+            traceback.print_exc()
+
             
                    
     async def asyncLoad(self):
-        #loads the online doc into the freecad doc
+        # loads the online doc into the freecad doc
         
         try:
             #first we need to get into view mode for the document, to have a steady picture of the current state of things and
@@ -358,10 +386,7 @@ class OnlineDocument():
             #create all document objects!
             uri = f"ocp.documents.{self.id}.content.Document.Objects.GetObjectTypes"
             objs = await self.connection.session.call(uri)
-            if not objs:
-                self.logger.error(f"Cannot inquery object types: {objs}")
-                return
-
+   
             tasks = []              
             with Observer.blocked(self.document):
                 for name, objtype in objs.items():
@@ -377,21 +402,23 @@ class OnlineDocument():
                     # create and load the online object
                     oobj = OnlineObject(fcobj, self)
                     self.objects[name] = oobj
-                    tasks.append(oobj.load(fcobj))
+                    tasks.append(oobj.download(fcobj))
                     
                     # create and load the online viewprovider
                     if fcobj.ViewObject:
                         ovp = OnlineViewProvider(fcobj.ViewObject, self.objects[name], self)
                         self.viewproviders[name] = ovp
-                        tasks.append(ovp.load(fcobj.ViewObject))
-                
+                        tasks.append(ovp.download(fcobj.ViewObject))
+              
+            #TODO: load document properties
+              
             # we do this outside of the observer blocking context, as the object loads block themself
             if tasks:
                 await asyncio.gather(*tasks)
         
         except Exception as e:
-            self.logger.error(f"Unable to load object: {e}")
-            traceback.print_stack()
+            self.logger.error(f"Unable to load document: {e}")
+            traceback.print_exc()
             
         finally:
             await self.connection.session.call(f"ocp.documents.{self.id}.view", False)

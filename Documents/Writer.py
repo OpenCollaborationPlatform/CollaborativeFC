@@ -60,8 +60,16 @@ class OCPObjectWriter():
         self.propChangeOutlist  = []
         self.setupStage         = True
 
+    
+    async def isAvailable(self):
+        try:
+            uri = f"ocp.documents.{self.docId}.content.Document.{self.objGroup}.Has"
+            return await self.connection.session.call(uri, self.name)
+        except Exception as e:
+            self.logger.error(f"Queriying availablitiy failed: {e}")
+            
 
-    async def setup(self, typeid, values, infos):
+    async def setup(self, typeid, properties, infos):
         #creates the object in the ocp node
     
         self.logger.debug(f"New object {self.name} ({typeid})")
@@ -71,7 +79,7 @@ class OCPObjectWriter():
             await self.connection.session.call(uri + u".content.Document.{0}.NewObject".format(self.objGroup), self.name, typeid)
             
             #create all properties that need setup           
-            await self.__createProperties(False, list(values.keys()), list(infos.values()))
+            await self.__createProperties(False, properties, infos)
             
             self.setupStage = False
         
@@ -260,9 +268,11 @@ class OCPObjectWriter():
             #now batchwrite all properties in correct order
             if len(props) == 1:
                 prop = list(props.keys())[0]
+                self.logger.debug(f"Write property {prop}")
                 uri = f"ocp.documents.{self.docId}.content.Document.{self.objGroup}.{self.name}.Properties.{prop}.SetValue"
                 await self.connection.session.call(uri, list(props.values())[0])
             else:
+                self.logger.debug(f"Write properties {list(props.keys())}")
                 uri = u"ocp.documents.{0}.content.Document.{1}.{2}.Properties.SetValues".format(self.docId, self.objGroup, self.name)
                 failed = await self.connection.session.call(uri, list(props.keys()), list(props.values()))
                 if failed:
@@ -277,10 +287,10 @@ class OCPObjectWriter():
                     await self.connection.session.call(uri, self.name, out)
                 
         except Exception as e:
-            self.logger.error(f"Batch writing properties for {self.name} failed: {e}")
+            self.logger.error(f"Batch writing properties {list(props.keys())} failed: {e}")
         
         
-    async def addExtension(self, extension, props, infos):
+    async def addExtension(self, extension, props=None, infos=None):
         #adds the extension including the new properties
         
         try:           
@@ -290,7 +300,8 @@ class OCPObjectWriter():
             self.logger.debug("Add extension {0}".format(extension))
             calluri = uri + u".content.Document.{0}.{1}.Extensions.Append".format(self.objGroup, self.name)
             await self.connection.session.call(calluri, extension)
-            await self.__createProperties(False, props, infos)
+            if props and infos:
+                await self.__createProperties(False, props, infos)
                 
         except Exception as e:
             self.logger.error("Adding extension failed: {0}".format(e))

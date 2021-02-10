@@ -25,6 +25,12 @@ import Documents.Observer as Observer
 import FreeCAD, FreeCADGui
 from contextlib import contextmanager
 
+__FC018_Extensions = ["App::GroupExtensionPython", "App::GeoFeatureGroupExtensionPython", 
+                      "App::OriginGroupExtensionPython", "Gui::ViewProviderGeoFeatureGroupExtensionPython",
+                      "Gui::ViewProviderGroupExtensionPython", "Gui::ViewProviderOriginGroupExtensionPython", 
+                      "Part::AttachExtensionPython", "PartGui::ViewProviderAttachExtensionPython"]
+
+
 #Simplify object cleanup by making it a context
 @contextmanager
 def __fcobject_cleanup(obj):
@@ -128,8 +134,8 @@ def setProperty(obj, prop, value):
 def setProperties(obj, props, values):
         
     with __fcobject_processing(obj):
-        for index, prop in enumerate(props):
-            Property.convertWampToProperty(obj, prop, values[index])
+        for prop, value in zip(props, values):
+            Property.convertWampToProperty(obj, prop, value)
            
 
 def setPropertyStatus(obj, prop, status):
@@ -156,3 +162,15 @@ def setPropertyStatus(obj, prop, status):
         else:
             obj.setEditorMode(prop, Property.statusToEditorMode(status))
 
+
+def getExtensions(obj):
+    
+    if  float(".".join(FreeCAD.Version()[0:2])) >= 0.19:
+       
+        allExt    = [e.Name for e in FreeCAD.Base.TypeId.getAllDerivedFrom("App::Extension")]
+        pythonExt = [e for e in allExt if "Python" in e]
+    
+    else:
+        pythonExt = __FC018_Extensions 
+       
+    return [e for e in pythonExt if obj.hasExtension(e, False)]
