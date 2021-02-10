@@ -21,7 +21,17 @@ __title__ = "FreeCAD Collaboration API"
 __author__ = "Stefan Troeger"
 __url__ = "http://www.freecadweb.org"
 
-import os
+import os, sys 
+
+# make sure the vendor folder is used for dependencies
+# *******************************************************
+parent_dir = os.path.abspath(os.path.dirname(__file__))
+vendor_dir = os.path.join(parent_dir, 'Vendor')
+sys.path.append(vendor_dir)
+
+
+# setup all the collaboration infrastructure
+# ******************************************
 from PySide import QtCore
 from Documents.Manager import Manager
 import Documents.Observer as Observer

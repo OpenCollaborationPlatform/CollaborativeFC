@@ -19,7 +19,7 @@
 
 #handle basic logging first
 #*******************************************************
-import logging, txaio, sys
+import logging, txaio, sys, os
 #txaio.use_asyncio()
 #txaio.start_logging(level='error') 
 logging.basicConfig(level=logging.DEBUG, stream=sys.stdout, format="[%(levelname)8s] %(name)25s:   %(message)s")
@@ -29,9 +29,7 @@ logging.getLogger('qasync').setLevel(logging.ERROR)
 #import the collaboration infrastructure
 #*******************************************************
 import FreeCAD, Collaboration, Commands, Test
-
-#need to import Part::Gui to register the coin nodes, e.g. EdgeBrepSet
-import PartGui
+import PartGui #needed for coin nodes
 
 
 #setup the UI
