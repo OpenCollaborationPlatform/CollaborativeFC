@@ -1,0 +1,55 @@
+import "property.dml" as PropertyContainer
+
+Data {
+        
+    .name: "Object"
+    
+    property string typeid
+    property string fcName
+    
+    event onSetupFinished    //no args. Emited from FreeCAD
+    event onObjectRecomputed //no args
+    event onExtensionCreated //extension
+    event onExtensionRemoved //extension
+    
+    PropertyContainer {
+        .name: "Properties"
+    }
+    
+    Vector {
+        .name: "Extensions"
+        .type: string        
+        
+        .onNewEntry: function(idx) {                
+            var ext = this.Get(idx)
+            this.parent.onExtensionCreated.Emit(ext)
+        }
+        
+        .onDeleteEntry: function(idx) {                
+            var ext = this.Get(idx)
+            this.parent.onExtensionRemoved.Emit(ext)
+        }
+        
+        const function Has(name) {
+        
+            var length = this.Length()
+            for (var i=0; i < length; i++) {
+                if (this.Get(i) == name) {
+                    return true
+                }
+            }
+            return false
+        }
+        
+        function RemoveByName(name) {
+        
+            for (var i=0; i < this.Length(); i++) {
+                if (this.Get(i) == name) {
+                    this.Remove(i)
+                    return
+                }
+            }
+            throw "Cannot remove extension: not available"
+        }
+    }
+}
