@@ -17,51 +17,190 @@
 # *   Suite 330, Boston, MA  02111-1307, USA                             *
 # ************************************************************************
 
-import os, sys, logging, asyncio
+import os, sys, logging, asyncio, collections, json
+import aiofiles
+from qasync import asyncSlot
+from PySide import QtCore
 
-def getNodePath():
-    pass
+class LogReader(QtCore.QAbstractListModel):
+    # Reads log updates from rotating log file and makes it accessible as Qt List Model
     
+    RoleMessage = 0
+    RoleLevel = 1
+    RoleTime = 2
+    RoleModule = 3
+    RoleData = 4    
+    
+    def __init__(self, logpath):
+        super().__init__()
+        
+        self.__path    = logpath
+        self.__fileNo  = os.stat(logpath).st_ino
+        self.__lines   = collections.deque(maxlen=100)
+        
+        self.__task = asyncio.create_task(self.follow())
+    
+    async def close(self):
+        self.__task.cancel()
+        
+        if self.__file:
+            await self.__file.close()
+
+    async def follow(self):
+        
+        self.__file = await aiofiles.open(self.__path, "r")
+        
+        while True:
+            while True:
+                try:
+                    line = await self.__file.readline()
+                    if not line:
+                        break
+                    
+                    try:
+                        self.__lines.append(json.loads(line))
+                    except:
+                        # not json,  parse the printed line
+                        pass
+                    
+                    self.layoutChanged.emit()
+                
+                except Exception as e:
+                    print(e)
+                
+            try:
+                #in case new file opened by rotating log provider
+                if os.stat(self.__path).st_ino != self.__fileNo:
+                    new = aiofiles.open(self.__path, "r")
+                    await self.__file.close()
+                    self.__file =new
+                    self.__fileNo = os.stat(self.__path).st_ino
+                    continue
+                
+            except IOError:
+                await asyncio.sleep(1)
+                pass
+
+
+    #implementation of ListModel
+    #***************************
+    
+    def roleNames(self):
+        #return the QML accessible entries
+        
+        return {LogReader.RoleLevel: QtCore.QByteArray(bytes("level", 'utf-8')),
+                LogReader.RoleMessage: QtCore.QByteArray(bytes("message", 'utf-8')),
+                LogReader.RoleTime: QtCore.QByteArray(bytes("time", 'utf-8')),
+                LogReader.RoleModule: QtCore.QByteArray(bytes("module", 'utf-8')),
+                LogReader.RoleData: QtCore.QByteArray(bytes("data", 'utf-8'))}
+    
+    def data(self, index, role):
+        #return the data for the given index and role
+        
+        #index = PySide2.QtCore.QModelIndex
+        if role == LogReader.RoleMessage:
+            return self.__lines[index.row()]["@message"]
+        
+        if role == LogReader.RoleLevel:
+            return self.__lines[index.row()]["@level"]
+        
+        if role == LogReader.RoleTime:
+            time = self.__lines[index.row()]["@timestamp"]
+            return QtCore.QDateTime.fromString(time, QtCore.Qt.ISODateWithMs)
+        
+        if role == LogReader.RoleModule:
+            entry  =  self.__lines[index.row()]
+            if "@module" in entry:
+                return entry["@module"]
+            return ""
+        
+        if role == LogReader.RoleData:
+            #return all entries without an @
+            entry  =  self.__lines[index.row()]
+            keys = [e for e in entry.keys() if not "@" in e]
+            result = {}
+            for key in keys:
+                result[key] = entry[key]
+            return result
+            
+
+    def rowCount(self, index):
+        return len(self.__lines)
+
+    
+
 #Helper class to call the running node via CLI
-class OCPNode():
+class OCPNode(QtCore.QObject):
     
     def __init__(self):
+        
+        QtCore.QObject.__init__(self)
         
         parent_dir = os.path.abspath(os.path.dirname(__file__))
     
         # get the path to use for the OCP node
         if sys.platform == "linux" or sys.platform == "linux2":
-            self.ocp = os.path.join(parent_dir, "OCPNodeLinux")
+            self.__ocp = os.path.join(parent_dir, "OCPNodeLinux")
         elif sys.platform == "darwin":
-            self.ocp = os.path.join(parent_dir, "OCPNodeMac")
+            self.__ocp = os.path.join(parent_dir, "OCPNodeMac")
         elif sys.platform == "win32":
-            self.ocp = os.path.join(parent_dir, "OCPNodeWindows.exe")
+            self.__ocp = os.path.join(parent_dir, "OCPNodeWindows.exe")
+            
+        self.__ocp = "/home/stefan/Projects/Go/CollaborationNode/CollaborationNode"
                
         #for testing we need to connect to a dedicated node       
-        self.test = False
+        self.__test = False
         if os.getenv('OCP_TEST_RUN', "0") == "1":
             #we are in testing mode! check out the required node to connect to
             print("OCP test mode detected")
-            self.test = True
-            self.conf = os.getenv("OCP_TEST_NODE_CONFIG", "none")
+            self.__test = True
+            self.__conf = os.getenv("OCP_TEST_NODE_CONFIG", "none")
             
-            if self.conf == "none":
+            if self.__conf == "none":
                 raise Exception("Testmode is set, but no config file name provided")
+        
+        # important internal properties
+        self.__logger    = logging.getLogger("OCPNode")
+        self.__poll      = asyncio.ensure_future(self.__updateLoop())
+        self.__logReader = None
+        
+        # Qt property storage
+        self.__running   = False
+        self.__p2pPort   = 0
+        self.__p2pUri    = "unknown"
+        self.__apiPort   = 0
+        self.__apiUri    = "unknown"
 
-        self.logger = logging.getLogger("OCPNode")
 
+    async def run(self):
+        # handles the full setup process till a OCP node is running       
+        await self.__init()
+        await self.__start()
+        
+   
+    async def shutdown(self):
+        
+        if self.__test:
+            #in test mode we do not start our own node!
+            print("Test mode: no own node, cannot shut down!")
+            return
+        
+        process = await asyncio.create_subprocess_shell(self.__ocp + " stop")        
+        await asyncio.wait_for(process.wait(), timeout = 10)
+        await self.__checkRunning()
 
-    async def init(self):
+    
+    async def __init(self):
         # initializes the OCP node. This ensures that all setup is done, however, does not start the node itself.
         # This init is required before start can be called
 
-        if self.test:
+        if self.__test:
             #no initialisation needed in test run!
             ("Test mode: no initialization required")
             return
         
         #check if init is required
-        process = await asyncio.create_subprocess_shell(self.ocp, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+        process = await asyncio.create_subprocess_shell(self.__ocp, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
         out, err = await process.communicate()
         
         if not out:
@@ -69,7 +208,7 @@ class OCPNode():
         
         if "OCP directory not configured" in out.decode():
         
-            process = await asyncio.create_subprocess_shell(self.ocp + ' init', stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+            process = await asyncio.create_subprocess_shell(self.__ocp + ' init', stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
             out, err = await process.communicate()
         
             if not out:
@@ -82,91 +221,77 @@ class OCPNode():
                 raise Exception("Unable to initialize OCP node:", out.decode())
 
 
-    async def port(self):
+    async def __fetchConfig(self, conf, online):
         # returns the port the OCP node is listening on for WAMP connection
         
-        args = self.ocp + ' config -o connection.port'
-        if self.test:
-            args += " --config " + self.conf
+        args = self.__ocp + ' config '
+        if online: 
+            args += '-o '
+        args += conf
+        
+        if self.__test:
+            args += " --config " + self.__conf
          
         process = await asyncio.create_subprocess_shell(args, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
         out, err = await process.communicate()
         
         if not out:
-            raise Exception("Unable to call OCP network")
+            raise Exception("Unable to receive config from OCP node")
         
         if err and err.decode() != "":
-            raise Exception("Unable to get Port from OCP node:", err.decode())
+            raise Exception("Error while fetching config from OCP node:", err.decode())
         
         if "No node is currently running" in out.decode():
-            raise Exception("No node running: cannot read port")
+            raise Exception("No node running: cannot read online config")
 
         return out.decode().rstrip()
-    
-      
-    async def uri(self):
-        # returns the adress the ocp is listening on for WAMP connection
         
-        args = self.ocp + ' config -o connection.uri'
-        if self.test:
-            args += " --config " + self.conf
-            
-        process = await asyncio.create_subprocess_shell(args, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
-        out, err = await process.communicate()
         
-        if not out:
-            raise Exception("Unable to call OCP network")
-        
-        if err and err.decode() != "":
-            raise Exception("Unable to get URI from OCP node:", err.decode())
-        
-        if "No node is currently running" in out.decode():
-            raise Exception("No node running: cannot read port")
-                            
-        return out.decode().rstrip()
-    
-       
-    async def start(self):
+    async def __start(self):
         # checks if a OCP node is running, and starts up one if not
-        
-        if self.test:
+               
+        if self.__test:
             #in test mode we do not start our own node!
             print("Test mode: no own node startup!")
             return
         
-        if not await self.running():
+        if not await self.__checkRunning():
             
             #start it
-            process = await asyncio.create_subprocess_shell(self.ocp + " start -d", 
-                                                            stdout=asyncio.subprocess.PIPE, 
-                                                            stderr=asyncio.subprocess.PIPE)
+            await asyncio.create_subprocess_shell(self.__ocp + " start -d -e -j", 
+                                                  stdout=asyncio.subprocess.PIPE, 
+                                                  stderr=asyncio.subprocess.PIPE)
             
             #and wait till setup fully
             try:
                 async def indicator():
                     while True:
                         await asyncio.sleep(0.5)
-                        if await self.running():
+                        if await self.__checkRunning():
+                            await self.__update()
                             return                         
             
-                await asyncio.wait_for(indicator(), timeout = 10)
+                await asyncio.wait_for(indicator(), timeout = 10)             
                 
             except asyncio.TimeoutError as e:
                 raise Exception("OCP node startup timed out") from None
             
+        # get the latest information 
+        await self.__update()
+        
+        #setup logging
+        if not self.__logReader and (await self.__fetchConfig("log.file.enable", True) == "true"):
+            dir = await self.__fetchConfig("directory", True)
+            log = os.path.join(dir, "Logs",  "ocp.log")
+            self.__logReader = LogReader(log)
+            self.logModelChanged.emit()
             
-
-    async def run(self):
-        # handles the full setup process till a OCP node is running
-        
-        await self.init()
-        await self.start()
-        
-        
-    async def running(self):
+              
+    
+    async def __checkRunning(self):
         # returns if a OCP node is running
         
-        process = await asyncio.create_subprocess_shell(self.ocp, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+        process = await asyncio.create_subprocess_shell(self.__ocp, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
         out, err = await process.communicate()
         
         if not out:
@@ -175,19 +300,117 @@ class OCPNode():
         if err and err.decode() != "":
             raise Exception("Unable to call OCP network node: ", err.decode())
         
-        return not "No node is currently running" in out.decode()
+        result = not "No node is currently running" in out.decode()
+        if result != self.__running:
+            self.__running = result
+            self.runningChanged.emit()
+    
+        return result
     
     
-    async def shutdown(self):
+    async def __update(self):
+        await self.__checkRunning()
+        print("Update, running: ", self.running)
         
-        if self.test:
-            #in test mode we do not start our own node!
-            print("Test mode: no own node, cannot shut down!")
-            return
+        p2pPort = await self.__fetchConfig("p2p.port", self.running)
+        if self.__p2pPort != p2pPort:
+            self.__p2pPort = p2pPort
+            self.p2pPortChanged.emit()
+            
+        p2pUri  = await self.__fetchConfig("p2p.uri", self.running)
+        if self.__p2pUri != p2pUri:
+            self.__p2pUri = p2pUri
+            self.p2pUriChanged.emit()
+            
+        apiPort = await self.__fetchConfig("connection.port", self.running)
+        if self.__apiPort != apiPort:
+            self.__apiPort = apiPort
+            self.apiPortChanged.emit()
+            
+        apiUri  = await self.__fetchConfig("connection.uri", self.running)
+        if self.__apiUri != apiUri:
+            self.__apiUri = apiUri
+            self.apiUriChanged.emit()
         
-        process = await asyncio.create_subprocess_shell(self.ocp + " stop", 
-                                                            stdout=asyncio.subprocess.PIPE, 
-                                                            stderr=asyncio.subprocess.PIPE)
-        
-        await asyncio.wait_for(process.wait(), timeout = 10)
     
+    async def __updateLoop(self):
+        while True:
+            try:
+                asyncio.sleep(5)
+                self.__update()
+            except:
+                pass
+    
+
+    # Qt Property/Signal API used from the UI
+    # ********************************************************************************************
+    
+    #signals for property change (needed to have QML update on property change) and asyncslot finish
+    runFinished             = QtCore.Signal()
+    updateDetailsFinished   = QtCore.Signal()
+    setDetailsFinished      = QtCore.Signal()
+    runningChanged          = QtCore.Signal()
+    p2pUriChanged           = QtCore.Signal()
+    p2pPortChanged          = QtCore.Signal()
+    apiUriChanged           = QtCore.Signal()
+    apiPortChanged          = QtCore.Signal()
+    logModelChanged         = QtCore.Signal()
+
+
+    @QtCore.Property(bool, notify=runningChanged)
+    def running(self):
+        return self.__running
+    
+    @QtCore.Property(str, notify=p2pUriChanged)
+    def p2pUri(self):
+        return self.__p2pUri
+        
+    @QtCore.Property(str, notify=p2pPortChanged)
+    def p2pPort(self):
+        return self.__p2pPort
+    
+    @QtCore.Property(str, notify=apiUriChanged)
+    def apiUri(self):
+        return self.__apiUri
+        
+    @QtCore.Property(str, notify=apiPortChanged)
+    def apiPort(self):
+        return self.__apiPort
+    
+    @QtCore.Property(QtCore.QObject, notify=logModelChanged)
+    def logModel(self):
+        return self.__logReader
+    
+    @asyncSlot
+    async def runSlot(self):
+        await self.run()
+        self.runFinished.emit()
+    
+    @asyncSlot
+    async def updateDetails(self):
+        
+        self.__update()        
+        self.updateDetailsFinished.emit()
+
+    @asyncSlot
+    async def setDetails(self, uri, port):
+        
+        if await self.__checkRunning():
+            raise Exception("Cannot set connection details while running")
+        
+        args = f"{self.__ocp} config write p2p.port {port}"
+        if self.__test:
+            args += " --config " + self.__conf
+         
+        process = await asyncio.create_subprocess_shell(args, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+        await process.wait()
+        
+        args = f"{self.__ocp} config write p2p.uri {uri}"
+        if self.__test:
+            args += " --config " + self.__conf
+         
+        process = await asyncio.create_subprocess_shell(args, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+        await process.wait()
+        
+        self.setDetailsFinished.emit()
+        

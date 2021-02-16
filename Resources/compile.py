@@ -25,10 +25,10 @@ assert not os.path.exists(qrc_filename)
 
 qrc = '''<RCC version="1.0">
         <qresource prefix="/Collaboration">'''
-for fn in glob.glob('Icons/*') + glob.glob('Ui/*.ui'):
+for fn in glob.glob('Icons/*') + glob.glob('Ui/*.ui') + glob.glob('Ui/*.qml'):
     qrc = qrc + '\n\t\t<file>%s</file>' % fn
-qrc = qrc + '''\n\t</qresource>
-</RCC>'''
+    
+qrc = qrc + '''\n\t</qresource>\n</RCC>'''
 
 print(qrc)
 
@@ -38,3 +38,5 @@ f.close()
 
 os.system('rcc -binary %s -o resources.rcc' % qrc_filename)
 os.remove(qrc_filename)
+
+print("Done compiling")

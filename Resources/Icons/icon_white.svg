@@ -13,7 +13,7 @@
    version="1.1"
    id="svg8"
    inkscape:version="1.0.2 (e86c870879, 2021-01-15)"
-   sodipodi:docname="icon.svg">
+   sodipodi:docname="icon_white.svg">
   <defs
      id="defs2" />
   <sodipodi:namedview
@@ -53,9 +53,10 @@
      id="layer1">
     <g
        id="g853"
-       transform="matrix(-5.9039238,-11.690064,11.690064,-5.9039238,44.675374,91.844454)">
+       transform="matrix(-5.9039238,-11.690064,11.690064,-5.9039238,44.675374,91.844454)"
+       style="fill:#ffffff;fill-opacity:1;stroke:#fffffd;stroke-opacity:1">
       <path
-         style="fill:none;fill-opacity:0.945884;stroke:#000000;stroke-width:0.440782;stroke-opacity:1"
+         style="fill:#ffffff;fill-opacity:1;stroke:#fffffd;stroke-width:0.440782;stroke-opacity:1"
          id="path833"
          sodipodi:type="arc"
          sodipodi:cx="3.5468254"
@@ -68,7 +69,7 @@
          sodipodi:arc-type="arc"
          d="M 5.1867737,4.8724122 A 2.8518651,2.2234254 0 0 1 1.8759473,4.8552217" />
       <rect
-         style="fill:#000000;fill-opacity:1;stroke:#000000;stroke-width:0.264583;stroke-opacity:1"
+         style="fill:#ffffff;fill-opacity:1;stroke:#fffffd;stroke-width:0.264583;stroke-opacity:1"
          id="rect841"
          width="0.14835058"
          height="0.79164714"
@@ -76,7 +77,7 @@
          y="5.8013663"
          transform="rotate(-15)" />
       <rect
-         style="fill:#000000;fill-opacity:1;stroke:#000000;stroke-width:0.264583;stroke-opacity:1"
+         style="fill:#ffffff;fill-opacity:1;stroke:#fffffd;stroke-width:0.264583;stroke-opacity:1"
          id="rect843"
          width="0.14835058"
          height="0.79164714"
@@ -84,7 +85,7 @@
          y="3.9695311"
          transform="matrix(-0.96592583,-0.25881905,-0.25881905,0.96592583,0,0)" />
       <rect
-         style="fill:#000000;fill-opacity:1;stroke:#000000;stroke-width:0.256001;stroke-opacity:1"
+         style="fill:#ffffff;fill-opacity:1;stroke:#fffffd;stroke-width:0.256001;stroke-opacity:1"
          id="rect845"
          width="0.8534103"
          height="0.45358366"
@@ -93,9 +94,10 @@
     </g>
     <g
        id="g863"
-       transform="matrix(5.3992229,-15.3559,15.3559,5.3992229,-22.498313,99.80063)">
+       transform="matrix(5.3992229,-15.3559,15.3559,5.3992229,-22.498313,99.80063)"
+       style="fill:#ffffff;fill-opacity:1;stroke:#fffffd;stroke-opacity:1">
       <path
-         style="fill:none;fill-opacity:0.945884;stroke:#000000;stroke-width:0.440782;stroke-opacity:1"
+         style="fill:#ffffff;fill-opacity:1;stroke:#fffffd;stroke-width:0.440782;stroke-opacity:1"
          id="path855"
          sodipodi:type="arc"
          sodipodi:cx="3.5468254"
@@ -108,7 +110,7 @@
          sodipodi:arc-type="arc"
          d="M 5.1867737,4.8724122 A 2.8518651,2.2234254 0 0 1 1.8759473,4.8552217" />
       <rect
-         style="fill:#000000;fill-opacity:1;stroke:#000000;stroke-width:0.264583;stroke-opacity:1"
+         style="fill:#ffffff;fill-opacity:1;stroke:#fffffd;stroke-width:0.264583;stroke-opacity:1"
          id="rect857"
          width="0.14835058"
          height="0.79164714"
@@ -116,7 +118,7 @@
          y="5.8013663"
          transform="rotate(-15)" />
       <rect
-         style="fill:#000000;fill-opacity:1;stroke:#000000;stroke-width:0.264583;stroke-opacity:1"
+         style="fill:#ffffff;fill-opacity:1;stroke:#fffffd;stroke-width:0.264583;stroke-opacity:1"
          id="rect859"
          width="0.14835058"
          height="0.79164714"
@@ -124,7 +126,7 @@
          y="3.9695311"
          transform="matrix(-0.96592583,-0.25881905,-0.25881905,0.96592583,0,0)" />
       <rect
-         style="fill:#000000;fill-opacity:1;stroke:#000000;stroke-width:0.256001;stroke-opacity:1"
+         style="fill:#ffffff;fill-opacity:1;stroke:#fffffd;stroke-width:0.256001;stroke-opacity:1"
          id="rect861"
          width="0.8534103"
          height="0.45358366"
@@ -133,9 +135,10 @@
     </g>
     <g
        id="g873"
-       transform="matrix(0.0730357,19.175638,-19.175638,0.0730357,117.98824,-17.541761)">
+       transform="matrix(0.0730357,19.175638,-19.175638,0.0730357,117.98824,-17.541761)"
+       style="fill:#ffffff;fill-opacity:1;stroke:#fffffd;stroke-opacity:1">
       <path
-         style="fill:none;fill-opacity:0.945884;stroke:#000000;stroke-width:0.440782;stroke-opacity:1"
+         style="fill:#ffffff;fill-opacity:1;stroke:#fffffd;stroke-width:0.440782;stroke-opacity:1"
          id="path865"
          sodipodi:type="arc"
          sodipodi:cx="3.5468254"
@@ -148,7 +151,7 @@
          sodipodi:arc-type="arc"
          d="M 5.1867737,4.8724122 A 2.8518651,2.2234254 0 0 1 1.8759473,4.8552217" />
       <rect
-         style="fill:#000000;fill-opacity:1;stroke:#000000;stroke-width:0.264583;stroke-opacity:1"
+         style="fill:#ffffff;fill-opacity:1;stroke:#fffffd;stroke-width:0.264583;stroke-opacity:1"
          id="rect867"
          width="0.14835058"
          height="0.79164714"
@@ -156,7 +159,7 @@
          y="5.8013663"
          transform="rotate(-15)" />
       <rect
-         style="fill:#000000;fill-opacity:1;stroke:#000000;stroke-width:0.264583;stroke-opacity:1"
+         style="fill:#ffffff;fill-opacity:1;stroke:#fffffd;stroke-width:0.264583;stroke-opacity:1"
          id="rect869"
          width="0.14835058"
          height="0.79164714"
@@ -164,7 +167,7 @@
          y="3.9695311"
          transform="matrix(-0.96592583,-0.25881905,-0.25881905,0.96592583,0,0)" />
       <rect
-         style="fill:#000000;fill-opacity:1;stroke:#000000;stroke-width:0.256001;stroke-opacity:1"
+         style="fill:#ffffff;fill-opacity:1;stroke:#fffffd;stroke-width:0.256001;stroke-opacity:1"
          id="rect871"
          width="0.8534103"
          height="0.45358366"
@@ -172,7 +175,7 @@
          y="5.5816894" />
     </g>
     <rect
-       style="fill:#000000;fill-opacity:1;stroke:none;stroke-width:1.59238"
+       style="fill:#ffffff;fill-opacity:1;stroke:#fffffd;stroke-width:1.59238;stroke-opacity:1"
        id="rect2205"
        width="79.055656"
        height="8.0729122"
@@ -180,7 +183,7 @@
        y="49.061855"
        transform="matrix(0.90987193,-0.41488922,0.35874258,0.93343653,0,0)" />
     <rect
-       style="fill:#000000;fill-opacity:1;stroke:none;stroke-width:1.59238"
+       style="fill:#ffffff;fill-opacity:1;stroke:#fffffd;stroke-width:1.59238;stroke-opacity:1"
        id="rect2207"
        width="79.055656"
        height="8.0729132"

@@ -17,56 +17,42 @@
 # *   Suite 330, Boston, MA  02111-1307, USA                             *
 # ************************************************************************
 
-import FreeCADGui, asyncio
+import FreeCADGui, asyncio, os
 from PySide import QtCore, QtGui
-from PySide.QtUiTools import QUiLoader
+from PySide2.QtQuick import QQuickView
 
 from Interface.DocumentModel import DocumentModel
 from Documents.Manager import Entity
 
-class UIWidget(QtGui.QFrame):
+class UIWidget(QQuickView):
     
-    def __init__(self, manager, parent=None):
+    def __init__(self, manager, connection, parent=None):
         super().__init__(parent)
+        
+        print("setup")
 
-        self.__connection = None
+        self.__connection = connection
         self.__manager = manager
         self.__model = DocumentModel(self.__manager)
 
         # We are a popup, make sure we look like it
-        self.setContentsMargins(1,1,1,1)
-        self.setWindowFlags(QtCore.Qt.FramelessWindowHint | QtCore.Qt.Popup)
-        self.setGeometry(0, 0, 375, 500)   
-        self.setFrameShape(QtGui.QFrame.StyledPanel)
-        self.setFrameShadow(QtGui.QFrame.Raised)
+        self.setFlags(QtCore.Qt.FramelessWindowHint | QtCore.Qt.Popup | QtCore.Qt.CustomizeWindowHint)
+        self.setGeometry(0, 0, 500, 700)   
         
-        loader = QUiLoader()
-        self.ui = loader.load(":/Collaboration/Ui/Widget.ui", self)
+        #setup Qml
+        self.setResizeMode(QQuickView.SizeRootObjectToView)
+        self.engine().rootContext().setContextProperty("connection", connection)
+        self.engine().addImportPath("qrc:/Collaboration/Ui")
+        self.setSource(QtCore.QUrl("qrc:/Collaboration/Ui/Main.qml"))
         
-        layout = QtGui.QVBoxLayout()
-        layout.addWidget(self.ui)
-        self.setLayout(layout)
-    
-        #connect all ui elements
-        self.ui.DocumentList.activated.connect(self.onSelectionChanged)
-        self.ui.Collaborate.toggled.connect(self.onShared)
+        #event used to hide the window when we get inactive
+        self.activeChanged.connect(self.activeSlot)
 
 
-    #component API
-    async def setConnection(self, con):
-        self.__connection = con
-        self.ui.DocumentList.setModel(self.__model)
-        self.__model.layoutChanged.emit
-    
-    
-    #component API
-    async def removeConnection(self):
-        self.__connection = None
-        self.__model = None
-        model = QtCore.QStringListModel()
-        model.setStringList([])
-        self.ui.DocumentList.setModel(model)
-        
+    def activeSlot(self):
+        if not self.isActive():
+            self.hide()
+
 
     def show(self):
         #try to find the correct position for the popup
@@ -74,8 +60,9 @@ class UIWidget(QtGui.QFrame):
         widget = QtGui.QApplication.widgetAt(pos)
         point = widget.rect().bottomLeft()
         global_point = widget.mapToGlobal(point)
-        self.move(global_point)            
+        self.setPosition(global_point)
         super().show()
+        self.requestActivate()
         
     @QtCore.Slot(bool)
     def onShared(self, collaborate):

@@ -22,19 +22,20 @@ import asyncio, txaio, os
 from autobahn.asyncio.component import Component
 from qasync import QEventLoop
 from PySide import QtCore
+from qasync import asyncSlot
 from OCP.Node import OCPNode
-
 
 
 #Class to handle all connection matters to the ocp node
 #must be provided all components that need to use this connection
-class OCPConnection():
-        
+class OCPConnection(QtCore.QObject):
+       
     def __init__(self, *argv):
         
-        self.node = OCPNode()
+        QtCore.QObject.__init__(self)
+        
+        self.__node = OCPNode()
         self.session = None 
-        self.components = list(argv)        
         
         #make sure asyncio and qt work together
         app = QtCore.QCoreApplication.instance()
@@ -43,37 +44,51 @@ class OCPConnection():
         asyncio.set_event_loop(loop)       
         
         #run the conenction asyncronously but not blocking
-        self.__readyEvent = asyncio.Event()
-        asyncio.ensure_future(self.__startup())
+        #self.__readyEvent = asyncio.Event()
+        #asyncio.ensure_future(self.__startup())
    
+    
+    async def ready(self):
+        await self.__readyEvent.wait()
+        
    
     async def __startup(self):
 
         #run the node
-        await self.node.run()
+        await self.__node.run()
         
         #make the OCP node connection!            
-        uri = "ws://" + await self.node.uri() + ":" + await self.node.port() + "/ws"          
-        self.wamp = Component(  transports={
+        uri = f"ws://{self.__node.apiUri}:{self.__node.apiPort}/ws"
+        self.__wamp = Component(  transports={
                                     "url":uri,
                                     "serializers": ['msgpack']
                                 },
                                 realm = "ocp")
-        self.wamp.on('join', self.__onJoin)
-        self.wamp.on('leave', self.__onLeave)
+        self.__wamp.on('join', self.__onJoin)
+        self.__wamp.on('leave', self.__onLeave)
 
         #blocks till all wamp handling is finsihed
-        await self.wamp.start()
+        await self.__wamp.start()
         
         
+    async def __shutdown(self):
+
+        # close the connection
+        await self.__wamp.stop()
+        self.__wamp = None
+        
+        # close the node
+        await self.__node.shutdown()
+        
+    
+    # Wamp callbacks
+    # ********************************************************************************************
+    
     async def __onJoin(self, session, details):
         print("Connection to OCP node established")
        
         self.session = session
-        #startup all relevant components
-        for comp in self.components:
-            await comp.setConnection(self)
-
+        self.connectedChanged.emit()
         self.__readyEvent.set()
             
             
@@ -82,10 +97,42 @@ class OCPConnection():
         
         self.__readyEvent.clear()
         self.session = None
-        #stop all relevant components
-        for comp in self.components:
-            await comp.removeConnection()
+        self.connectedChanged.emit()           
+       
+        
+    # Qt Property/Signal API used from the UI
+    # ********************************************************************************************
+    
+    #signals for property change (needed to have QML update on property change)
+    connectedChanged = QtCore.Signal()
+    shutdownFinished = QtCore.Signal()
+    startupFinished  = QtCore.Signal()
+
+    @QtCore.Property(bool, notify=connectedChanged)
+    def connected(self):
+        return self.session != None
+    
+    def nodeGetter(self):
+        return self.__node
+
+    node = QtCore.Property(QtCore.QObject, nodeGetter, constant=True)
+
+    @asyncSlot
+    async  def shutdown(self):
+        await self.__shutdown()
+        self.shutdownFinished.emit()
+        
+    @asyncSlot
+    async def startup(self):
+        
+        async def signaler():
+            await self.ready()
+            self.startupFinished.emit()
+        
+        asyncio.ensure_future(signaler())
+        
+        #note: calling startup blocks till shutdown. But asyncslot uses ensure future, so this is ok
+        await self.__startup()
+        
             
-            
-    async def ready(self):
-        await self.__readyEvent.wait()
+        

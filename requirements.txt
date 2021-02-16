@@ -1,3 +1,4 @@
 msgpack
 autobahn[serialization]
 qasync
+aiofiles
