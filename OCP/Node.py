@@ -161,7 +161,6 @@ class OCPNode(QtCore.QObject):
         
         # important internal properties
         self.__logger    = logging.getLogger("OCPNode")
-        self.__poll      = asyncio.ensure_future(self.__updateLoop())
         self.__logReader = None
         
         # Qt property storage
@@ -176,6 +175,8 @@ class OCPNode(QtCore.QObject):
         # handles the full setup process till a OCP node is running       
         await self.__init()
         await self.__start()
+        self.__poll  = asyncio.create_task(self.__updateLoop())
+
         
    
     async def shutdown(self):
@@ -188,6 +189,9 @@ class OCPNode(QtCore.QObject):
         process = await asyncio.create_subprocess_shell(self.__ocp + " stop")        
         await asyncio.wait_for(process.wait(), timeout = 10)
         await self.__checkRunning()
+        
+        if self.__poll:
+            self.__poll.cancel()
 
     
     async def __init(self):
@@ -336,8 +340,8 @@ class OCPNode(QtCore.QObject):
     async def __updateLoop(self):
         while True:
             try:
-                asyncio.sleep(5)
-                self.__update()
+                await asyncio.sleep(5)
+                await self.__update()
             except:
                 pass
     
@@ -389,7 +393,7 @@ class OCPNode(QtCore.QObject):
     @asyncSlot
     async def updateDetails(self):
         
-        self.__update()        
+        await self.__update()        
         self.updateDetailsFinished.emit()
 
     @asyncSlot

@@ -19,18 +19,19 @@
 
 import FreeCADGui, asyncio, os
 from PySide import QtCore, QtGui
+from PySide2 import QtQml
 from PySide2.QtQuick import QQuickView
+from qasync import asyncClose
 
 from Interface.DocumentModel import DocumentModel
 from Documents.Manager import Entity
 
 class UIWidget(QQuickView):
     
-    def __init__(self, manager, connection, parent=None):
-        super().__init__(parent)
+    def __init__(self, manager, connection):
         
-        print("setup")
-
+        super().__init__()
+        
         self.__connection = connection
         self.__manager = manager
         self.__model = DocumentModel(self.__manager)
@@ -41,41 +42,51 @@ class UIWidget(QQuickView):
         
         #setup Qml
         self.setResizeMode(QQuickView.SizeRootObjectToView)
-        self.engine().rootContext().setContextProperty("connection", connection)
+        self.rootContext().setContextProperty("connection", connection)
         self.engine().addImportPath("qrc:/Collaboration/Ui")
         self.setSource(QtCore.QUrl("qrc:/Collaboration/Ui/Main.qml"))
         
         #event used to hide the window when we get inactive
-        self.activeChanged.connect(self.activeSlot)
-
-
-    def activeSlot(self):
-        if not self.isActive():
-            self.hide()
-
-
-    def show(self):
+        self.activeChanged.connect(self.activeSlot)        
+        QtCore.QCoreApplication.instance().aboutToQuit.connect(self.exit)
+        
+        
+    def show(self):       
         #try to find the correct position for the popup
         pos = QtGui.QCursor.pos()
         widget = QtGui.QApplication.widgetAt(pos)
-        point = widget.rect().bottomLeft()
-        global_point = widget.mapToGlobal(point)
-        self.setPosition(global_point)
+        if widget:
+            point = widget.rect().bottomLeft()
+            global_point = widget.mapToGlobal(point)
+            self.setPosition(global_point)
+            
         super().show()
         self.requestActivate()
+        
+        
+    @QtCore.Slot()
+    def exit(self):
+        self.deleteLater()
+        
+
+    @QtCore.Slot()
+    def activeSlot(self):
+        if not self.isActive():
+            self.hide()
+        
         
     @QtCore.Slot(bool)
     def onShared(self, collaborate):
         
-        if not self.__connection:
+        if not self.__view.__connection:
             return
         
-        indexs = self.ui.DocumentList.selectedIndexes()
+        indexs = self.__view.ui.DocumentList.selectedIndexes()
         if len(indexs) == 0:
             return
         
         idx = indexs[0].row()
-        entity = self.__manager.getEntities()[idx]
+        entity = self.__view.__manager.getEntities()[idx]
         
         shared = entity.status == Entity.Status.shared
         if shared and collaborate:
@@ -83,30 +94,30 @@ class UIWidget(QQuickView):
             return
         
         if shared and not collaborate:
-            asyncio.ensure_future(self.__manager.stopCollaborate(entity))
+            asyncio.ensure_future(self.__view.__manager.stopCollaborate(entity))
             return
 
         #we need to collaborate!
-        asyncio.ensure_future(self.__manager.collaborate(entity))
+        asyncio.ensure_future(self.__view.__manager.collaborate(entity))
             
         
         
     @QtCore.Slot(int)    
     def onSelectionChanged(self, index):
         
-        if not self.__connection:
+        if not self.__view.__connection:
             return
         
         #change the entity info side to the selected doc!
-        entity = self.__manager.getEntities()[index.row()]
+        entity = self.__view.__manager.getEntities()[index.row()]
         
         shared = entity.status == Entity.Status.shared
-        self.ui.Collaborate.setChecked(shared)
+        self.__view.ui.Collaborate.setChecked(shared)
         
         #if shared:
         #    pass            
         #else:
-        #    self.ui.UserList.model.setStringList( QStringList{} )
+        #    self.__view.ui.UserList.model.setStringList( QStringList{} )
         
             
 
