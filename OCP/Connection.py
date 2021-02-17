@@ -17,43 +17,48 @@
 # *   Suite 330, Boston, MA  02111-1307, USA                             *
 # ************************************************************************
 
-__title__ = "FreeCAD Collaboration API"
-__author__ = "Stefan Troeger"
-__url__ = "http://www.freecadweb.org"
 
-import os, sys 
-
-# make sure the vendor folder is used for dependencies
-# *******************************************************
-parent_dir = os.path.abspath(os.path.dirname(__file__))
-vendor_dir = os.path.join(parent_dir, 'Vendor')
-sys.path.append(vendor_dir)
-
-
-# setup all the collaboration infrastructure
-# ******************************************
+import asyncio, txaio, os, logging
+from autobahn.asyncio.component import Component
+from qasync import QEventLoop
 from PySide import QtCore
-from Documents.Manager import Manager
-import Documents.Observer as Observer
-from Interface.Widget import UIWidget
-from OCP.Connection import OCPConnection
+from qasync import asyncSlot
+from OCP.Node       import Node
+from OCP.API        import API
+from OCP.Network    import Network
 
 
-#handle the resources required
-#*******************************************************
-QtCore.QResource.registerResource(os.path.join(os.path.dirname(__file__), 'Resources', 'resources.rcc'))
+#Class to handle all connection matters to the ocp node
+#must be provided all components that need to use this connection
+class OCPConnection(QtCore.QObject):
+       
+    def __init__(self, *argv):
+        
+        QtCore.QObject.__init__(self)
+        
+        self.__logger   = logging.getLogger("OCP")
+        self.__node     = Node(self.__logger.getChild("Node"))
+        self.__api      = API(self.__node, self.__logger.getChild("API"))
+        self.__network  = Network(self.__api, self.__logger.getChild("Network"))
+       
+        
+    # Qt Property/Signal API used from the UI
+    # ********************************************************************************************
+    def nodeGetter(self):
+        return self.__node
+
+    node = QtCore.Property(QtCore.QObject, nodeGetter, constant=True)
 
 
-#The Collaboration module provides functions to work on documents with others
-#for now use simple global variables!
-connection  = OCPConnection()
-manager     = Manager(os.path.dirname(__file__))
-widget      = UIWidget(manager, connection)
+    def apiGetter(self):
+        return self.__api
 
-#initialize the global FreeCAD document observer
-Observer.initialize(manager)
+    api = QtCore.Property(QtCore.QObject, apiGetter, constant=True)
 
-if os.getenv('OCP_TEST_RUN', "0") == "1":
-    #connect to test server
-    import Test
-    tester = Test.Handler(connection, manager)
+
+    def networkGetter(self):
+        return self.__network
+
+    network = QtCore.Property(QtCore.QObject, networkGetter, constant=True)
+
+ 
