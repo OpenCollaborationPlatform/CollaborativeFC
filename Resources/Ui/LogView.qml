@@ -26,14 +26,6 @@ Pane {
             Layout.alignment: Qt.AlignLeft | Qt.AlignTop
         }
 
-        RowLayout {
-            id: filterLayout
-            width: 10
-            Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
-            Layout.fillWidth: true
-            visible: opener.checked
-        }
-
         ListView {
             id: listView
             width: 10

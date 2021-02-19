@@ -32,38 +32,37 @@ class Network(QtCore.QObject):
         self.__api    = api
         self.__peers  = QtCore.QStringListModel()
         self.__addrs  = QtCore.QStringListModel()
-        self.__id     = "unknown"
+        self.__id     = "Unknown"
         self.__logger = logger
-        self.__reachability = "not reachable"
+        self.__reachability = "Unknown"
         
-        
-        #slot = self.__apiChanged
-        #print(slot)
-        
-        #print(dir(self.__api.connectedChanged))
-        #self.__api.testSignal.connect(self.testSlot)
+        self.__api.connectedChanged.connect(self.__apiChanged)
         
         asyncio.ensure_future(self.__asyncInit())
         
         
     async def __asyncInit(self):
         # connect all events we want to listen on
-        await self.__api.subscribe(self.reachabilityChanged, "ocp.p2p.reachabilityChanged")
-        await self.__api.subscribe(self.connectionChanged, "ocp.p2p.peerChanged")
+        await self.__api.subscribe(self.__reachabilityChange, "ocp.p2p.reachabilityChanged")
+        await self.__api.subscribe(self.__peerConnected, "ocp.p2p.peerConnected")
+        await self.__api.subscribe(self.__peerDisconnected, "ocp.p2p.peerDisconnected")
 
 
     def testSlot(self):
         pass
+
 
     @asyncSlot()
     async def __apiChanged(self):
         
         if self.__api.connected:
             peers = await self.__api.call("ocp.p2p.peers")
+            self.__logger.debug(f"Connected to {len(peers)} peers")
             self.__peers.setStringList(peers)
+            self.__peerCountChanged.emit()
             
-            peers = await self.__api.call("ocp.p2p.addresses")
-            self.__addrs.setStringList(peers)
+            addrs = await self.__api.call("ocp.p2p.addresses", False)
+            self.__addrs.setStringList(addrs)
             
             id = await self.__api.call("ocp.p2p.id")            
             reach = await self.__api.call("ocp.p2p.reachability")
@@ -71,45 +70,73 @@ class Network(QtCore.QObject):
         
         else:
             self.__peers.setStringList([])
+            self.__peerCountChanged.emit()
             self.__addrs.setStringList([])
-            id  = "unknown"
-            reach = "not reachable"
+            id  = "Unknown"
+            reach = "Unknown"
             
         if self.__reachability != reach:
-            self.__reachability = id
+            self.__reachability = reach
             self.__reachabilityChanged.emit()
                 
         if self.__id != id:
             self.__id  = id
-            self.__idChanged.emit()
+            self.__nodeIdChanged.emit()
     
 
-    async def reachabilityChanged(self, status):
-        print(f"reachability changed: {status}")
+    async def __reachabilityChange(self, status):
+        self.__reachability  = status
+        self.__reachabilityChanged.emit()
     
-    async def connectionChanged(self, peer, status):
-        print(f"connection changed: {peer}, {status}")
+    async def __peerConnected(self, peer):
+        
+        self.__logger.debug(f"Connected to peer {peer}")
+        peers = self.__peers.stringList()
+        if not peer in peers:
+            peers.append(peer)
+            self.__peers.setStringList(peers)
+            self.__peerCountChanged.emit()
+        
+    async def __peerDisconnected(self, peer):
+        
+        self.__logger.debug(f"Disconnected from peer {peer}")
+        
+        peers = self.__peers.stringList()
+        if peer in peers:
+            peers.remove(peer)
+            self.__peers.setStringList(peers)
+            self.__peerCountChanged.emit()
+        
     
     
     # Qt Property/Signal API used from the UI
     # ********************************************************************************************
     
-    #signals for property change (needed to have QML update on property change) and asyncslot finish
-    #__idChanged           = QtCore.Signal()
-    #__reachabilityChanged = QtCore.Signal()
+    # signals for property change (needed to have QML update on property change) and asyncslot finish
+    __nodeIdChanged       = QtCore.Signal()
+    __reachabilityChanged = QtCore.Signal()
+    __peerCountChanged    = QtCore.Signal()
     
 
-    #@QtCore.Property(str, notify=__reachabilityChanged)
-    #def reachability(self):
-    #    return self.__reachability
+    @QtCore.Property(str, notify=__reachabilityChanged)
+    def reachability(self):
+        return self.__reachability
     
-    #def peersGetter(self):
-    #    return self.__peers
-
-    #peers = QtCore.Property(QtCore.QObject, peersGetter, constant=True)
+    @QtCore.Property(str, notify=__nodeIdChanged)
+    def nodeId(self):
+        return self.__id
     
-    #def addressesGetter(self):
-    #    return self.__addrs
+    @QtCore.Property(int, notify=__peerCountChanged)
+    def peerCount(self):
+        return self.__peers.rowCount()
+   
+    def peersGetter(self):
+        return self.__peers
 
-    #addresses = QtCore.Property(QtCore.QObject, addressesGetter, constant=True)
+    peers = QtCore.Property(QtCore.QObject, peersGetter, constant=True)
+    
+    def addressesGetter(self):
+        return self.__addrs
+
+    addresses = QtCore.Property(QtCore.QObject, addressesGetter, constant=True)
     

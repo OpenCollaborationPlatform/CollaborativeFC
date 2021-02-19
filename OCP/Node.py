@@ -20,7 +20,7 @@
 import os, sys, logging, asyncio, collections, json
 import aiofiles
 from qasync import asyncSlot
-from PySide import QtCore
+from PySide2 import QtCore
 
 class LogReader(QtCore.QAbstractListModel):
     # Reads log updates from rotating log file and makes it accessible as Qt List Model
@@ -48,9 +48,13 @@ class LogReader(QtCore.QAbstractListModel):
 
     async def follow(self):
         
-        self.__file = await aiofiles.open(self.__path, "r")
+        self.__file = await aiofiles.open(self.__path, "rb") # use rb to allow seek with offset from end
+        await self.__file.seek(int(-10e3), 2) # only use last 10kB
+        await self.__file.readline() # drop one line, as it is most likely truncated
         
         while True:
+            
+            newlines = []
             while True:
                 try:
                     line = await self.__file.readline()
@@ -58,16 +62,21 @@ class LogReader(QtCore.QAbstractListModel):
                         break
                     
                     try:
-                        self.__lines.append(json.loads(line))
+                        newlines.append(json.loads(line))
                     except:
                         # not json,  parse the printed line
                         pass
-                    
-                    self.layoutChanged.emit()
-                
+                                   
                 except Exception as e:
-                    print(e)
-                
+                    break
+                    
+            if newlines:
+                # we do this here to not emit the signal on every new line. This is rather slow 
+                # if we have a large log file
+                self.layoutAboutToBeChanged.emit()
+                self.__lines += newlines
+                self.layoutChanged.emit()
+
             try:
                 #in case new file opened by rotating log provider
                 if os.stat(self.__path).st_ino != self.__fileNo:
@@ -320,7 +329,7 @@ class Node(QtCore.QObject):
     
     
     async def __update(self):
-        
+               
         # we need to check if the node is running at the beginning, to get correct config data
         running = await self.__checkRunning()
         
@@ -418,7 +427,7 @@ class Node(QtCore.QObject):
         self.updateDetailsFinished.emit()
 
 
-    @asyncSlot()
+    @asyncSlot(str, str)
     async def setP2PDetails(self, uri, port):
         
         if await self.__checkRunning():
@@ -441,7 +450,7 @@ class Node(QtCore.QObject):
         self.setP2PDetailsFinished.emit()
     
     
-    @asyncSlot()
+    @asyncSlot(str, str)
     async def setAPIDetails(self, uri, port):
         
         if await self.__checkRunning():

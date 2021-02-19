@@ -8,7 +8,6 @@ Rectangle {
     width: 400
     height: 60
     color: "#222222"
-    property string nodeId: "None"
     
     RowLayout {
         id: rowLayout
@@ -70,10 +69,10 @@ Rectangle {
                     width: 80
                     height: 20
                     color: "#ffffff"
-                    text: nodeId
                     font.pixelSize: 12
                     selectByMouse: true
                     readOnly: true
+                    text: connection.network.nodeId
                     mouseSelectionMode: TextInput.SelectCharacters
                 }
             }

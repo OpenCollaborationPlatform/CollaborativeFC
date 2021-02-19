@@ -10,11 +10,13 @@ Pane {
     ColumnLayout {
         id: columnLayout1
         anchors.fill: parent
+        spacing: 10
 
         RowLayout {
             id: rowLayout
             width: 100
             height: 100
+            Layout.alignment: Qt.AlignLeft | Qt.AlignTop
             spacing: 10
             Layout.fillWidth: true
 
@@ -130,6 +132,7 @@ Pane {
 
                 LogView {
                     id: logView
+                    Layout.alignment: Qt.AlignLeft | Qt.AlignTop
                     Layout.fillWidth: true
                     Layout.fillHeight: false
                 }
@@ -142,9 +145,11 @@ Pane {
         }
 
         RowLayout {
-            id: rowLayout5
+            id: api
             width: 100
             height: 100
+            Layout.fillHeight: false
+            Layout.alignment: Qt.AlignLeft | Qt.AlignTop
             Layout.fillWidth: true
             spacing: 10
 
@@ -162,7 +167,6 @@ Pane {
                 id: columnLayout2
                 width: 100
                 height: 100
-                enabled: connection.node.running
                 spacing: 1
                 Layout.alignment: Qt.AlignLeft | Qt.AlignTop
 
@@ -196,53 +200,83 @@ Pane {
                 CheckBox {
                     id: reconnectCheckbox
                     text: qsTr("Autoconnect when node is running")
-                    checked: connection.api.reconnect
-
-                    onCheckStateChanged: connection.api.reconnect = reconnectCheckbox.checked
+                    Component.onCompleted: checked = connection.api.reconnect
+                    onClicked: connection.api.reconnect = checked
                 }
             }
 
         }
 
         RowLayout {
-            id: rowLayout2
+            id: network
             width: 100
             height: 100
+            Layout.alignment: Qt.AlignLeft | Qt.AlignTop
+            spacing: 10
             Layout.fillWidth: true
+            enabled: connection.api.connected
+
+            property bool connected: connection.network.peerCount > 0
 
             Rectangle {
                 id: rectangle4
                 width: 20
                 height: 20
-                color: "grey"
+                color: network.connected ? "green" : "grey"
                 radius: 10
+                Layout.topMargin: 5
+                Layout.alignment: Qt.AlignLeft | Qt.AlignTop
             }
 
-            Label {
-                id: label3
-                text: qsTr("Node connected to network")
-                Layout.fillWidth: true
-                font.bold: true
-                font.pointSize: 15
+            ColumnLayout {
+                id: columnLayout3
+                width: 100
+                height: 100
+
+                Label {
+                    id: label3
+                    text: network.connected ? qsTr("Node connected to P2P network") : qsTr("Node cannot reach P2P network")
+                    Layout.fillWidth: true
+                    font.bold: true
+                    font.pointSize: 15
+                }
+
+                PeerView {
+                    id: peerView
+                }
             }
         }
 
         RowLayout {
-            id: rowLayout3
+            id: rechability
             width: 100
             height: 100
+            Layout.fillHeight: false
+            Layout.alignment: Qt.AlignLeft | Qt.AlignTop
+            spacing: 10
             Layout.fillWidth: true
+            enabled: connection.api.connected
+
             Rectangle {
                 id: rectangle5
                 width: 20
                 height: 20
-                color: "grey"
+                color: connection.network.reachability === "Public" ? "green" : "grey"
                 radius: 10
+                Layout.topMargin: 5
+                Layout.alignment: Qt.AlignLeft | Qt.AlignTop
             }
 
             Label {
                 id: label4
-                text: qsTr("Reachable by other nodes")
+                text: qsTr("Network reachability:")
+                font.bold: true
+                font.pointSize: 15
+            }
+
+            Label {
+                id: label5
+                text: connection.network.reachability
                 Layout.fillWidth: true
                 font.bold: true
                 font.pointSize: 15

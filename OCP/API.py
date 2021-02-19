@@ -20,11 +20,10 @@
 
 
 import asyncio, logging
-import FreeCAD
 from autobahn.asyncio.component import Component
-from PySide import QtCore
+from PySide2 import QtCore
 from qasync import asyncSlot
-
+import FreeCAD
 
 class API(QtCore.QObject):
     #Class to handle the WAMP connection to the OCP node
@@ -34,6 +33,7 @@ class API(QtCore.QObject):
         QtCore.QObject.__init__(self)
         
         self.__node = node
+        self.__wamp = None
         self.__session = None        
         self.__readyEvent = asyncio.Event()
         self.__registered = []
@@ -41,16 +41,15 @@ class API(QtCore.QObject):
         self.__logger = logger
         self.__settings = FreeCAD.ParamGet("User parameter:BaseApp/Preferences/Mod").GetGroup("Collaboration")
 
-        
         # connect to node ready events for auto reconnect
         self.__node.runningChanged.connect(self.__nodeChange)
-  
+
     
     async def waitTillReady(self):
         await self.__readyEvent.wait()
         
    
-    async def connect(self):
+    async def connectToNode(self):
         
         self.__logger.debug(f"Try to connect")
         
@@ -76,12 +75,13 @@ class API(QtCore.QObject):
         self.__wamp.start()
         
         
-    async def disconnect(self):
+    async def disconnectFromNode(self):
 
         # close the connection
         self.__logger.debug(f"Try to disconnect")
         if self.__wamp:
-            self.__wamp.stop()
+            await self.__wamp.stop()
+            self.__wamp = None
    
     
     async def register(self, *args, **kwargs):
@@ -121,10 +121,10 @@ class API(QtCore.QObject):
         self.__logger.debug(f"Node change callback, node running: {self.__node.running}")
         
         if self.reconnect and self.__node.running:
-            await self.connect()
+            await self.connectToNode()
             
         if self.__wamp and not self.__node.running:
-            await self.disconnect()
+            await self.disconnectFromNode()
     
     
     # Wamp callbacks
@@ -148,11 +148,7 @@ class API(QtCore.QObject):
         
         self.__readyEvent.clear()
         self.__session = None
-        self.connectedChanged.emit()   
-        if self.__wamp:
-            await self.__wamp.stop()
-            self.__wamp = None
-            
+        self.connectedChanged.emit()            
         self.__logger.info("connection closed")
         
             
@@ -176,24 +172,24 @@ class API(QtCore.QObject):
         return self.__session != None
     
     
-    @QtCore.Property(bool, notify=__reconnectChanged)
-    def reconnect(self):
+    def getReconnect(self):
         return self.__settings.GetBool("APIReconnect", True)
     
-    @reconnect.setter(bool)
     def setReconnect(self, value):
        self.__settings.SetBool("APIReconnect", value)
        self.__reconnectChanged.emit()
+       
+    reconnect = QtCore.Property(bool, getReconnect, setReconnect, notify=__reconnectChanged)
  
     @asyncSlot()
     async  def disconnectSlot(self):
-        await self.disconnect()
+        await self.disconnectFromNode()
         self.__disconnectSlotFinished.emit()
         
     @asyncSlot()
     async def connectSlot(self):
 
-        await self.connect()
+        await self.connectToNode()
         await self.waitTillReady()
         self.__connectSlotFinished.emit()
         
