@@ -43,9 +43,9 @@ class Network(QtCore.QObject):
         
     async def __asyncInit(self):
         # connect all events we want to listen on
-        await self.__api.subscribe(self.__reachabilityChange, "ocp.p2p.reachabilityChanged")
-        await self.__api.subscribe(self.__peerConnected, "ocp.p2p.peerConnected")
-        await self.__api.subscribe(self.__peerDisconnected, "ocp.p2p.peerDisconnected")
+        await self.__api.subscribe("network", self.__reachabilityChange, "ocp.p2p.reachabilityChanged")
+        await self.__api.subscribe("network", self.__peerConnected, "ocp.p2p.peerConnected")
+        await self.__api.subscribe("network", self.__peerDisconnected, "ocp.p2p.peerDisconnected")
 
 
     def testSlot(self):

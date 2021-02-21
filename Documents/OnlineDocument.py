@@ -53,6 +53,23 @@ class OnlineDocument():
         
         self.logger.debug("Created")
  
+ 
+    async def close(self):
+        # we close the online doc. That means closing the observer and all objects/viewproviders
+        tasks = []
+        tasks.append(self.onlineObs.close())
+        
+        for obj in self.objects.values():
+            tasks.append(obj.close())
+        
+        for vp in self.viewproviders.values():
+            tasks.append(vp.close())
+ 
+        if tasks:
+            await asyncio.gather(*tasks)
+            
+        self.objects = []
+        self.viewproviders = []
   
     def shouldExcludeTypeId(self, typeid):
         #we do not add App origins, lines and planes, as they are only Autocreated from parts and bodies
@@ -326,7 +343,7 @@ class OnlineDocument():
         #try:     
         #    self.logger.debug("Close transaction")
         #    uri = f"ocp.documents.{self.id}.content.Transaction.Close"
-        #    await self.connection.session.call(uri)           
+        #    await self.connection.api.call(uri)           
 
         #except Exception as e:
         #    self.logger.error(f"Closing transaction failed: {e}")
@@ -339,7 +356,7 @@ class OnlineDocument():
 
     async def _docPrints(self):
         uri = f"ocp.documents.{self.id}.prints"
-        vals = await self.connection.session.call(uri)
+        vals = await self.connection.api.call(uri)
         for val in vals:
             self.logger.debug(val)
 
@@ -381,11 +398,11 @@ class OnlineDocument():
         try:
             #first we need to get into view mode for the document, to have a steady picture of the current state of things and
             #to not get interupted
-            await self.connection.session.call(f"ocp.documents.{self.id}.view", True)
+            await self.connection.api.call(f"ocp.documents.{self.id}.view", True)
             
             #create all document objects!
             uri = f"ocp.documents.{self.id}.content.Document.Objects.GetObjectTypes"
-            objs = await self.connection.session.call(uri)
+            objs = await self.connection.api.call(uri)
    
             tasks = []              
             with Observer.blocked(self.document):
@@ -421,7 +438,7 @@ class OnlineDocument():
             traceback.print_exc()
             
         finally:
-            await self.connection.session.call(f"ocp.documents.{self.id}.view", False)
+            await self.connection.api.call(f"ocp.documents.{self.id}.view", False)
         
     
     async def asyncUnload(self):
@@ -429,7 +446,7 @@ class OnlineDocument():
     
     async def asyncGetDocumentPeers(self):
         try:
-            return await self.connection.session.call(u"ocp.documents.{0}.listPeers".format(self.id))
+            return await self.connection.api.call(u"ocp.documents.{0}.listPeers".format(self.id))
         
         except Exception as e:
             self.logger.error(f"Getting peers error: {e}")

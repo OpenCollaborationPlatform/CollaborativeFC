@@ -47,7 +47,7 @@ QtCore.QResource.registerResource(os.path.join(os.path.dirname(__file__), 'Resou
 #The Collaboration module provides functions to work on documents with others
 #for now use simple global variables!
 connection  = OCPConnection()
-manager     = Manager(os.path.dirname(__file__))
+manager     = Manager(os.path.dirname(__file__), connection)
 widget      = UIWidget(manager, connection)
 
 #initialize the global FreeCAD document observer

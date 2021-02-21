@@ -64,7 +64,7 @@ class OCPObjectWriter():
     async def isAvailable(self):
         try:
             uri = f"ocp.documents.{self.docId}.content.Document.{self.objGroup}.Has"
-            return await self.connection.session.call(uri, self.name)
+            return await self.connection.api.call(uri, self.name)
         except Exception as e:
             self.logger.error(f"Queriying availablitiy failed: {e}")
             
@@ -76,7 +76,7 @@ class OCPObjectWriter():
 
         try:           
             uri = u"ocp.documents.{0}".format(self.docId)
-            await self.connection.session.call(uri + u".content.Document.{0}.NewObject".format(self.objGroup), self.name, typeid)
+            await self.connection.api.call(uri + u".content.Document.{0}.NewObject".format(self.objGroup), self.name, typeid)
             
             #create all properties that need setup           
             await self.__createProperties(False, properties, infos)
@@ -100,7 +100,7 @@ class OCPObjectWriter():
             fnc = "SetupProperty"
             
         uri = f"ocp.documents.{self.docId}.content.Document.{self.objGroup}.{self.name}.Properties.{fnc}"
-        await self.connection.session.call(uri, prop, info["typeid"], info["group"], info["docu"], info["status"])
+        await self.connection.api.call(uri, prop, info["typeid"], info["group"], info["docu"], info["status"])
 
     
     
@@ -117,14 +117,14 @@ class OCPObjectWriter():
             fnc = "SetupProperties"
             
         uri = f"ocp.documents.{self.docId}.content.Document.{self.objGroup}.{self.name}.Properties.{fnc}"
-        await self.connection.session.call(uri, props, infos)
+        await self.connection.api.call(uri, props, infos)
 
     
     async def removeProperty(self, prop):
         try:        
             self.logger.debug(f"Remove property {prop}")
             uri = u"ocp.documents.{0}.content.Document.{1}.{2}.Properties.RemoveDynamicProperty".format(self.docId, self.objGroup, self.name)
-            await self.connection.session.call(uri, prop)
+            await self.connection.api.call(uri, prop)
         
         except Exception as e:
             self.logger.error("Remove property {0} failed: {1}".format(prop, e))
@@ -181,12 +181,12 @@ class OCPObjectWriter():
                 if len(props) == 1:
                     self.logger.debug("Change property status {0}".format(keys[0]))
                     uri += keys[0] + ".status"
-                    await self.connection.session.call(uri, values[0])
+                    await self.connection.api.call(uri, values[0])
                 
                 else:
                     self.logger.debug("Change batched property status: {0}".format(keys))
                     uri += "SetStatus"
-                    failed = await self.connection.session.call(uri, keys, values)
+                    failed = await self.connection.api.call(uri, keys, values)
                     if failed:
                         raise Exception(f"Properties {failed} failed")
             else:
@@ -194,12 +194,12 @@ class OCPObjectWriter():
                 if len(props) == 1:
                     self.logger.debug("Change property status {0}".format(keys[0]))
                     uri += keys[0] + ".SetEditorMode"
-                    await self.connection.session.call(uri, values[0])
+                    await self.connection.api.call(uri, values[0])
                 
                 else:
                     self.logger.debug("Change batched property status: {0}".format(keys))
                     uri += "SetEditorModes"
-                    failed = await self.connection.session.call(uri, keys, values)
+                    failed = await self.connection.api.call(uri, keys, values)
                     if failed:
                         raise Exception(f"Properties {failed} failed")
                 
@@ -222,7 +222,7 @@ class OCPObjectWriter():
         
         #get the cid!
         uri = f"ocp.documents.{self.docId}.raw.CidByBinary"
-        cid = await self.connection.session.call(uri, self.data.uri, datakey)
+        cid = await self.connection.api.call(uri, self.data.uri, datakey)
         return cid
         
     
@@ -255,7 +255,7 @@ class OCPObjectWriter():
                 outlist = []
                 async def getOutlist():
                     uri = f"ocp.documents.{self.docId}.content.Document.DAG.GetObjectOutList"
-                    outlist = await self.connection.session.call(uri, self.name)
+                    outlist = await self.connection.api.call(uri, self.name)
                     outlist.sort()
                     
                 tasks.append(getOutlist())
@@ -270,11 +270,11 @@ class OCPObjectWriter():
                 prop = list(props.keys())[0]
                 self.logger.debug(f"Write property {prop}")
                 uri = f"ocp.documents.{self.docId}.content.Document.{self.objGroup}.{self.name}.Properties.{prop}.SetValue"
-                await self.connection.session.call(uri, list(props.values())[0])
+                await self.connection.api.call(uri, list(props.values())[0])
             else:
                 self.logger.debug(f"Write properties {list(props.keys())}")
                 uri = u"ocp.documents.{0}.content.Document.{1}.{2}.Properties.SetValues".format(self.docId, self.objGroup, self.name)
-                failed = await self.connection.session.call(uri, list(props.keys()), list(props.values()))
+                failed = await self.connection.api.call(uri, list(props.keys()), list(props.values()))
                 if failed:
                     raise Exception(f"Properties {failed} failed")
 
@@ -284,7 +284,7 @@ class OCPObjectWriter():
                 if out != outlist:
                     self.logger.debug(f"Set Outlist")
                     uri = f"ocp.documents.{self.docId}.content.Document.DAG.SetObjectOutList"
-                    await self.connection.session.call(uri, self.name, out)
+                    await self.connection.api.call(uri, self.name, out)
                 
         except Exception as e:
             self.logger.error(f"Batch writing properties {list(props.keys())} failed: {e}")
@@ -299,7 +299,7 @@ class OCPObjectWriter():
             #add the extension must be done: a changed property could result in use of the extension
             self.logger.debug("Add extension {0}".format(extension))
             calluri = uri + u".content.Document.{0}.{1}.Extensions.Append".format(self.objGroup, self.name)
-            await self.connection.session.call(calluri, extension)
+            await self.connection.api.call(calluri, extension)
             if props and infos:
                 await self.__createProperties(False, props, infos)
                 
@@ -311,7 +311,7 @@ class OCPObjectWriter():
         try:
             self.logger.debug("Remove")
             uri = u"ocp.documents.{0}".format(self.docId)
-            await self.connection.session.call(uri + u".content.Document.{0}.RemoveObject".format(self.objGroup), self.name)
+            await self.connection.api.call(uri + u".content.Document.{0}.RemoveObject".format(self.objGroup), self.name)
         
         except Exception as e:
             self.logger.error("Removing error: {0}".format(e))
@@ -323,7 +323,7 @@ class OCPObjectWriter():
         try:
             self.logger.debug("Recompute")                
             uri = f"ocp.documents.{self.docId}.content.Document.Objects.{self.name}.onObjectRecomputed"
-            await self.connection.session.call(uri)
+            await self.connection.api.call(uri)
         
         except Exception as e:
             self.logger.error("Recompute exception: {0}".format(e))

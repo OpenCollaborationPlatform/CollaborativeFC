@@ -2,77 +2,124 @@ import QtQuick 2.0
 import QtQuick.Controls 2.15
 import QtQuick.Layouts 1.11
 
-Rectangle {
-    id: rectangle
-    height: 70
-    radius: 3
-    Button {
-        id: button
-        x: 548
-        y: 18
-        text: qsTr("Edit")
-        anchors.right: parent.right
-        anchors.rightMargin: 8
+Pane {
+    id: root
+    width: 500
+    height: 60
+    padding: 0
+    leftPadding: 0
+    rightPadding: 0
+    bottomPadding: 0
+    topPadding: 0
+
+    property string docStatus: status
+
+    onDocStatusChanged: {
+        if (docStatus == "shared"  || docStatus == "node" ) {
+            shareButton.shared = true
+            openButton.enabled = true
+            editButton.enabled = true
+        } else {
+            shareButton.text = qsTr("Share")
+            shareButton.shared = false
+            openButton.enabled = false
+            editButton.enabled = false
+        }
     }
 
-    Text {
-        id: text1
-        y: 12
-        text: qsTr("MyDocument")
-        anchors.left: parent.left
-        font.pixelSize: 20
-        anchors.leftMargin: 47
-    }
+    RowLayout {
+        id: rowLayout
+        anchors.fill: parent
+        spacing: 10
 
-    Button {
-        id: button1
-        x: 453
-        y: 18
-        width: 89
-        height: 34
-        text: qsTr("Open")
-    }
+        ColumnLayout {
+            id: columnLayout
+            width: 100
+            height: 100
+            Layout.alignment: Qt.AlignLeft | Qt.AlignTop
+            spacing: 2
+            Layout.fillWidth: true
 
-    Button {
-        id: button2
-        x: 378
-        y: 18
-        width: 77
-        height: 34
-        text: qsTr("Join")
-    }
+            Label {
+                id: docNameLabel
+                Layout.preferredWidth: root.width - buttons.width - 10
+                text: name
+                elide: Text.ElideRight
+                font.pointSize: 15
+            }
 
-    BorderImage {
-        id: borderImage
-        x: 8
-        y: 16
-        width: 24
-        height: 20
-        source: "qrc:/qtquickplugin/images/template_image.png"
-    }
+            Row {
+                id: row
+                width: 200
+                height: 400
+                spacing: 20
 
-    Text {
-        id: text2
-        x: 47
-        y: 42
-        text: qsTr("Local")
-        font.pixelSize: 12
-    }
+                Label {
+                    id: docStatusLabel
+                    text: status
+                }
 
-    Text {
-        id: text3
-        x: 91
-        y: 42
-        text: qsTr("2 Members")
-        font.pixelSize: 12
-    }
+                Label {
+                    id: docMembersLabel
+                    property int count: members
+                    text: qsTr("0 Members")
+                    onCountChanged: text = qsTr("%1 Members").arg(count)
+                }
 
-    Text {
-        id: text4
-        x: 179
-        y: 42
-        text: qsTr("1 Joined")
-        font.pixelSize: 12
+                Label {
+                    id: docActiveLabel
+                    property int count: joined
+                    text: qsTr("0 Joined")
+                    onCountChanged: text = qsTr("%1 Joined").arg(count)
+                }
+            }
+        }
+
+        RowLayout {
+            id: rowLayout1
+            spacing: 1
+            Layout.alignment: Qt.AlignRight | Qt.AlignTop
+        }
+
+        Row {
+            id: buttons
+            width: 200
+            height: 400
+            spacing: 1
+            Layout.alignment: Qt.AlignRight | Qt.AlignTop
+
+            Button {
+                id: shareButton
+                width: implicitWidth*0.6
+                flat: true
+                property bool shared: false
+
+                text: shared ? qsTr("Stop") : qsTr("Start")
+                onClicked: shared ? ocpDocuments.stopCollaborateSlot(index) : ocpDocuments.collaborateSlot(index)
+            }
+
+            Button {
+                id: openButton
+                width: implicitWidth*0.6
+
+                display: AbstractButton.TextOnly
+                flat: true
+
+                text: isOpen ? qsTr("Close") : qsTr("Open")
+                onClicked: isOpen ? ocpDocuments.closeSlot(index) : ocpDocuments.openSlot(index)
+            }
+
+            Button {
+                id: editButton
+                width: implicitWidth*0.6
+                text: qsTr("Edit")
+                display: AbstractButton.TextOnly
+                flat: true
+                //onClicked: root.edit()
+            }
+
+        }
+
     }
     
 }

@@ -25,6 +25,7 @@ from PySide2 import QtCore
 from qasync import asyncSlot
 import FreeCAD
 
+
 class API(QtCore.QObject):
     #Class to handle the WAMP connection to the OCP node
        
@@ -36,8 +37,10 @@ class API(QtCore.QObject):
         self.__wamp = None
         self.__session = None        
         self.__readyEvent = asyncio.Event()
-        self.__registered = []
-        self.__subscribed = []
+        self.__registered = {}          # key: [(args, kwargs)]
+        self.__registeredSessions = {}  # key: [sessions]
+        self.__subscribed = {}
+        self.__subscribedSessions = {}
         self.__logger = logger
         self.__settings = FreeCAD.ParamGet("User parameter:BaseApp/Preferences/Mod").GetGroup("Collaboration")
 
@@ -69,6 +72,7 @@ class API(QtCore.QObject):
                                 realm = "ocp")
         self.__wamp.on('join', self.__onJoin)
         self.__wamp.on('leave', self.__onLeave)
+        self.__wamp.on('disconnect', self.__onDisconnect)
         self.__wamp.on('ready', self.__onReady)
 
         #run the component
@@ -84,23 +88,53 @@ class API(QtCore.QObject):
             self.__wamp = None
    
     
-    async def register(self, *args, **kwargs):
+    async def register(self, key, *args, **kwargs):
         # Registers an API function. It stays registered over multiple session and reconnects
+        # Can be unregistered with the given key. Note: multiple register and subscribe calls can be 
+        # made with a single key
         
         self.__logger.debug(f"Register function {args[1]}")
-        self.__registered.append((args, kwargs))
+        
+        self.__registered[key] = self.__registered.get(key, []) + [(args, kwargs)]
         if self.connected:
-            return await self.__session.register(*args, **kwargs)
+            try:
+                self.__registeredSessions[key] = self.__registeredSessions.get(key, [])  + [await self.__session.register(*args, **kwargs)]
+            except:
+                pass
     
     
-    async def subscribe(self, *args, **kwargs):
+    async def subscribe(self, key, *args, **kwargs):
         # Subscribe to API event. It stays subscribed over multiple session and reconnects
         
         self.__logger.debug(f"Subscribe event {args[1]}")
-        self.__subscribed.append((args, kwargs))
+        
+        self.__subscribed[key] = self.__subscribed.get(key, []) + [(args, kwargs)]
         if self.connected:
-            return await self.__session.subscribe(*args, **kwargs)
+            try:
+                self.__subscribedSessions[key] = self.__subscribedSessions.get(key, [])  + [await self.__session.subscribe(*args, **kwargs)]
+            except:
+                pass
+    
+    
+    async def closeKey(self, key):
+
+        if key in self.__registered:
+            #remove regiter entries and clsoe sessions
+            del self.__registered[key]
+            for session in self.__registeredSessions[key]:
+                await session.unregister()
             
+            self.__registeredSessions.pop(key, None)
+            
+        
+        if key in self.__subscribed:
+            #remove subscribe entries and close sessions
+            del self.__subscribed[key]
+            for session in self.__subscribedSessions[key]:
+                await session.unsubscribe()
+            
+            self.__subscribedSessions.pop(key, None)
+        
             
     async def call(self, *args, **kwargs):
         # calls api function
@@ -136,26 +170,46 @@ class API(QtCore.QObject):
         self.__session = session
         
         # register all functions
-        for args in self.__registered:
-            await self.__session.register(*(args[0]), **(args[1]))
+        for key, argsList in self.__registered.items():
+            
+            sessions = []
+            for args in argsList:
+                sessions.append(await self.__session.register(*(args[0]), **(args[1])))
+            
+            self.__registeredSessions[key] = sessions
             
         # subscribe to all events
-        for args in self.__subscribed:
-            await self.__session.subscribe(*(args[0]), **(args[1]))
+        for key, argsList in self.__subscribed.items():
+            
+            sessions = []
+            for args in argsList:
+                sessions.append(await self.__session.subscribe(*(args[0]), **(args[1])))
+            
+            self.__subscribedSessions[key] = sessions
                     
             
     async def __onLeave(self, session, reason):
         
+        self.__logger.debug(f"Leave WAMP session: {reason}")
+        
+        # clear all registered and subscribed session objects
+        self.__registeredSessions = {}
+        self.__subscribedSessions = {}
+        
         self.__readyEvent.clear()
         self.__session = None
-        self.connectedChanged.emit()            
-        self.__logger.info("connection closed")
         
-            
+        self.connectedChanged.emit()            
+        
+        
+    async def __onDisconnect(self, *args):
+        self.__logger.info("API closed")
+        
+        
     async def __onReady(self, *args):
         self.connectedChanged.emit()
         self.__readyEvent.set()
-        self.__logger.info("connection ready")
+        self.__logger.info("API ready")
        
         
     # Qt Property/Signal API used from the UI

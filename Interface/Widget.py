@@ -34,7 +34,6 @@ class UIWidget(QQuickView):
         
         self.__connection = connection
         self.__manager = manager
-        self.__model = DocumentModel(self.__manager)
 
         # We are a popup, make sure we look like it
         self.setFlags(QtCore.Qt.FramelessWindowHint | QtCore.Qt.Popup | QtCore.Qt.CustomizeWindowHint)
@@ -43,6 +42,7 @@ class UIWidget(QQuickView):
         #setup Qml
         self.setResizeMode(QQuickView.SizeRootObjectToView)
         self.rootContext().setContextProperty("connection", connection)
+        self.rootContext().setContextProperty("ocpDocuments", manager)
         self.engine().addImportPath("qrc:/Collaboration/Ui")
         self.setSource(QtCore.QUrl("qrc:/Collaboration/Ui/Main.qml"))
         

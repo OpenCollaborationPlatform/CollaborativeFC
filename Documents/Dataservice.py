@@ -17,6 +17,7 @@
 # *   Suite 330, Boston, MA  02111-1307, USA                             *
 # ************************************************************************
 
+import asyncio
 from autobahn.wamp.types import RegisterOptions
 
 class DataService():
@@ -25,8 +26,15 @@ class DataService():
         self.__keyCntr = 0
         self.__data = {}
         self.uri = u'freecad.{0}.dataUpload'.format(fcid)
+        self.__connection = connection
         
-        connection.session.register(self.__dataUpload, self.uri, RegisterOptions(details_arg='details'))
+        asyncio.ensure_future(self.__asyncInit())
+        
+    async def __asyncInit(self):
+        await self.__connection.api.register("dataservice", self.__dataUpload, self.uri, RegisterOptions(details_arg='details'))
+    
+    async def close(self):
+        await self.__connection.api.closeKey("dataservice")
     
     def addData(self, data):
         key = self.__keyCntr

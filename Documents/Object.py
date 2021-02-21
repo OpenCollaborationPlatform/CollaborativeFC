@@ -173,4 +173,4 @@ def getExtensions(obj):
     else:
         pythonExt = __FC018_Extensions 
        
-    return [e for e in pythonExt if obj.hasExtension(e, False)]
+    return [e for e in pythonExt if obj.hasExtension(e)]

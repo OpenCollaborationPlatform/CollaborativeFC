@@ -36,6 +36,11 @@ class OnlineObserver():
         self.logger = logging.getLogger("Online observer " + odoc.id[-5:])
         self.runners = {}
         
+        asyncio.ensure_future(self.__asyncInit())
+       
+
+    async def __asyncInit(self):
+        
         self.callbacks = {
                 "Objects.onObjectCreated": self.__cbNewObject,
                 "Objects.onObjectRemoved": self.__cbRemoveObject,
@@ -69,16 +74,31 @@ class OnlineObserver():
             self.synced = False
         
         try:
-            uri = f"ocp.documents.{odoc.id}.content.Document."
-            
+            # careful: any change here must be also changed for close and unsubscribe!
+            key = f"observer {self.onlineDoc.id}"
+            uri = f"ocp.documents.{self.onlineDoc.id}.content.Document."            
             for cb in self.callbacks.keys():
-                odoc.connection.session.subscribe(self.__run, uri+cb, options=SubscribeOptions(match="wildcard", details_arg="details"))
+                await self.onlineDoc.connection.api.subscribe(key, self.__run, uri+cb, options=SubscribeOptions(match="wildcard", details_arg="details"))
 
-            #odoc.connection.session.subscribe(self.__runDocProperties, uri+"Properties", options=SubscribeOptions(match="prefix", details_arg="details"))
+            #self.onlineDoc.connection.api.subscribe(self.__runDocProperties, uri+"Properties", options=SubscribeOptions(match="prefix", details_arg="details"))
            
         except Exception as e:
             self.logger.error("Setup failed: ", e)
-              
+
+     
+    async def close(self):
+        tasks = []
+        for runner in self.runners.values():
+            tasks.append(runner.close())
+        
+        tasks.append(self.onlineDoc.connection.api.closeKey(f"observer {self.onlineDoc.id}"))
+            
+        if tasks:
+            await asyncio.gather(*tasks)
+            
+        self.runners = []
+     
+        
     async def __run(self, *args, details=None):
     
         #the path are all topics after Document.Objects.
@@ -531,7 +551,7 @@ class OnlineObserver():
                     uri = f"ocp.documents.{self.onlineDoc.id}.raw.BinaryByCid"
                     dat = Data()
                     opt = CallOptions(on_progress=dat.progress)
-                    result = await self.onlineDoc.connection.session.call(uri, cid, options=opt)
+                    result = await self.onlineDoc.connection.api.call(uri, cid, options=opt)
                     if result is not None:
                         dat.progress(result)
                         

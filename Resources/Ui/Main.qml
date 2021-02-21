@@ -58,10 +58,14 @@ Pane {
 
             Node {
                 id: node
+                Layout.fillHeight: true
+                Layout.fillWidth: true
             }
 
             Documents {
                 id: documents
+                Layout.fillHeight: true
+                Layout.fillWidth: true
             }
         }
 

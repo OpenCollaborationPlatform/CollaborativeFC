@@ -55,7 +55,7 @@ class FreeCADOnlineObject():
 
     async def _docPrints(self):
         uri = u"ocp.documents.{0}.prints".format(self._docId)
-        vals = await self.connection.session.call(uri)
+        vals = await self.connection.api.call(uri)
         for val in vals:
             self.logger.debug(val)
 

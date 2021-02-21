@@ -50,7 +50,7 @@ class OCPObjectReader():
     async def isAvailable(self):
         try:
             uri = f"ocp.documents.{self.docId}.content.Document.{self.objGroup}.Has"
-            return await self.connection.session.call(uri, self.name)
+            return await self.connection.api.call(uri, self.name)
         except Exception as e:
             self.logger.error(f"Queriying availablitiy failed: {e}")
     
@@ -60,7 +60,7 @@ class OCPObjectReader():
         
         try:
             uri = f"ocp.documents.{self.docId}.content.Document.{self.objGroup}.{self.name}.Properties.Keys"
-            return await self.connection.session.call(uri)
+            return await self.connection.api.call(uri)
         
         except Exception as e:
             self.logger.error(f"Fetching property list failed: {e}")
@@ -71,7 +71,7 @@ class OCPObjectReader():
         
         try:
             uri = f"ocp.documents.{self.docId}.content.Document.{self.objGroup}.{self.name}.Properties.{prop}.GetValue"
-            value = await self.connection.session.call(uri)
+            value = await self.connection.api.call(uri)
             return await self.__getBinaryValues(value)
         
         except Exception as e:
@@ -85,7 +85,7 @@ class OCPObjectReader():
             values = [None]*len(props)
             async def fetch(index, prop):
                 uri = f"ocp.documents.{self.docId}.content.Document.{self.objGroup}.{self.name}.Properties.{prop}.GetValue"
-                values[index] = await self.connection.session.call(uri)
+                values[index] = await self.connection.api.call(uri)
             
             tasks = []
             for i, prop in enumerate(props):
@@ -105,7 +105,7 @@ class OCPObjectReader():
         
         try:
             uri = f"ocp.documents.{self.docId}.content.Document.{self.objGroup}.{self.name}.Properties.{prop}.GetInfo"
-            return await self.connection.session.call(uri)
+            return await self.connection.api.call(uri)
         
         except Exception as e:
             self.logger.error(f"Reading property info for {prop} failed: {e}")
@@ -118,7 +118,7 @@ class OCPObjectReader():
             infos = [None]*len(props)
             async def fetch(index, prop):
                 uri = f"ocp.documents.{self.docId}.content.Document.{self.objGroup}.{self.name}.Properties.{prop}.GetInfo"
-                infos[index] = await self.connection.session.call(uri)
+                infos[index] = await self.connection.api.call(uri)
             
             tasks = []
             for i, prop in enumerate(props):
@@ -137,7 +137,7 @@ class OCPObjectReader():
         # returns all registered extensions
         try:
             uri = f"ocp.documents.{self.docId}.content.Document.{self.objGroup}.{self.name}.Extensions.GetAll"
-            return await self.connection.session.call(uri)
+            return await self.connection.api.call(uri)
         
         except Exception as e:
             self.logger.error(f"Fetching object extensions failed: {e}")
@@ -169,7 +169,7 @@ class OCPObjectReader():
                     uri = f"ocp.documents.{self.docId}.raw.BinaryByCid"
                     dat = Data()
                     opt = CallOptions(on_progress=dat.progress)
-                    result = await self.connection.session.call(uri, cid, options=opt)
+                    result = await self.connection.api.call(uri, cid, options=opt)
                     if result is not None:
                         dat.progress(result)
                         
