@@ -23,8 +23,6 @@ from PySide2 import QtQml
 from PySide2.QtQuick import QQuickView
 from qasync import asyncClose
 
-from Interface.DocumentModel import DocumentModel
-from Documents.Manager import Entity
 
 class UIWidget(QQuickView):
     
@@ -74,50 +72,4 @@ class UIWidget(QQuickView):
         if not self.isActive():
             self.hide()
         
-        
-    @QtCore.Slot(bool)
-    def onShared(self, collaborate):
-        
-        if not self.__view.__connection:
-            return
-        
-        indexs = self.__view.ui.DocumentList.selectedIndexes()
-        if len(indexs) == 0:
-            return
-        
-        idx = indexs[0].row()
-        entity = self.__view.__manager.getEntities()[idx]
-        
-        shared = entity.status == Entity.Status.shared
-        if shared and collaborate:
-            #we are done.. event thougth this should not have happend
-            return
-        
-        if shared and not collaborate:
-            asyncio.ensure_future(self.__view.__manager.stopCollaborate(entity))
-            return
-
-        #we need to collaborate!
-        asyncio.ensure_future(self.__view.__manager.collaborate(entity))
-            
-        
-        
-    @QtCore.Slot(int)    
-    def onSelectionChanged(self, index):
-        
-        if not self.__view.__connection:
-            return
-        
-        #change the entity info side to the selected doc!
-        entity = self.__view.__manager.getEntities()[index.row()]
-        
-        shared = entity.status == Entity.Status.shared
-        self.__view.ui.Collaborate.setChecked(shared)
-        
-        #if shared:
-        #    pass            
-        #else:
-        #    self.__view.ui.UserList.model.setStringList( QStringList{} )
-        
-            
 

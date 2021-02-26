@@ -42,7 +42,7 @@ Pane {
             }
         }
 
-        StackLayout {
+        SwipeView {
             id: stackLayout
             width: 100
             height: 100
@@ -55,6 +55,7 @@ Pane {
             Layout.fillWidth: true
 
             currentIndex: tabBar.currentIndex
+
 
             Node {
                 id: node

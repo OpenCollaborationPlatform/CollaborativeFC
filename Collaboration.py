@@ -33,7 +33,7 @@ sys.path.append(vendor_dir)
 # setup all the collaboration infrastructure
 # ******************************************
 from PySide import QtCore
-from Documents.Manager import Manager
+from Manager.Manager import Manager
 import Documents.Observer as Observer
 from Interface.Widget import UIWidget
 from OCP.Connection import OCPConnection

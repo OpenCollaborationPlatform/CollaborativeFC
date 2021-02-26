@@ -12,6 +12,8 @@ Pane {
     bottomPadding: 0
     topPadding: 0
 
+    signal edit(var documentObject)
+
     property string docStatus: status
 
     onDocStatusChanged: {
@@ -61,14 +63,14 @@ Pane {
 
                 Label {
                     id: docMembersLabel
-                    property int count: members
+                    property int count: document.memberCount
                     text: qsTr("0 Members")
                     onCountChanged: text = qsTr("%1 Members").arg(count)
                 }
 
                 Label {
                     id: docActiveLabel
-                    property int count: joined
+                    property int count: document.joinedCount
                     text: qsTr("0 Joined")
                     onCountChanged: text = qsTr("%1 Joined").arg(count)
                 }
@@ -115,7 +117,7 @@ Pane {
                 text: qsTr("Edit")
                 display: AbstractButton.TextOnly
                 flat: true
-                //onClicked: root.edit()
+                onClicked: root.edit(document)
             }
 
         }

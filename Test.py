@@ -58,7 +58,7 @@ class Handler():
         await connection.ready()
         
         #register ourself to the OCP node
-        await connection.session.subscribe(self.__receiveSync, "ocp.documents..content.Document.sync", options=SubscribeOptions(match="wildcard"))
+        await connection.api.subscribe("testhandler", self.__receiveSync, "ocp.documents..content.Document.sync", options=SubscribeOptions(match="wildcard"))
         
         #connect to testserver       
         uri = os.getenv('OCP_TEST_SERVER_URI', '')

@@ -21,12 +21,14 @@ import FreeCAD, FreeCADGui, asyncio, os
 
 from Documents.Dataservice      import DataService
 from Documents.OnlineDocument   import OnlineDocument
+from Manager.Document           import ManagedDocument
 
 from qasync import asyncSlot
 from PySide import QtCore
 import uuid
 from autobahn.wamp.types import CallResult
 from enum import Enum, auto
+
 
 class Entity():
     ''' data structure describing a entity in the collaboration framework. A entity is a things that can be calloborated on, e.g.:
@@ -38,17 +40,18 @@ class Entity():
     
     class Status(Enum):
         unknown = auto()
-        local   = auto()
-        node    = auto()
-        invited = auto()
-        shared  = auto()   
+        local   = auto()    # entity is available only in local freecad session
+        node    = auto()    # entity is available only on ocp node (has a manager, but no onlinedoc)
+        invited = auto()    # entity is not even open on the ocp node, but someone else added the node as a member of a document
+        shared  = auto()    # entity is open on ocp node and in local freecad session (has a manager and a onlinedoc)
         
-    def __init__(self, id = None, status = Status.unknown, onlinedoc = None, fcdoc = None ):
+    def __init__(self, id = None, status = Status.unknown, onlinedoc = None, fcdoc = None, manager = None ):
         
         self.id = id
         self.status = status
-        self.onlinedoc = onlinedoc
         self.fcdoc = fcdoc
+        self.onlinedoc = onlinedoc
+        self.manager = manager
         
 
 class Manager(QtCore.QAbstractListModel):
@@ -107,15 +110,24 @@ class Manager(QtCore.QAbstractListModel):
             doclist = await self.__connection.api.call(u"ocp.documents.list")
             for doc in doclist:
                 if not self.hasEntity("id", doc):
-                    entity = Entity(id = doc, status = Entity.Status.node, onlinedoc = None, fcdoc = None)
+                    entity = Entity(id = doc, status = Entity.Status.node, onlinedoc = None,
+                                    fcdoc = None, manager=ManagedDocument(doc, self.__connection))
                     self.__entities.append(entity)
                 
         else:
             for entity in self.__entities:
-                if entity.status == Entity.Status.node or entity.status == Entity.Status.invited:
+                    
+                if entity.status == Entity.Status.invited:
                     self.__entities.remove(entity)
+                    
+                if entity.status == Entity.Status.node:
+                    await entity.manager.close()
+                    self.__entities.remove(entity)
+                    
                 if entity.status == Entity.Status.shared:
-                    entity.status = Entity.Status.unknown
+                    await entity.onlinedoc.close()
+                    await entity.manager.close()
+                    self.__entities.remove(entity)
           
         self.layoutChanged.emit()
         
@@ -132,7 +144,7 @@ class Manager(QtCore.QAbstractListModel):
             return
         
         #If a document was opened in freecad this function makes it known to the Handler. 
-        entity = Entity(id = None, status = Entity.Status.local, onlinedoc = None, fcdoc = doc)
+        entity = Entity(id = None, status = Entity.Status.local, onlinedoc = None, fcdoc = doc, manager=None)
         self.layoutAboutToBeChanged.emit()
         self.__entities.append(entity)
         self.layoutChanged.emit()
@@ -150,16 +162,16 @@ class Manager(QtCore.QAbstractListModel):
         
         self.layoutAboutToBeChanged.emit()
         if entity.status == Entity.Status.local:
-            #we can remove the entity if it is local only
+            # we can remove the entity if it is local only
             self.__entities.remove(entity)
             
         elif entity.status == Entity.Status.shared:
-            #but if shared we change it to be on node only
+            # but if shared we change it to be on node only
             entity.status = Entity.Status.node
             entity.fcdoc = None
             if entity.onlinedoc:
                 asyncio.ensure_future(entity.onlinedoc.close())
-                entity.onlinedoc = None #garbage collect takes care of online doc and obj
+                entity.onlinedoc = None 
  
         self.layoutChanged.emit()
 
@@ -176,7 +188,8 @@ class Manager(QtCore.QAbstractListModel):
         
         self.layoutAboutToBeChanged.emit()
         
-        entity = Entity(id = id, status = Entity.Status.node, onlinedoc = None, fcdoc = None)
+        entity = Entity(id = id, status = Entity.Status.node, onlinedoc = None, 
+                        fcdoc = None, manager=ManagedDocument(id, self.__connection))
         self.__entities.append(entity)
         
         self.layoutChanged.emit()
@@ -197,6 +210,8 @@ class Manager(QtCore.QAbstractListModel):
         
         if entity.status == Entity.Status.node or entity.status == Entity.Status.invited:
             #it if is a pure node document we can remove it
+            if entity.manager:
+                await entity.manager.close()
             self.__entities.remove(entity)     
         
         elif entity.status == Entity.Status.shared:
@@ -204,6 +219,9 @@ class Manager(QtCore.QAbstractListModel):
             if entity.onlinedoc:
                 await entity.onlinedoc.close()
                 entity.onlinedoc = None
+            if entity.manager:
+                await entity.manager.close()
+                entity.manager = None
                 
             entity.status = Entity.Status.local
             entity.id = None
@@ -270,6 +288,7 @@ class Manager(QtCore.QAbstractListModel):
             
             entity.id = res
             entity.onlinedoc = OnlineDocument(res, entity.fcdoc, self.__connection, self.__dataservice)
+            entity.manager = ManagedDocument(res, self.__connection)
             await entity.onlinedoc.asyncSetup()
                 
         elif entity.status == Entity.Status.node:
@@ -287,6 +306,7 @@ class Manager(QtCore.QAbstractListModel):
             self.__blockLocalEvents = False
             entity.fcdoc = doc
             entity.onlinedoc = OnlineDocument(entity.id, doc, self.__connection, self.__dataservice)
+            entity.manager = ManagedDocument(entity.id, self.__connection)
             await entity.onlinedoc.asyncLoad() 
 
         entity.status = Entity.Status.shared
@@ -302,7 +322,7 @@ class Manager(QtCore.QAbstractListModel):
         
         try:
             # we do not do any entity work, as this is handled by the ocp event callbacks we trigger
-            
+
             if entity.status == Entity.Status.shared or entity.status == Entity.Status.node:
                 await self.__connection.api.call(u"ocp.documents.close", entity.id)
                 
@@ -339,21 +359,20 @@ class Manager(QtCore.QAbstractListModel):
     stopCollabborateFinished    = QtCore.Signal()
 
     class ModelRole(Enum):
-        status  = auto()
-        name    = auto()
-        members = auto()
-        joined  = auto()
-        isOpen  = auto()
+        status   = auto()
+        name     = auto()
+        isOpen   = auto()
+        document = auto()
 
     
     def roleNames(self):
         #return the QML accessible entries        
-        return {Manager.ModelRole.status.value: QtCore.QByteArray(bytes("status", 'utf-8')),
-                Manager.ModelRole.name.value: QtCore.QByteArray(bytes("name", 'utf-8')),
-                Manager.ModelRole.members.value: QtCore.QByteArray(bytes("members", 'utf-8')),
-                Manager.ModelRole.joined.value: QtCore.QByteArray(bytes("joined", 'utf-8')),
-                Manager.ModelRole.isOpen.value: QtCore.QByteArray(bytes("isOpen", 'utf-8'))}
-    
+        result = {}
+        for role in Manager.ModelRole:
+            result[role.value] = QtCore.QByteArray(bytes(role.name, 'utf-8'))
+        
+        return result
+     
     def data(self, index, role):
         #return the data for the given index and role
         
@@ -372,14 +391,11 @@ class Manager(QtCore.QAbstractListModel):
                         
             return "Unknown name"
         
-        if role == Manager.ModelRole.members:
-            return 0
-        
-        if role == Manager.ModelRole.joined:
-            return 0
-        
         if role == Manager.ModelRole.isOpen:
             return not entity.fcdoc is None
+        
+        if role == Manager.ModelRole.document:
+            return entity.manager
 
     def rowCount(self, index):
         return len(self.__entities)
