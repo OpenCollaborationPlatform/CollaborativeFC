@@ -18,10 +18,9 @@
 # ************************************************************************
 
 import FreeCADGui, asyncio, os
-from PySide import QtCore, QtGui
+from PySide2 import QtCore, QtGui, QtWidgets
 from PySide2 import QtQml
 from PySide2.QtQuick import QQuickView
-from qasync import asyncClose
 
 
 class UIWidget(QQuickView):
@@ -52,7 +51,7 @@ class UIWidget(QQuickView):
     def show(self):       
         #try to find the correct position for the popup
         pos = QtGui.QCursor.pos()
-        widget = QtGui.QApplication.widgetAt(pos)
+        widget = QtWidgets.QApplication.widgetAt(pos)
         if widget:
             point = widget.rect().bottomLeft()
             global_point = widget.mapToGlobal(point)

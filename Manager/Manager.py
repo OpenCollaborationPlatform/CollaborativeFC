@@ -19,6 +19,7 @@
 
 import FreeCAD, FreeCADGui, asyncio, os
 
+import Helper
 from Documents.Dataservice      import DataService
 from Documents.OnlineDocument   import OnlineDocument
 from Manager.Document           import ManagedDocument
@@ -54,7 +55,7 @@ class Entity():
         self.manager = manager
         
 
-class Manager(QtCore.QAbstractListModel):
+class Manager(QtCore.QAbstractListModel, Helper.AsyncSlotObject):
     #Manager that handles all entities for collaboration:
     # - the local ones that are unshared
     # - the ones we have been invited too but not yet joined
@@ -355,9 +356,6 @@ class Manager(QtCore.QAbstractListModel):
     # QT Model implementation
     # **************************************************************************************************
 
-    collabborateFinished        = QtCore.Signal()
-    stopCollabborateFinished    = QtCore.Signal()
-
     class ModelRole(Enum):
         status   = auto()
         name     = auto()
@@ -400,19 +398,17 @@ class Manager(QtCore.QAbstractListModel):
     def rowCount(self, index):
         return len(self.__entities)
     
-    @asyncSlot(int)
+    @Helper.AsyncSlot(int)
     async def collaborateSlot(self, idx):
         entity = self.__entities[idx]
         await self.collaborate(entity)
-        self.collabborateFinished.emit()
     
-    @asyncSlot(int)
+    @Helper.AsyncSlot(int)
     async def stopCollaborateSlot(self, idx):
         entity = self.__entities[idx]
         await self.stopCollaborate(entity)
-        self.stopCollabborateFinished.emit()
         
-    @asyncSlot(int)
+    @Helper.AsyncSlot(int)
     async def openSlot(self, idx):
         entity = self.__entities[idx]
         if entity.fcdoc:
@@ -421,7 +417,7 @@ class Manager(QtCore.QAbstractListModel):
         # we can reuse collaborate, as it opens a document for a node status entity anyway
         await self.collaborate(entity)
         
-    @asyncSlot(int)
+    @Helper.AsyncSlot(int)
     async def closeSlot(self, idx):
         entity = self.__entities[idx]
         if entity.fcdoc:

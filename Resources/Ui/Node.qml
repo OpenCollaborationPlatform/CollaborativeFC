@@ -5,7 +5,7 @@ import QtQuick.Layouts 1.11
 Pane {
     width: 800
     height: 800
-    property alias rowLayout: rowLayout
+    property alias node: node
 
     ColumnLayout {
         id: columnLayout1
@@ -13,9 +13,7 @@ Pane {
         spacing: 10
 
         RowLayout {
-            id: rowLayout
-            width: 100
-            height: 100
+            id: node
             Layout.alignment: Qt.AlignLeft | Qt.AlignTop
             spacing: 10
             Layout.fillWidth: true
@@ -32,14 +30,11 @@ Pane {
 
             ColumnLayout {
                 id: columnLayout4
-                width: 100
-                height: 100
                 Layout.fillWidth: true
 
                 RowLayout {
                     id: rowLayout1
-                    width: 100
-                    height: 100
+                    Layout.alignment: Qt.AlignLeft | Qt.AlignTop
                     Layout.fillWidth: true
 
                     ColumnLayout {
@@ -130,14 +125,14 @@ Pane {
                     }
                 }
 
+
+
                 LogView {
                     id: logView
                     Layout.alignment: Qt.AlignLeft | Qt.AlignTop
                     Layout.fillWidth: true
                     Layout.fillHeight: false
                 }
-
-
             }
 
 

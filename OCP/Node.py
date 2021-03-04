@@ -19,6 +19,7 @@
 
 import os, sys, logging, asyncio, collections, json
 import aiofiles
+import Helper
 from qasync import asyncSlot
 from PySide2 import QtCore
 
@@ -141,7 +142,7 @@ class LogReader(QtCore.QAbstractListModel):
     
 
 #Helper class to call the running node via CLI
-class Node(QtCore.QObject):
+class Node(QtCore.QObject, Helper.AsyncSlotObject):
     
     def __init__(self, logger):
         
@@ -373,11 +374,6 @@ class Node(QtCore.QObject):
     # ********************************************************************************************
     
     #signals for property change (needed to have QML update on property change) and asyncslot finish
-    runFinished             = QtCore.Signal()
-    shutdownFinished        = QtCore.Signal()
-    updateDetailsFinished   = QtCore.Signal()
-    setP2PDetailsFinished   = QtCore.Signal()
-    setAPIDetailsFinished   = QtCore.Signal()
     runningChanged          = QtCore.Signal()
     p2pUriChanged           = QtCore.Signal()
     p2pPortChanged          = QtCore.Signal()
@@ -410,24 +406,19 @@ class Node(QtCore.QObject):
     def logModel(self):
         return self.__logReader
     
-    @asyncSlot()
+    @Helper.AsyncSlot()
     async def runSlot(self):
         await self.run()
-        self.runFinished.emit()
         
-    @asyncSlot()
+    @Helper.AsyncSlot()
     async def shutdownSlot(self):
         await self.shutdown()
-        self.shutdownFinished.emit()
     
-    @asyncSlot()
-    async def updateDetails(self):
-        
+    @Helper.AsyncSlot()
+    async def updateDetails(self):        
         await self.__update()        
-        self.updateDetailsFinished.emit()
 
-
-    @asyncSlot(str, str)
+    @Helper.AsyncSlot(str, str)
     async def setP2PDetails(self, uri, port):
         
         if await self.__checkRunning():
@@ -446,11 +437,9 @@ class Node(QtCore.QObject):
          
         process = await asyncio.create_subprocess_shell(args, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
         await process.wait()
-        
-        self.setP2PDetailsFinished.emit()
+
     
-    
-    @asyncSlot(str, str)
+    @Helper.AsyncSlot(str, str)
     async def setAPIDetails(self, uri, port):
         
         if await self.__checkRunning():
@@ -470,4 +459,3 @@ class Node(QtCore.QObject):
         process = await asyncio.create_subprocess_shell(args, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
         await process.wait()
         
-        self.setAPIDetailsFinished.emit()

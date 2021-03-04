@@ -18,10 +18,10 @@
 # ************************************************************************
 
 import FreeCAD, logging, os, asyncio, traceback
+import Helper
 import Documents.Property       as Property
 import Documents.Object         as Object
 import Documents.AsyncRunner    as AsyncRunner
-import Documents.Helper         as Helper
 import Documents.Observer       as Observer
 from Documents.OnlineObject import OnlineObject
 from Documents.OnlineObject import OnlineViewProvider

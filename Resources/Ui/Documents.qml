@@ -14,27 +14,37 @@ Pane {
         anchors.fill: parent
         currentIndex: 0
 
-        ListView {
-            id: listView
-            anchors.fill: parent
-            model: ocpDocuments //exposed from python (name, status, members, joined)
-            delegate: Document {
-                width: listView.width
+        BusyErrorElement {
+            id: docList
+            Component.onCompleted: setAsyncSlotObject(ocpDocuments)
 
-                onEdit: {
-                    docEdit.document = documentObject
-                    stack.currentIndex = 1
+            ListView {
+                id: listView
+                anchors.fill: parent
+                model: ocpDocuments //exposed from python (name, status, members, joined)
+                delegate: Document {
+                    width: listView.width
+
+                    onEdit: {
+                        docEdit.document = documentObject
+                        stack.currentIndex = 1
+                    }
                 }
             }
         }
 
-        Pane {
+        BusyErrorElement {
             id: docEdit
+
             property var document  //the document to edit
 
             onDocumentChanged: {
+
                 nameEdit.text = document.name
                 docPeerList.model = document.peers
+
+                //the documents async slots call slotFinished when done
+                docEdit.setAsyncSlotObject(document)
             }
 
             anchors.fill: parent
