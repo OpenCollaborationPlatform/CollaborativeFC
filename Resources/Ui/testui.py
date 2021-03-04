@@ -43,7 +43,6 @@ class Peers(QtCore.QAbstractListModel):
 class Document(QtCore.QObject, Helper.AsyncSlotObject):
     def __init__(self, name):
         QtCore.QObject.__init__(self)
-        print(dir(self))
         self.__peers = Peers()
         self.__name = name
 

@@ -5,21 +5,21 @@ import QtQuick.Layouts 1.11
 Pane {
     width: 800
     height: 800
-    property alias node: node
+    //property alias node: node
 
     ColumnLayout {
-        id: columnLayout1
+        id: mainLayout
         anchors.fill: parent
         spacing: 10
 
         RowLayout {
-            id: node
+            id: nodeMainLayout
             Layout.alignment: Qt.AlignLeft | Qt.AlignTop
             spacing: 10
             Layout.fillWidth: true
 
             Rectangle {
-                id: rectangle
+                id: nodeIndicator
                 width: 20
                 height: 20
                 color: connection.node.running ? "green" : "grey"
@@ -28,119 +28,124 @@ Pane {
                 Layout.alignment: Qt.AlignLeft | Qt.AlignTop
             }
 
-            ColumnLayout {
-                id: columnLayout4
+            BusyErrorElement {
+                id: nodeBusy
+                Layout.alignment: Qt.AlignLeft | Qt.AlignTop
                 Layout.fillWidth: true
+                padding: 0
 
-                RowLayout {
-                    id: rowLayout1
-                    Layout.alignment: Qt.AlignLeft | Qt.AlignTop
-                    Layout.fillWidth: true
+                Component.onCompleted: setAsyncSlotObject(connection.node)
 
-                    ColumnLayout {
-                        id: columnLayout
+                //required as BusyErrorElement cannot calculate its size with layouts as parent and children
+                contentHeight: nodeLayout.implicitHeight
+
+                ColumnLayout {
+                    id: nodeLayout
+                    width: parent.width
+
+                    RowLayout {
+                        id: nodeControlLayout
                         Layout.alignment: Qt.AlignLeft | Qt.AlignTop
-                        Layout.fillHeight: false
                         Layout.fillWidth: true
 
-                        Label {
-                            id: text3
-                            text: connection.node.running ? qsTr("OCP Node running") : qsTr("No OCP Node running")
-                            font.pointSize: 15
+                        ColumnLayout {
+                            id: nodeDataLayout
+                            Layout.alignment: Qt.AlignLeft | Qt.AlignTop
+                            Layout.fillHeight: false
                             Layout.fillWidth: true
-                            font.bold: true
-                            Layout.alignment: Qt.AlignLeft | Qt.AlignTop
+
+                            Label {
+                                id: nodeMessage
+                                text: connection.node.running ? qsTr("OCP Node running") : qsTr("No OCP Node running")
+                                font.pointSize: 15
+                                Layout.fillWidth: true
+                                font.bold: true
+                                Layout.alignment: Qt.AlignLeft | Qt.AlignTop
+                            }
+
+                            Grid {
+
+                                id: nodeSettingsGrid
+                                Layout.fillWidth: false
+                                spacing: 3
+                                rows: 2
+                                columns: 3
+                                enabled: !connection.node.running
+
+                                verticalItemAlignment: Grid.AlignVCenter
+                                Layout.alignment: Qt.AlignLeft | Qt.AlignTop
+
+                                Label {
+                                    text: qsTr("P2P listens on")
+                                    rightPadding: 10
+                                }
+
+                                TextField {
+                                    id: p2pUri
+                                    width: 130
+                                    text: connection.node.p2pUri
+                                    placeholderText: qsTr("IP Adress")
+
+                                    onEditingFinished: connection.node.setP2PDetails(p2pUri.text,  p2pPort.text)
+                                }
+
+                                TextField {
+                                    id: p2pPort
+                                    width: 60
+                                    text: connection.node.p2pPort
+                                    placeholderText: qsTr("Port")
+
+                                    onEditingFinished: connection.node.setP2PDetails(p2pUri.text,  p2pPort.text)
+                                }
+
+                                Label {
+                                    text: qsTr("API listen on")
+                                    rightPadding: 10
+                                }
+
+                                TextField {
+                                    id: wampUri
+                                    width: 130
+                                    text: connection.node.apiUri
+                                    placeholderText: qsTr("IP Adress")
+
+                                    onEditingFinished: connection.node.setAPIDetails(apiUri.text,  apiPort.text)
+                                }
+
+                                TextField {
+                                    id: wampPort
+                                    width: 60
+                                    text: connection.node.apiPort
+                                    placeholderText: qsTr("Port")
+
+                                    onEditingFinished: connection.node.setAPIDetails(apiUri.text,  apiPort.text)
+                                }
+                            }
                         }
 
-                        Grid {
+                        Button {
+                            id: nodeButton
+                            height: 25
+                            enabled: !connection.api.connected
+                            text: connection.node.running ? qsTr("Shutdown") : qsTr("Startup")
+                            Layout.alignment: Qt.AlignRight | Qt.AlignTop
 
-                            id: grid
-                            Layout.fillWidth: false
-                            spacing: 3
-                            rows: 2
-                            columns: 3
-                            enabled: !connection.node.running
-
-                            verticalItemAlignment: Grid.AlignVCenter
-                            Layout.alignment: Qt.AlignLeft | Qt.AlignTop
-
-                            Label {
-                                id: label
-                                text: qsTr("P2P listens on")
-                                rightPadding: 10
-                            }
-
-                            TextField {
-                                id: p2pUri
-                                width: 130
-                                text: connection.node.p2pUri
-                                placeholderText: qsTr("IP Adress")
-
-                                onEditingFinished: connection.node.setP2PDetails(p2pUri.text,  p2pPort.text)
-                            }
-
-                            TextField {
-                                id: p2pPort
-                                width: 60
-                                text: connection.node.p2pPort
-                                placeholderText: qsTr("Port")
-
-                                onEditingFinished: connection.node.setP2PDetails(p2pUri.text,  p2pPort.text)
-                            }
-
-                            Label {
-                                id: label1
-                                text: qsTr("API listen on")
-                                rightPadding: 10
-                            }
-
-                            TextField {
-                                id: wampUri
-                                width: 130
-                                text: connection.node.apiUri
-                                placeholderText: qsTr("IP Adress")
-
-                                onEditingFinished: connection.node.setAPIDetails(apiUri.text,  apiPort.text)
-                            }
-
-                            TextField {
-                                id: wampPort
-                                width: 60
-                                text: connection.node.apiPort
-                                placeholderText: qsTr("Port")
-
-                                onEditingFinished: connection.node.setAPIDetails(apiUri.text,  apiPort.text)
-                            }
+                            onClicked: connection.node.running ? connection.node.shutdownSlot() : connection.node.runSlot()
                         }
                     }
 
-                    Button {
-                        id: button
-                        height: 25
-                        enabled: !connection.api.connected
-                        text: connection.node.running ? qsTr("Shutdown") : qsTr("Startup")
-                        Layout.alignment: Qt.AlignRight | Qt.AlignTop
-
-                        onClicked: connection.node.running ? connection.node.shutdownSlot() : connection.node.runSlot()
+                    LogView {
+                        id: nodeLog
+                        Layout.alignment: Qt.AlignLeft | Qt.AlignTop
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
                     }
-                }
-
-
-
-                LogView {
-                    id: logView
-                    Layout.alignment: Qt.AlignLeft | Qt.AlignTop
-                    Layout.fillWidth: true
-                    Layout.fillHeight: false
                 }
             }
-
-
-
         }
 
         RowLayout {
-            id: api
+            id: apiMainLayout
             width: 100
             height: 100
             Layout.fillHeight: false
@@ -149,7 +154,7 @@ Pane {
             spacing: 10
 
             Rectangle {
-                id: rectangle3
+                id: apiIndicator
                 width: 20
                 height: 20
                 color: connection.api.connected ? "green" : "grey"
@@ -158,22 +163,32 @@ Pane {
                 Layout.alignment: Qt.AlignLeft | Qt.AlignTop
             }
 
-            ColumnLayout {
-                id: columnLayout2
-                width: 100
-                height: 100
+            BusyErrorElement {
+                id: apiBusy
+                Layout.alignment: Qt.AlignLeft | Qt.AlignTop
+                Layout.fillWidth: true
+                padding: 0
+
+                Component.onCompleted: setAsyncSlotObject(connection.api)
+
+                //required as BusyErrorElement cannot calculate its size with layouts as parent and children
+                contentHeight: apiLayout.implicitHeight
+
+              ColumnLayout {
+                id: apiLayout
+                width: parent.width
                 spacing: 1
                 Layout.alignment: Qt.AlignLeft | Qt.AlignTop
 
                 RowLayout {
-                    id: rowLayout4
+                    id: apiControlLayout
                     width: 100
                     height: 100
                     Layout.fillHeight: false
                     Layout.fillWidth: true
 
                     Label {
-                        id: label2
+                        id: apiMessage
                         text: connection.api.connected ? qsTr("API connection established") : qsTr("Not connected to OCP Node API")
                         Layout.alignment: Qt.AlignLeft | Qt.AlignTop
                         Layout.fillWidth: true
@@ -182,7 +197,7 @@ Pane {
                     }
 
                     Button {
-                        id: button1
+                        id: apiButton
                         enabled: connection.node.running
                         text: connection.api.connected ? qsTr("Disconnect") : qsTr("Connect")
                         Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
@@ -200,6 +215,7 @@ Pane {
                 }
             }
 
+            }
         }
 
         RowLayout {

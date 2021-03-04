@@ -23,10 +23,11 @@ import asyncio, logging
 from autobahn.asyncio.component import Component
 from PySide2 import QtCore
 from qasync import asyncSlot
+import Helper
 import FreeCAD
 
 
-class API(QtCore.QObject):
+class API(QtCore.QObject, Helper.AsyncSlotObject):
     #Class to handle the WAMP connection to the OCP node
        
     def __init__(self, node, logger):
@@ -218,8 +219,7 @@ class API(QtCore.QObject):
     #signals for property change (needed to have QML update on property change)
     connectedChanged         = QtCore.Signal()
     __reconnectChanged       = QtCore.Signal()
-    __connectSlotFinished    = QtCore.Signal()
-    __disconnectSlotFinished = QtCore.Signal()
+
 
     @QtCore.Property(bool, notify=connectedChanged)
     def connected(self):
@@ -235,17 +235,15 @@ class API(QtCore.QObject):
        
     reconnect = QtCore.Property(bool, getReconnect, setReconnect, notify=__reconnectChanged)
  
-    @asyncSlot()
+    @Helper.AsyncSlot()
     async  def disconnectSlot(self):
         await self.disconnectFromNode()
-        self.__disconnectSlotFinished.emit()
         
-    @asyncSlot()
+    @Helper.AsyncSlot()
     async def connectSlot(self):
 
         await self.connectToNode()
         await self.waitTillReady()
-        self.__connectSlotFinished.emit()
         
             
         

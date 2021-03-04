@@ -51,7 +51,7 @@ Pane {
 
         function onAsyncSlotStarted(id) {
             startBusy()
-            _running.push(id)
+            internal.running.push(id)
         }
 
         function startBusy() {
@@ -92,7 +92,6 @@ Pane {
     BusyIndicator {
         id: busy
         running: false
-
         x: Math.round((parent.width - width) / 2)
         y: Math.round((parent.height - height) / 2)
     }
