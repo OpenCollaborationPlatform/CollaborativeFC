@@ -85,6 +85,9 @@ class PeerModel(QtCore.QAbstractListModel):
             
     def peerByIndex(self, idx):
         return self.__peers[idx][PeerModel.Roles.nodeid]
+    
+    def peerAuthByIndex(self, idx):
+        return self.__peers[idx][PeerModel.Roles.authorisation]
             
     def peerCount(self):
         return len(self.__peers)
@@ -233,23 +236,28 @@ class ManagedDocument(QtCore.QObject, Helper.AsyncSlotObject):
     joinedCount = QtCore.Property(int, __getJoinedCount, notify=__joinedCountChanged)
 
     @Helper.AsyncSlot(str)
-    def setName(self, name):
+    def setNameSlot(self, name):
         print(f"SetName with {name}")
 
     @Helper.AsyncSlot(int)
-    def removePeer(self, idx):
+    async def removePeerSlot(self, idx):
         peer = self.__peers.peerByIndex(idx)
-        self.removePeer(peer)
+        await self.removePeer(peer)
 
     @Helper.AsyncSlot(int)
-    def togglePeerRigths(self, idx):
-        print(f"Toggle Peer Rigths {idx}")
-
+    async def togglePeerRigthsSlot(self, idx):
+        
+        peer = self.__peers.peerByIndex(idx)
+        auth = self.__peers.peerAuthByIndex(idx)
+        if auth == "Write":
+            await self.changePeerAuth(peer, "Read")
+        else:
+            await self.changePeerAuth(peer, "Write")
 
     @Helper.AsyncSlot(str, bool)
-    def addPeer(self, id, edit):
-        rigth = "Read"
+    async def addPeerSlot(self, id, edit):
+        auth = "Read"
         if edit:
-            rigth = "Write"
+            auth = "Write"
                 
-        self.addPeer(id, edit)
+        await self.addPeer(id, auth)

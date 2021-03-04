@@ -54,8 +54,9 @@ class Handler():
           
     async def _startup(self, connection):
         
+        
         self.__connection = connection
-        await connection.ready()
+        await connection.api.waitTillReady()
         
         #register ourself to the OCP node
         await connection.api.subscribe("testhandler", self.__receiveSync, "ocp.documents..content.Document.sync", options=SubscribeOptions(match="wildcard"))
@@ -66,8 +67,7 @@ class Handler():
         self.test.on('join', self.__onJoin)
         self.test.on('leave', self.__onLeave)
         
-        #block till all handling is done
-        await self.test.start()
+        self.test.start()
     
     
     async def __onJoin(self, session, details):
@@ -91,7 +91,6 @@ class Handler():
             await session.register(getattr(self, rpc), rpc_uri)
     
         #inform test framework that we are set up!
-        print("trigger event: ", uri)
         try:
             await session.call("ocp.test.triggerEvent", uri, True)
         except Exception as e:
@@ -142,7 +141,7 @@ class Handler():
         #and now issue the event that all FC instances know that they should sync.
         self.__logger.debug(f"Work done, trigger sync events via dml: {docId[:6]}")
         uri = f"ocp.documents.{docId}.content.Document.sync"
-        await self.__connection.session.call(uri, docId)
+        await self.__connection.api.call(uri, docId)
 
      
     async def  __receiveSync(self, docId):

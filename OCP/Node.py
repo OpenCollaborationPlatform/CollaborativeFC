@@ -164,7 +164,7 @@ class Node(QtCore.QObject, Helper.AsyncSlotObject):
         self.__test = False
         if os.getenv('OCP_TEST_RUN', "0") == "1":
             #we are in testing mode! check out the required node to connect to
-            print("OCP test mode detected")
+            print("OCP Node: test mode detected")
             self.__test = True
             self.__conf = os.getenv("OCP_TEST_NODE_CONFIG", "none")
             
@@ -275,13 +275,8 @@ class Node(QtCore.QObject, Helper.AsyncSlotObject):
         
     async def __start(self):
         # checks if a OCP node is running, and starts up one if not
-               
-        if self.__test:
-            #in test mode we do not start our own node!
-            print("Test mode: no own node startup!")
-            return
-        
-        if not await self.__checkRunning():
+
+        if not self.__test and not await self.__checkRunning():
             
             #start it
             await asyncio.create_subprocess_shell(self.__ocp + " start -d -e -j", 
@@ -317,7 +312,11 @@ class Node(QtCore.QObject, Helper.AsyncSlotObject):
     async def __checkRunning(self):
         # returns if a OCP node is running
         
-        process = await asyncio.create_subprocess_shell(self.__ocp, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+        args = self.__ocp
+        if self.__test:
+            args += " --config " + self.__conf
+            
+        process = await asyncio.create_subprocess_shell(args, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
         out, err = await process.communicate()
         
         if not out:
@@ -344,12 +343,12 @@ class Node(QtCore.QObject, Helper.AsyncSlotObject):
             self.__p2pUri = p2pUri
             self.p2pUriChanged.emit()
             
-        apiPort = await self.__fetchConfig("connection.port", running)
+        apiPort = await self.__fetchConfig("api.port", running)
         if self.__apiPort != apiPort:
             self.__apiPort = apiPort
             self.apiPortChanged.emit()
             
-        apiUri  = await self.__fetchConfig("connection.uri", running)
+        apiUri  = await self.__fetchConfig("api.uri", running)
         if self.__apiUri != apiUri:
             self.__apiUri = apiUri
             self.apiUriChanged.emit()

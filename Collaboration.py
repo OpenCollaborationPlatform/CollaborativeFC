@@ -55,5 +55,6 @@ Observer.initialize(manager)
 
 if os.getenv('OCP_TEST_RUN', "0") == "1":
     #connect to test server
+    print("startup test handler")
     import Test
     tester = Test.Handler(connection, manager)

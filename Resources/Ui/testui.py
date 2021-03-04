@@ -68,23 +68,23 @@ class Document(QtCore.QObject, Helper.AsyncSlotObject):
     joinedCount = QtCore.Property(int, getJoinedCount, notify=joinedCountChanged)
 
     @Helper.AsyncSlot(str)
-    async def setName(self, name):
+    async def setNameSlot(self, name):
         print(f"Set Name {name}")
         await asyncio.sleep(1)
 
     @Helper.AsyncSlot(int)
-    async def removePeer(self, idx):
+    async def removePeerSlot(self, idx):
         print(f"Remove peer {idx}")
         await asyncio.sleep(1)
 
     @Helper.AsyncSlot(int)
-    async def togglePeerRigths(self, idx):
+    async def togglePeerRigthsSlot(self, idx):
         print(f"Toggle Peer Rigths {idx}")
         await asyncio.sleep(1)
         raise Exception("error occured")
 
     @Helper.AsyncSlot(str, bool)
-    async def addPeer(self, id, edit):
+    async def addPeerSlot(self, id, edit):
         print(f"Add Peer {id}: {edit}")
         await asyncio.sleep(2)
         print("Add Peer done")
