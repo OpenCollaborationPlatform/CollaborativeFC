@@ -37,7 +37,10 @@ def __fcobject_cleanup(obj):
     try: 
         yield
     finally: 
-        if hasattr(obj, "purgeTouched"):
+        if obj.TypeId  == "Spreadsheet::Sheet":
+            obj.recompute()  #Spreadsheet setup dynamic alias properties in recompute
+            
+        elif hasattr(obj, "purgeTouched"):
             obj.purgeTouched()
 
 # Simplify object handling by combining observer blockingand object cleanup

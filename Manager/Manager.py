@@ -328,17 +328,14 @@ class Manager(QtCore.QAbstractListModel, Helper.AsyncSlotObject):
         if not self.__connection.api.connected:
             return 
         
-        try:
-            # we do not do any entity work, as this is handled by the ocp event callbacks we trigger
+        # we do not do any entity work, as this is handled by the ocp event callbacks we trigger
 
-            if entity.status == Entity.Status.shared or entity.status == Entity.Status.node:
-                await self.__connection.api.call(u"ocp.documents.close", entity.id)
-                
-            else:
-                raise Exception(f"Cannot stop colaboration when status is {entity.status.name}")
-        
-        except Exception as e:
-            print("Stop collaboration error: {0}".format(e))
+        if entity.status == Entity.Status.shared or entity.status == Entity.Status.node:
+            await self.__connection.api.call(u"ocp.documents.close", entity.id)
+            
+        else:
+            raise Exception(f"Cannot stop colaboration when status is {entity.status.name}")
+
     
 
     def getEntity(self, key, val):
