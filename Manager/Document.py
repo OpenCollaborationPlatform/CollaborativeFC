@@ -129,6 +129,7 @@ class ManagedDocument(QtCore.QObject, Helper.AsyncSlotObject):
         self.__peers = PeerModel()
         self.__docId = id
         self.__connection = connection
+        self.__readyEvt = asyncio.Event()
         
         connection.api.connectedChanged.connect(self.__connectChanged)
         asyncio.ensure_future(self.__asyncInit())
@@ -146,7 +147,10 @@ class ManagedDocument(QtCore.QObject, Helper.AsyncSlotObject):
         await self.__connection.api.subscribe(self.__subkey, self.__peerActivityChanged,  f"ocp.documents.{self.__docId}.peerActivityChanged")
         await self.__connection.api.subscribe(self.__subkey, self.__peerAdded,  f"ocp.documents.{self.__docId}.peerAdded")
         await self.__connection.api.subscribe(self.__subkey, self.__peerRemoved,  f"ocp.documents.{self.__docId}.peerRemoved")
+        self.__readyEvt.set()
         
+    async def ready(self):
+        await self.__readyEvt.wait()
 
     async def close(self):
         #unsubscribe the events

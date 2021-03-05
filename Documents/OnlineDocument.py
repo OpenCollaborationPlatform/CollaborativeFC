@@ -43,16 +43,16 @@ class OnlineDocument():
         self.logger = logging.getLogger("Document " + id[-5:])
         self.sync = None
         
-        if os.getenv('FC_OCP_SYNC_MODE', "0") == "1":
-            self.synced = True
-        else:
-            self.synced = False
+        self.synced = bool(os.getenv('FC_OCP_SYNC_MODE', "0"))
             
         #Online documents cannot use the FreeCAD Transaction framework
         doc.UndoMode = 0
         
         self.logger.debug("Created")
  
+    async def ready(self):
+        await self.onlineObs.ready()
+        await self.data.ready()
  
     async def close(self):
         # we close the online doc. That means closing the observer and all objects/viewproviders
@@ -467,4 +467,4 @@ class OnlineDocument():
         coros.append(self.onlineObs.waitTillCloseout(timeout))
 
         if len(coros)>0:
-            await asyncio.wait(coros)
+            await asyncio.gather(*coros)

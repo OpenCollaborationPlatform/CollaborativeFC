@@ -35,6 +35,7 @@ class OnlineObserver():
         self.onlineDoc = odoc
         self.logger = logging.getLogger("Online observer " + odoc.id[-5:])
         self.runners = {}
+        self.readyEvt = asyncio.Event()
         
         asyncio.ensure_future(self.__asyncInit())
        
@@ -80,11 +81,14 @@ class OnlineObserver():
             for cb in self.callbacks.keys():
                 await self.onlineDoc.connection.api.subscribe(key, self.__run, uri+cb, options=SubscribeOptions(match="wildcard", details_arg="details"))
 
+            self.readyEvt.set()
             #self.onlineDoc.connection.api.subscribe(self.__runDocProperties, uri+"Properties", options=SubscribeOptions(match="prefix", details_arg="details"))
            
         except Exception as e:
             self.logger.error("Setup failed: ", e)
 
+    async def ready(self):
+        await self.readyEvt.wait()
      
     async def close(self):
         tasks = []
@@ -160,11 +164,11 @@ class OnlineObserver():
 
     async def waitTillCloseout(self, timeout = 10):
         coros = []
-        for runner in self.runners:
-            coros.append(self.runners[runner].waitTillCloseout(timeout))
+        for runner in self.runners.values():
+            coros.append(runner.waitTillCloseout(timeout))
             
         if coros:
-            await asyncio.wait(coros)
+            await asyncio.gather(*coros)
 
      
     #Callbacks for DML events

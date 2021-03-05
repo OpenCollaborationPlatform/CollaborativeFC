@@ -70,7 +70,7 @@ def createDynamicProperties(obj, props, infos):
     
     with __fcobject_processing(obj):
         for prop, info in zip(props, infos):
-            if hasattr(obj, prop):
+            if prop in obj.PropertiesList:
                 continue
                             
             attributes = Property.statusToType(info["status"])            
@@ -86,7 +86,7 @@ def createDynamicProperties(obj, props, infos):
 
 def removeDynamicProperty(obj, prop):
     
-    if not hasattr(obj, prop):
+    if not prop in obj.PropertiesList:
         return
             
     with __fcobject_processing(obj):
@@ -97,7 +97,7 @@ def removeDynamicProperties(obj, props):
     
     with __fcobject_processing(obj):
         for prop in props:
-            if not hasattr(obj, prop):
+            if not prop in obj.PropertiesList:
                 continue
     
             obj.removeProperty(prop)

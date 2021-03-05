@@ -27,11 +27,16 @@ class DataService():
         self.__data = {}
         self.uri = u'freecad.{0}.dataUpload'.format(fcid)
         self.__connection = connection
+        self.__readyEvt = asyncio.Event()
         
         asyncio.ensure_future(self.__asyncInit())
         
     async def __asyncInit(self):
         await self.__connection.api.register("dataservice", self.__dataUpload, self.uri, RegisterOptions(details_arg='details'))
+        self.__readyEvt.set()
+    
+    async def ready(self):
+        await self.__readyEvt.wait()
     
     async def close(self):
         await self.__connection.api.closeKey("dataservice")

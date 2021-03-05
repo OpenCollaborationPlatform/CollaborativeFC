@@ -105,7 +105,7 @@ class FreeCADOnlineObject():
             # create the dynamic properties
             add = set(oProps) - set(props)
             infos = await self.Reader.propertiesInfos(add)
-            Object.createDynamicProperties(obj, props, infos)
+            Object.createDynamicProperties(obj, add, infos)
             
             # set all property values. Note that data can be None in case the property was never written (default value)
             values = await self.Reader.properties(oProps)

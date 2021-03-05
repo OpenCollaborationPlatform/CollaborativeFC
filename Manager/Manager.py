@@ -113,6 +113,7 @@ class Manager(QtCore.QAbstractListModel, Helper.AsyncSlotObject):
                 if not self.hasEntity("id", doc):
                     entity = Entity(id = doc, status = Entity.Status.node, onlinedoc = None,
                                     fcdoc = None, manager=ManagedDocument(doc, self.__connection))
+                    await entity.manager.ready()
                     self.__entities.append(entity)
                 
         else:
@@ -191,6 +192,7 @@ class Manager(QtCore.QAbstractListModel, Helper.AsyncSlotObject):
         
         entity = Entity(id = id, status = Entity.Status.node, onlinedoc = None, 
                         fcdoc = None, manager=ManagedDocument(id, self.__connection))
+        await entity.manager.ready()
         self.__entities.append(entity)
         
         self.layoutChanged.emit()
@@ -289,7 +291,9 @@ class Manager(QtCore.QAbstractListModel, Helper.AsyncSlotObject):
             
             entity.id = res
             entity.onlinedoc = OnlineDocument(res, entity.fcdoc, self.__connection, self.__dataservice)
+            await entity.onlinedoc.ready()
             entity.manager = ManagedDocument(res, self.__connection)
+            await entity.manager.ready()
             await entity.onlinedoc.asyncSetup()
                 
         elif entity.status == Entity.Status.node:
@@ -298,6 +302,7 @@ class Manager(QtCore.QAbstractListModel, Helper.AsyncSlotObject):
             self.__blockLocalEvents = False
             entity.fcdoc = doc
             entity.onlinedoc = OnlineDocument(entity.id, doc, self.__connection, self.__dataservice)
+            await entity.onlinedoc.ready()
             await entity.onlinedoc.asyncLoad() 
                 
         elif entity.status == Entity.Status.invited:
@@ -307,7 +312,9 @@ class Manager(QtCore.QAbstractListModel, Helper.AsyncSlotObject):
             self.__blockLocalEvents = False
             entity.fcdoc = doc
             entity.onlinedoc = OnlineDocument(entity.id, doc, self.__connection, self.__dataservice)
+            await entity.onlinedoc.ready()
             entity.manager = ManagedDocument(entity.id, self.__connection)
+            await entity.manager.ready()
             await entity.onlinedoc.asyncLoad() 
 
         entity.status = Entity.Status.shared

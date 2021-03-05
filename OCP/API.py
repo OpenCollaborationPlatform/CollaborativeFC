@@ -93,9 +93,7 @@ class API(QtCore.QObject, Helper.AsyncSlotObject):
         # Registers an API function. It stays registered over multiple session and reconnects
         # Can be unregistered with the given key. Note: multiple register and subscribe calls can be 
         # made with a single key
-        
-        self.__logger.debug(f"Register function {args[1]}")
-        
+                
         self.__registered[key] = self.__registered.get(key, []) + [(args, kwargs)]
         if self.connected:
             try:
@@ -106,9 +104,7 @@ class API(QtCore.QObject, Helper.AsyncSlotObject):
     
     async def subscribe(self, key, *args, **kwargs):
         # Subscribe to API event. It stays subscribed over multiple session and reconnects
-        
-        self.__logger.debug(f"Subscribe event {args[1]}")
-        
+               
         self.__subscribed[key] = self.__subscribed.get(key, []) + [(args, kwargs)]
         if self.connected:
             try:
@@ -140,7 +136,6 @@ class API(QtCore.QObject, Helper.AsyncSlotObject):
     async def call(self, *args, **kwargs):
         # calls api function
         
-        self.__logger.debug(f"Call {args[0]}")
         if not self.connected: 
             raise Exception("Not connected to Node, cannot call API function")
         

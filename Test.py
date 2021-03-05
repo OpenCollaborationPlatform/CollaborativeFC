@@ -129,7 +129,7 @@ class Handler():
         #   1. Do all known opeations
         #   2. Emit sync event in DML document
         
-        self.__logger.debug(f"Start syncronisation for: {docId[:6]}")
+        self.__logger.debug(f"Start syncronisation for: {docId[-5:]}")
                 
         #we wait till all tasks are finished
         if not await self.waitTillCloseout(docId):
@@ -139,7 +139,7 @@ class Handler():
         await self.__session.call("ocp.test.registerSync", docId, numFCs)
         
         #and now issue the event that all FC instances know that they should sync.
-        self.__logger.debug(f"Work done, trigger sync events via dml: {docId[:6]}")
+        self.__logger.debug(f"Work done, trigger sync events via dml: {docId[-5:]}")
         uri = f"ocp.documents.{docId}.content.Document.sync"
         await self.__connection.api.call(uri, docId)
 
@@ -149,7 +149,8 @@ class Handler():
         # 1. Wait till all actions are finished
         # 2. Inform the TestServer, that we are finished
         
-        self.__logger.debug(f"Request for sync received: {docId[:6]}")
+        self.__logger.debug(f"Request for sync received: {docId[-5:]}")
+        #await asyncio.sleep(0.05)
         
         #wait till everything is done!
         try:
