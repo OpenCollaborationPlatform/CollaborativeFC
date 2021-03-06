@@ -241,7 +241,7 @@
    <item>
     <widget class="QStackedWidget" name="stack">
      <property name="currentIndex">
-      <number>1</number>
+      <number>0</number>
      </property>
      <widget class="QWidget" name="node">
       <layout class="QVBoxLayout" name="verticalLayout_5">
@@ -751,6 +751,12 @@
        </property>
        <item>
         <widget class="QScrollArea" name="docArea">
+         <property name="frameShape">
+          <enum>QFrame::NoFrame</enum>
+         </property>
+         <property name="horizontalScrollBarPolicy">
+          <enum>Qt::ScrollBarAlwaysOff</enum>
+         </property>
          <property name="widgetResizable">
           <bool>true</bool>
          </property>
@@ -759,8 +765,8 @@
            <rect>
             <x>0</x>
             <y>0</y>
-            <width>523</width>
-            <height>548</height>
+            <width>527</width>
+            <height>552</height>
            </rect>
           </property>
          </widget>

@@ -53,9 +53,10 @@ class Entity():
         self.fcdoc = fcdoc
         self.onlinedoc = onlinedoc
         self.manager = manager
+        self.uuid = str(uuid.uuid4())
         
 
-class Manager(QtCore.QAbstractListModel, Helper.AsyncSlotObject):
+class Manager(QtCore.QObject, Helper.AsyncSlotObject):
     #Manager that handles all entities for collaboration:
     # - the local ones that are unshared
     # - the ones we have been invited too but not yet joined
@@ -64,7 +65,7 @@ class Manager(QtCore.QAbstractListModel, Helper.AsyncSlotObject):
     
     def __init__(self, collab_path, connection):  
         
-        QtCore.QAbstractListModel.__init__(self)
+        QtCore.QObject.__init__(self)
         
         self.__entities = [] #empty list for all our document handling status, each doc is a map: {id, status, onlinedoc, doc}
         self.__connection = None
@@ -88,15 +89,12 @@ class Manager(QtCore.QAbstractListModel, Helper.AsyncSlotObject):
             await self.__connection.api.subscribe("manager", self.onOCPDocumentInvited, u"ocp.documents.invited")
 
             if self.__connection.api.connected:
-                self.layoutAboutToBeChanged.emit()
                 doclist = await self.__connection.api.call(u"ocp.documents.list")
             
                 for doc in doclist:
                     entity = Entity(id = doc, status = Entity.Status.node, onlinedoc = None, fcdoc = None)
                     self.__entities.append(entity)
-                    
-                self.layoutChanged.emit()
-            
+                    self.documentAdded.emit(entity.uuid)
             
         except Exception as e:
             print("Document Handler connection init error: {0}".format(e))
@@ -105,7 +103,6 @@ class Manager(QtCore.QAbstractListModel, Helper.AsyncSlotObject):
     @asyncSlot()
     async def __connectionChanged(self):
         
-        self.layoutAboutToBeChanged.emit()
         if self.__connection.api.connected:
             
             doclist = await self.__connection.api.call(u"ocp.documents.list")
@@ -115,24 +112,26 @@ class Manager(QtCore.QAbstractListModel, Helper.AsyncSlotObject):
                                     fcdoc = None, manager=ManagedDocument(doc, self.__connection))
                     await entity.manager.ready()
                     self.__entities.append(entity)
+                    self.documentAdded.emit(entity.uuid)
                 
         else:
             for entity in self.__entities:
                     
                 if entity.status == Entity.Status.invited:
                     self.__entities.remove(entity)
+                    self.documentRemoved.emit(entity.uuid)
                     
                 if entity.status == Entity.Status.node:
                     await entity.manager.close()
                     self.__entities.remove(entity)
+                    self.documentRemoved.emit(entity.uuid)
                     
                 if entity.status == Entity.Status.shared:
                     await entity.onlinedoc.close()
                     await entity.manager.close()
                     self.__entities.remove(entity)
-          
-        self.layoutChanged.emit()
-        
+                    self.documentRemoved.emit(entity.uuid)
+
 
     #FreeCAD event handling: Not blocking (used by document observers)
     #**********************************************************************
@@ -147,9 +146,8 @@ class Manager(QtCore.QAbstractListModel, Helper.AsyncSlotObject):
         
         #If a document was opened in freecad this function makes it known to the Handler. 
         entity = Entity(id = None, status = Entity.Status.local, onlinedoc = None, fcdoc = doc, manager=None)
-        self.layoutAboutToBeChanged.emit()
         self.__entities.append(entity)
-        self.layoutChanged.emit()
+        self.documentAdded.emit(entity.uuid)
         
         
     def onFCDocumentClosed(self, doc):
@@ -162,10 +160,10 @@ class Manager(QtCore.QAbstractListModel, Helper.AsyncSlotObject):
         
         entity = self.getEntity('fcdoc', doc)
         
-        self.layoutAboutToBeChanged.emit()
         if entity.status == Entity.Status.local:
             # we can remove the entity if it is local only
             self.__entities.remove(entity)
+            self.documentRemoved.emit(entity.uuid)
             
         elif entity.status == Entity.Status.shared:
             # but if shared we change it to be on node only
@@ -174,8 +172,9 @@ class Manager(QtCore.QAbstractListModel, Helper.AsyncSlotObject):
             if entity.onlinedoc:
                 asyncio.ensure_future(entity.onlinedoc.close())
                 entity.onlinedoc = None 
+                
+            self.documentChanged.emit(entity.uuid)
  
-        self.layoutChanged.emit()
 
 
 
@@ -187,16 +186,13 @@ class Manager(QtCore.QAbstractListModel, Helper.AsyncSlotObject):
         #could be that we alread have this id (e.g. if we created it ourself)
         if self.hasEntity('id', id):
             return
-        
-        self.layoutAboutToBeChanged.emit()
-        
+               
         entity = Entity(id = id, status = Entity.Status.node, onlinedoc = None, 
                         fcdoc = None, manager=ManagedDocument(id, self.__connection))
         await entity.manager.ready()
         self.__entities.append(entity)
-        
-        self.layoutChanged.emit()
-        
+        self.documentAdded.emit(entity.uuid)
+
         
     async def onOCPDocumentOpened(self, id): 
         # opened means a new node document in our node that was created by someone else, we just joined.
@@ -208,14 +204,13 @@ class Manager(QtCore.QAbstractListModel, Helper.AsyncSlotObject):
         
         #we do not check if entity exists, as a raise does not bother us
         entity = self.getEntity('id', id)
-        
-        self.layoutAboutToBeChanged.emit()
-        
+               
         if entity.status == Entity.Status.node or entity.status == Entity.Status.invited:
             #it if is a pure node document we can remove it
             if entity.manager:
                 await entity.manager.close()
-            self.__entities.remove(entity)     
+            self.__entities.remove(entity)
+            self.documentRemoved.emit(entity.uuid)
         
         elif entity.status == Entity.Status.shared:
             #it was shared before, hence now with it being closed on the node it is only availble locally
@@ -228,9 +223,7 @@ class Manager(QtCore.QAbstractListModel, Helper.AsyncSlotObject):
                 
             entity.status = Entity.Status.local
             entity.id = None
-            
-        self.layoutChanged.emit()
-             
+            self.documentChanged.emit(entity.uuid)
         
     
     def onOCPDocumentInvited(self):
@@ -277,9 +270,7 @@ class Manager(QtCore.QAbstractListModel, Helper.AsyncSlotObject):
         # - Opened in FC if open on node
         # - Opened on node and created in FC when invited
         # - Doing nothing if already shared
-             
-        self.layoutAboutToBeChanged.emit()
-        
+                    
         if entity.status == Entity.Status.local:
             dmlpath = os.path.join(self.__collab_path, "Dml")
             res = await self.__connection.api.call(u"ocp.documents.create", dmlpath)
@@ -288,6 +279,7 @@ class Manager(QtCore.QAbstractListModel, Helper.AsyncSlotObject):
             #that would be wrong! 
             if self.hasEntity("id", res):
                 self.__entities.remove(self.getEntity("id", res))
+                self.documentRemoved.emit(self.getEntity("id", res).uuid)
             
             entity.id = res
             entity.onlinedoc = OnlineDocument(res, entity.fcdoc, self.__connection, self.__dataservice)
@@ -318,8 +310,7 @@ class Manager(QtCore.QAbstractListModel, Helper.AsyncSlotObject):
             await entity.onlinedoc.asyncLoad() 
 
         entity.status = Entity.Status.shared
-        self.layoutChanged.emit()
-   
+        self.documentChanged.emit(entity.uuid)
    
     async def stopCollaborate(self, entity):
         # For the shared entity, this call stops the collaboration by closing it on the node, but keeping it local.
@@ -357,75 +348,28 @@ class Manager(QtCore.QAbstractListModel, Helper.AsyncSlotObject):
         return False
     
     
-    # QT Model implementation
+    # QT implementation
     # **************************************************************************************************
 
-    class ModelRole(Enum):
-        status   = auto()
-        name     = auto()
-        isOpen   = auto()
-        document = auto()
-
+    documentAdded   = QtCore.Signal(str)
+    documentRemoved = QtCore.Signal(str)
+    documentChanged = QtCore.Signal(str)
     
-    def roleNames(self):
-        #return the QML accessible entries        
-        result = {}
-        for role in Manager.ModelRole:
-            result[role.value] = QtCore.QByteArray(bytes(role.name, 'utf-8'))
+    @Helper.AsyncSlot(str)
+    async def toggleCollaborateSlot(self, uuid):
+        entity = self.getEntity("uuid", uuid)
+        if entity.status == Entity.Status.shared:
+            await self.stopCollaborate(entity)
+        else:
+            await self.collaborate(entity)
         
-        return result
-     
-    def data(self, index, role):
-        #return the data for the given index and role
-        
-        #index = PySide2.QtCore.QModelIndex
-        entity = self.__entities[index.row()]
-        role = Manager.ModelRole(role)
-        
-        if role == Manager.ModelRole.status:
-            return entity.status.name
-        
-        if role == Manager.ModelRole.name:
-            if entity.fcdoc != None:
-                return entity.fcdoc.Name
-            if entity.id != None:
-                return entity.id
-                        
-            return "Unknown name"
-        
-        if role == Manager.ModelRole.isOpen:
-            return not entity.fcdoc is None
-        
-        if role == Manager.ModelRole.document:
-            return entity.manager
-
-    def rowCount(self, index):
-        return len(self.__entities)
-    
-    @Helper.AsyncSlot(int)
-    async def collaborateSlot(self, idx):
-        entity = self.__entities[idx]
-        await self.collaborate(entity)
-    
-    @Helper.AsyncSlot(int)
-    async def stopCollaborateSlot(self, idx):
-        entity = self.__entities[idx]
-        await self.stopCollaborate(entity)
-        
-    @Helper.AsyncSlot(int)
-    async def openSlot(self, idx):
-        entity = self.__entities[idx]
-        if entity.fcdoc:
-            return
-        
-        # we can reuse collaborate, as it opens a document for a node status entity anyway
-        await self.collaborate(entity)
-        
-    @Helper.AsyncSlot(int)
-    async def closeSlot(self, idx):
-        entity = self.__entities[idx]
+    @Helper.AsyncSlot(str)
+    async def toggleOpenSlot(self, uuid):
+        entity = self.getEntity("uuid", uuid)
         if entity.fcdoc:
             # we simply close it. the doc observer callbacks handle all the entity stuff
             FreeCAD.closeDocument(entity.fcdoc.Name)
-        
+        else:
+            # we can reuse collaborate, as it opens a document for a node status entity anyway
+            await self.collaborate(entity)
         

@@ -19,8 +19,8 @@
 
 import FreeCADGui, asyncio, os
 from PySide2 import QtCore, QtGui, QtWidgets
-from PySide2 import QtQml
-from PySide2.QtQuick import QQuickView
+
+from Interface.DocumenWidget import DocWidget, DocView
 
 
 class UIWidget(QtWidgets.QFrame):
@@ -46,7 +46,14 @@ class UIWidget(QtWidgets.QFrame):
         layout.addWidget(self.ui)
         self.setLayout(layout)
         
-        #setup connections and defaults!
+        # setup document management
+        self.__docView = DocView(manager)
+        self.ui.docArea.setWidget(self.__docView)
+        self.__manager.documentAdded.connect(self.__docView.onDocumentAdded)
+        self.__manager.documentRemoved.connect(self.__docView.onDocumentRemoved)
+        self.__manager.documentChanged.connect(self.__docView.onDocumentChanged)
+        
+        # setup node, api and network
         self.ui.peerView.setVisible(False)
         self.ui.logsView.setVisible(False)
         self.ui.nodeButton.clicked.connect(lambda c: self.ui.stack.setCurrentIndex(0))
@@ -130,4 +137,6 @@ class UIWidget(QtWidgets.QFrame):
             self.ui.reachabilityIndicator.setPixmap(QtGui.QPixmap(":/Collaboration/Icons/indicator_on.svg"))
         else:
             self.ui.reachabilityIndicator.setPixmap(QtGui.QPixmap(":/Collaboration/Icons/indicator_off.svg"))
-            
+     
+     
+     
