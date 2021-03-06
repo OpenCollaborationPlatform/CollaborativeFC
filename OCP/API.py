@@ -198,7 +198,7 @@ class API(QtCore.QObject, Helper.AsyncSlotObject):
         self.connectedChanged.emit()            
         
         
-    async def __onDisconnect(self, *args):
+    async def __onDisconnect(self, *args, **kwargs):
         self.__logger.info("API closed")
         
         
@@ -224,6 +224,7 @@ class API(QtCore.QObject, Helper.AsyncSlotObject):
     def getReconnect(self):
         return self.__settings.GetBool("APIReconnect", True)
     
+    QtCore.Slot(bool)
     def setReconnect(self, value):
        self.__settings.SetBool("APIReconnect", value)
        self.__reconnectChanged.emit()
@@ -231,14 +232,10 @@ class API(QtCore.QObject, Helper.AsyncSlotObject):
     reconnect = QtCore.Property(bool, getReconnect, setReconnect, notify=__reconnectChanged)
  
     @Helper.AsyncSlot()
-    async  def disconnectSlot(self):
-        await self.disconnectFromNode()
-        
-    @Helper.AsyncSlot()
-    async def connectSlot(self):
+    async  def toggleConnectedSlot(self):
+        if self.connected:
+            await self.disconnectFromNode()
+        else:
+            await self.connectToNode()
+            await self.waitTillReady()           
 
-        await self.connectToNode()
-        await self.waitTillReady()
-        
-            
-        

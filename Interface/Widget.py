@@ -23,7 +23,7 @@ from PySide2 import QtQml
 from PySide2.QtQuick import QQuickView
 
 
-class UIWidget(QQuickView):
+class UIWidget(QtWidgets.QFrame):
     
     def __init__(self, manager, connection):
         
@@ -33,42 +33,101 @@ class UIWidget(QQuickView):
         self.__manager = manager
 
         # We are a popup, make sure we look like it
-        self.setFlags(QtCore.Qt.FramelessWindowHint | QtCore.Qt.Popup | QtCore.Qt.CustomizeWindowHint)
-        self.setGeometry(0, 0, 500, 700)   
+        self.setContentsMargins(1,1,1,1)
+        self.setWindowFlags(QtCore.Qt.FramelessWindowHint | QtCore.Qt.Popup)
+        self.setGeometry(0, 0, 375, 500)   
+        self.setFrameShape(QtWidgets.QFrame.StyledPanel)
+        self.setFrameShadow(QtWidgets.QFrame.Raised)
         
-        #setup Qml
-        self.setResizeMode(QQuickView.SizeRootObjectToView)
-        self.rootContext().setContextProperty("connection", connection)
-        self.rootContext().setContextProperty("ocpDocuments", manager)
-        self.engine().addImportPath("qrc:/Collaboration/Ui")
-        self.setSource(QtCore.QUrl("qrc:/Collaboration/Ui/Main.qml"))
+        self.ui = FreeCADGui.PySideUic.loadUi(":/Collaboration/Ui/Controls.ui")
         
-        #event used to hide the window when we get inactive
-        self.activeChanged.connect(self.activeSlot)        
-        QtCore.QCoreApplication.instance().aboutToQuit.connect(self.exit)
+        layout = QtWidgets.QVBoxLayout()
+        layout.setContentsMargins(0,0,0,0)
+        layout.addWidget(self.ui)
+        self.setLayout(layout)
         
+        #setup connections and defaults!
+        self.ui.peerView.setVisible(False)
+        self.ui.logsView.setVisible(False)
+        self.ui.nodeButton.clicked.connect(lambda c: self.ui.stack.setCurrentIndex(0))
+        self.ui.docButton.clicked.connect(lambda c: self.ui.stack.setCurrentIndex(1))
         
-    def show(self):       
+        self.__onNodeRunningChanged()
+        self.__connection.node.logModelChanged.connect(lambda: self.ui.logsView.setModel(self.__connection.node.logModel))
+        self.__connection.node.runningChanged.connect(self.__onNodeRunningChanged)
+        self.ui.startupButton.released.connect(self.__connection.node.toggleRunningSlot)
+        
+        self.__onApiConnectedChanged()        
+        self.__connection.api.connectedChanged.connect(self.__onApiConnectedChanged)
+        self.ui.connectButton.released.connect(self.__connection.api.toggleConnectedSlot)
+        self.ui.reconnectCheckbox.setChecked(self.__connection.api.reconnect)
+        self.ui.reconnectCheckbox.toggled.connect(self.__connection.api.setReconnect)
+        
+        self.__onNetworkUpdates()
+        self.__connection.network.peerCountChanged.connect(self.__onNetworkUpdates)
+        self.__connection.network.nodeIdChanged.connect(self.__onNetworkUpdates)
+        self.__connection.network.reachabilityChanged.connect(self.__onNetworkUpdates)
+        self.ui.peerView.setModel(self.__connection.network.peers)
+        
+    
+    def show(self):
         #try to find the correct position for the popup
         pos = QtGui.QCursor.pos()
         widget = QtWidgets.QApplication.widgetAt(pos)
-        if widget:
-            point = widget.rect().bottomLeft()
-            global_point = widget.mapToGlobal(point)
-            self.setPosition(global_point)
-            
+        point = widget.rect().bottomLeft()
+        global_point = widget.mapToGlobal(point)
+        self.move(global_point)            
         super().show()
-        self.requestActivate()
-        
+
+
+    # Qt slots 
+    # ******************************************************************
         
     @QtCore.Slot()
-    def exit(self):
-        self.deleteLater()
+    def __onNodeRunningChanged(self):
+        # the node object changed its running status
         
+        if self.__connection.node.running:
+            self.ui.nodeIndicator.setPixmap(QtGui.QPixmap(":/Collaboration/Icons/indicator_on.svg"))
+            self.ui.nodeLabel.setText("OCP node running")
+            self.ui.startupButton.setText("Shutdown")
+            self.ui.connectButton.setEnabled(True)
+        else:
+            self.ui.nodeIndicator.setPixmap(QtGui.QPixmap(":/Collaboration/Icons/indicator_off.svg"))
+            self.ui.nodeLabel.setText("No OCP node running")
+            self.ui.startupButton.setText("Startup")
+            self.ui.connectButton.setEnabled(False)
 
     @QtCore.Slot()
-    def activeSlot(self):
-        if not self.isActive():
-            self.hide()
+    def __onApiConnectedChanged(self):
+        # the api object changed its connected status
         
+        if self.__connection.api.connected:
+            self.ui.apiIndicator.setPixmap(QtGui.QPixmap(":/Collaboration/Icons/indicator_on.svg"))
+            self.ui.apiLabel.setText("API connection established")
+            self.ui.connectButton.setText("Disconnect")
+            self.ui.startupButton.setEnabled(False)
+        else:
+            self.ui.apiIndicator.setPixmap(QtGui.QPixmap(":/Collaboration/Icons/indicator_off.svg"))
+            self.ui.apiLabel.setText("API not connected to node")
+            self.ui.connectButton.setText("Connect")
+            self.ui.startupButton.setEnabled(True)
 
+    @QtCore.Slot()
+    def __onNetworkUpdates(self):
+        self.ui.nodeIdLabel.setText(self.__connection.network.nodeId)
+        self.ui.reachabilityLabel.setText(self.__connection.network.reachability)
+        self.ui.peerCountLabel.setText(f"Connected to {self.__connection.network.peerCount} nodes.")
+        
+        if self.__connection.network.peerCount > 0:
+            self.ui.networkIndicator.setPixmap(QtGui.QPixmap(":/Collaboration/Icons/indicator_on.svg"))
+            self.ui.networkLabel.setText("Part of P2P network")
+        else:
+            self.ui.networkIndicator.setPixmap(QtGui.QPixmap(":/Collaboration/Icons/indicator_off.svg"))
+            self.ui.networkLabel.setText("Cannot find P2P network")
+        
+        if self.__connection.network.reachability == "Public":
+            self.ui.reachabilityIndicator.setPixmap(QtGui.QPixmap(":/Collaboration/Icons/indicator_on.svg"))
+        else:
+            self.ui.reachabilityIndicator.setPixmap(QtGui.QPixmap(":/Collaboration/Icons/indicator_off.svg"))
+            

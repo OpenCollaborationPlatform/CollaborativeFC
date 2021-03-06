@@ -26,11 +26,11 @@ from PySide2 import QtCore
 class LogReader(QtCore.QAbstractListModel):
     # Reads log updates from rotating log file and makes it accessible as Qt List Model
     
-    RoleMessage = 0
-    RoleLevel = 1
-    RoleTime = 2
-    RoleModule = 3
-    RoleData = 4    
+    RoleMessage = 1
+    RoleLevel = 2
+    RoleTime = 3
+    RoleModule = 4
+    RoleData = 5    
     
     def __init__(self, logpath):
         super().__init__()
@@ -104,36 +104,48 @@ class LogReader(QtCore.QAbstractListModel):
                 LogReader.RoleMessage: QtCore.QByteArray(bytes("message", 'utf-8')),
                 LogReader.RoleTime: QtCore.QByteArray(bytes("time", 'utf-8')),
                 LogReader.RoleModule: QtCore.QByteArray(bytes("module", 'utf-8')),
-                LogReader.RoleData: QtCore.QByteArray(bytes("data", 'utf-8'))}
+                LogReader.RoleData: QtCore.QByteArray(bytes("data", 'utf-8')),
+                QtCore.Qt.DisplayRole: QtCore.QByteArray(bytes("display", 'utf-8'))}
     
     def data(self, index, role):
         #return the data for the given index and role
         
         #index = PySide2.QtCore.QModelIndex
+        idx = index.row()
         if role == LogReader.RoleMessage:
-            return self.__lines[index.row()]["@message"]
+            msg = self.__lines[idx]["@message"]
+            return msg.rstrip()
         
         if role == LogReader.RoleLevel:
-            return self.__lines[index.row()]["@level"]
+            return self.__lines[idx]["@level"]
         
         if role == LogReader.RoleTime:
-            time = self.__lines[index.row()]["@timestamp"]
+            time = self.__lines[idx]["@timestamp"]
             return QtCore.QDateTime.fromString(time, QtCore.Qt.ISODateWithMs)
         
         if role == LogReader.RoleModule:
-            entry  =  self.__lines[index.row()]
+            entry  =  self.__lines[idx]
             if "@module" in entry:
                 return entry["@module"]
             return ""
         
         if role == LogReader.RoleData:
             #return all entries without an @
-            entry  =  self.__lines[index.row()]
+            entry  =  self.__lines[idx]
             keys = [e for e in entry.keys() if not "@" in e]
             result = {}
             for key in keys:
                 result[key] = entry[key]
             return result
+        
+        if role == QtCore.Qt.DisplayRole:
+            msg = self.data(index, LogReader.RoleMessage)
+            lvl = self.data(index, LogReader.RoleLevel)
+            time = self.data(index, LogReader.RoleTime)
+            mod = self.data(index, LogReader.RoleModule)
+            
+            return f"{time.time().toString()} [{lvl}] {mod}: {msg}"
+            
             
 
     def rowCount(self, index):
@@ -404,14 +416,13 @@ class Node(QtCore.QObject, Helper.AsyncSlotObject):
     @QtCore.Property(QtCore.QObject, notify=logModelChanged)
     def logModel(self):
         return self.__logReader
-    
+
     @Helper.AsyncSlot()
-    async def runSlot(self):
-        await self.run()
-        
-    @Helper.AsyncSlot()
-    async def shutdownSlot(self):
-        await self.shutdown()
+    async def toggleRunningSlot(self):
+        if self.running:
+            await self.shutdown()
+        else:
+            await self.run()
     
     @Helper.AsyncSlot()
     async def updateDetails(self):        
