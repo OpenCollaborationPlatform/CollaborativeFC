@@ -21,13 +21,31 @@ __title__ = "FreeCAD Collaboration API"
 __author__ = "Stefan Troeger"
 __url__ = "http://www.freecadweb.org"
 
-import os, sys 
 
 # make sure the vendor folder is used for dependencies
 # *******************************************************
+import sys, os
 parent_dir = os.path.abspath(os.path.dirname(__file__))
 vendor_dir = os.path.join(parent_dir, 'Vendor')
 sys.path.append(vendor_dir)
+
+
+# handle basic logging first
+# *******************************************************
+import logging, qasync
+logging.basicConfig(level=logging.DEBUG, stream=sys.stdout, format="[%(levelname)8s] %(name)25s:   %(message)s")
+logging.getLogger('qasync').setLevel(logging.ERROR)
+
+
+# setup the qt based event loop for asyncio
+# *******************************************************
+import asyncio, txaio
+from PySide2 import QtCore
+app = QtCore.QCoreApplication.instance()
+loop = qasync.QEventLoop(app)
+txaio.config.loop = loop #workaround as component.start(loop=) does not propagate the loop correctly
+asyncio.set_event_loop(loop)       
+
 
 
 # setup all the collaboration infrastructure
@@ -40,9 +58,8 @@ from OCP.Connection import OCPConnection
 
 
 #handle the resources required
-#*******************************************************
-QtCore.QResource.registerResource(os.path.join(os.path.dirname(__file__), 'Resources', 'resources.rcc'))
-
+#******************************************************
+from Resources import resources
 
 #The Collaboration module provides functions to work on documents with others
 #for now use simple global variables!

@@ -564,7 +564,7 @@ class OnlineObserver():
                 tasks.append(worker(index, value))
         
         if tasks:
-            tasks = [asyncio.create_task(task) for task in tasks]
+            tasks = [asyncio.ensure_future(task) for task in tasks]
             results = await asyncio.gather(*tasks, return_exceptions=True)
             exceptions = [i for i in results if isinstance(i, Exception)]
             if exceptions:

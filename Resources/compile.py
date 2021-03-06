@@ -21,7 +21,8 @@
 import os, glob
 
 qrc_filename = 'resources.qrc'
-assert not os.path.exists(qrc_filename)
+if os.path.exists(qrc_filename):
+    os.remove(qrc_filename)
 
 qrc = '''<RCC version="1.0">
         <qresource prefix="/Collaboration">'''
@@ -36,7 +37,7 @@ f = open(qrc_filename,'w')
 f.write(qrc)
 f.close()
 
-os.system('rcc -binary %s -o resources.rcc' % qrc_filename)
-os.remove(qrc_filename)
+os.system(f"rcc --format-version 1 -g python { qrc_filename} -o resources.py")
+#os.remove(qrc_filename)
 
 print("Done compiling")

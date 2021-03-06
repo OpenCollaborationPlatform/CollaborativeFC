@@ -1,0 +1,19 @@
+<RCC version="1.0">
+        <qresource prefix="/Collaboration">
+		<file>Icons/indicator_on.svg</file>
+		<file>Icons/icon_white.svg</file>
+		<file>Icons/indicator_off.svg</file>
+		<file>Icons/icon.svg</file>
+		<file>Icons/logo.svg</file>
+		<file>Ui/Controls.ui</file>
+		<file>Ui/Document.qml</file>
+		<file>Ui/Node.qml</file>
+		<file>Ui/Main.qml</file>
+		<file>Ui/LogView.qml</file>
+		<file>Ui/Header.qml</file>
+		<file>Ui/PeerView.qml</file>
+		<file>Ui/Documents.qml</file>
+		<file>Ui/BusyErrorElement.qml</file>
+		<file>Ui/DocumentPeer.qml</file>
+	</qresource>
+</RCC>

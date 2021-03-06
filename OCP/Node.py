@@ -39,7 +39,7 @@ class LogReader(QtCore.QAbstractListModel):
         self.__fileNo  = os.stat(logpath).st_ino
         self.__lines   = collections.deque(maxlen=100)
         
-        self.__task = asyncio.create_task(self.follow())
+        self.__task = asyncio.ensure_future(self.follow())
     
     async def close(self):
         self.__task.cancel()
@@ -173,7 +173,7 @@ class Node(QtCore.QObject, Helper.AsyncSlotObject):
         
         # important internal properties
         self.__logger    = logging.getLogger("OCPNode")
-        self.__poll      = asyncio.create_task(self.__updateLoop())
+        self.__poll      = asyncio.ensure_future(self.__updateLoop())
         self.__logFile   = ""
         self.__logReader = None
         self.__logger    = logger

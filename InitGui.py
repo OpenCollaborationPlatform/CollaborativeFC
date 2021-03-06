@@ -17,21 +17,6 @@
 # *   Suite 330, Boston, MA  02111-1307, USA                             *
 # ************************************************************************
 
-# handle basic logging first
-# *******************************************************
-import logging, sys, os, asyncio, qasync, txaio
-from PySide2 import QtCore
-logging.basicConfig(level=logging.DEBUG, stream=sys.stdout, format="[%(levelname)8s] %(name)25s:   %(message)s")
-logging.getLogger('qasync').setLevel(logging.ERROR)
-
-
-# setup the qt based event loop for asyncio
-# *******************************************************
-app = QtCore.QCoreApplication.instance()
-loop = qasync.QEventLoop(app)
-txaio.config.loop = loop #workaround as component.start(loop=) does not propagate the loop correctly
-asyncio.set_event_loop(loop)       
-
 
 #import the collaboration infrastructure
 #*******************************************************
