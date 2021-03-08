@@ -201,14 +201,16 @@ class Node(QtCore.QObject, Helper.AsyncSlotObject):
      
     
     async def __asyncInit(self):
-        await self.__update()
-        dir = await self.__fetchConfig("directory", self.running)
+        await self.__update()           
+        
+        # open logfile if available
+        dir = await self.__fetchConfig("directory", self.running)  
         self.__logFile   = os.path.join(dir, "Logs",  "ocp.log")
         if os.path.isfile(self.__logFile) and not self.__logReader:
             self.__logReader = LogReader(self.__logFile)
             self.logModelChanged.emit()
-     
-        
+
+
     async def run(self):
         # handles the full setup process till a OCP node is running       
         await self.__initializeNode()

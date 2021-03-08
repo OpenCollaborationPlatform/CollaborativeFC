@@ -19,11 +19,12 @@
 
 import FreeCADGui, asyncio, os
 from PySide2 import QtCore, QtGui, QtWidgets
-from PySide2 import QtQml
 
 from Manager.Manager import Entity
 
 class DocView(QtWidgets.QWidget):
+    
+    edit = QtCore.Signal(str)
     
     def __init__(self, manager, parent = None):
         
@@ -37,26 +38,36 @@ class DocView(QtWidgets.QWidget):
         layout.addStretch(1)
         layout.setSpacing(15)
         self.setLayout(layout)
+        
+        self.__manager.documentAdded.connect(self.__onDocumentAdded)
+        self.__manager.documentRemoved.connect(self.__onDocumentRemoved)
+        self.__manager.documentChanged.connect(self.__onDocumentChanged)
 
     @QtCore.Slot(str)
-    def onDocumentAdded(self, uuid):
+    def __onEdit(self, uuid):
+        self.edit.emit(uuid)
+
+    @QtCore.Slot(str)
+    def __onDocumentAdded(self, uuid):
         widget = DocWidget(self.__manager, uuid, self)
         self.__widgets[uuid] = widget
         self.layout().insertWidget(0, widget)
+        widget.edit.connect(self.__onEdit)
      
     @QtCore.Slot(str)
-    def onDocumentRemoved(self, uuid):
+    def __onDocumentRemoved(self, uuid):
         
         if not uuid in self.__widgets:
             return 
         
         widget = self.__widgets[uuid]
+        widget.edit.disconnect(self.__onEdit)
         widget.setVisible(False)
         self.layout().removeWidget(widget)
         widget.deleteLater()
      
     @QtCore.Slot(str)
-    def onDocumentChanged(self, uuid):
+    def __onDocumentChanged(self, uuid):
         
         if not uuid in self.__widgets:
             return 
@@ -65,6 +76,8 @@ class DocView(QtWidgets.QWidget):
 
 
 class DocWidget(QtWidgets.QWidget):
+    
+    edit = QtCore.Signal(str)
     
     def __init__(self, manager, uuid, parent):
         
@@ -81,6 +94,7 @@ class DocWidget(QtWidgets.QWidget):
         
         self.ui.shareButton.clicked.connect(lambda: self.__manager.toggleCollaborateSlot(self.__uuid))
         self.ui.docButton.clicked.connect(lambda: self.__manager.toggleOpenSlot(self.__uuid))
+        self.ui.editButton.clicked.connect(lambda: self.edit.emit(self.__uuid))
         
         self.update()
     
@@ -93,8 +107,8 @@ class DocWidget(QtWidgets.QWidget):
             self.ui.memberLabel.setText(f"{entity.manager.memberCount}")
             self.ui.joinedLabel.setText(f"{entity.manager.joinedCount}")
         else:
-            self.ui.memberLabel.setText("0")
-            self.ui.joinedLabel.setText("0")
+            self.ui.memberLabel.setText("-")
+            self.ui.joinedLabel.setText("-")
 
         if entity.fcdoc:
             self.ui.nameLabel.setText(entity.fcdoc.Label)
@@ -104,16 +118,19 @@ class DocWidget(QtWidgets.QWidget):
         if entity.status == Entity.Status.shared:
             self.ui.shareButton.setText("Stop")
             self.ui.docButton.setText("Close")
+            self.ui.editButton.setEnabled(True)
             self.ui.statusIndicator.setPixmap(QtGui.QPixmap(":/Collaboration/Icons/indicator_on.svg"))
             
         elif entity.status == Entity.Status.local:
             self.ui.shareButton.setText("Share")
             self.ui.docButton.setText("Close")
+            self.ui.editButton.setEnabled(False)
             self.ui.statusIndicator.setPixmap(QtGui.QPixmap(":/Collaboration/Icons/indicator_off.svg"))
         
         elif entity.status == Entity.Status.node:
             self.ui.shareButton.setText("Stop")
             self.ui.docButton.setText("Open")
+            self.ui.editButton.setEnabled(True)
             self.ui.statusIndicator.setPixmap(QtGui.QPixmap(":/Collaboration/Icons/indicator_off.svg"))
             
     

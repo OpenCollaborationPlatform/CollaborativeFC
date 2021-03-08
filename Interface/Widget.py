@@ -20,7 +20,8 @@
 import FreeCADGui, asyncio, os
 from PySide2 import QtCore, QtGui, QtWidgets
 
-from Interface.DocumenWidget import DocWidget, DocView
+from Interface.DocView import DocView
+from Interface.DocEdit import DocEdit
 
 
 class UIWidget(QtWidgets.QFrame):
@@ -45,14 +46,17 @@ class UIWidget(QtWidgets.QFrame):
         layout.setContentsMargins(0,0,0,0)
         layout.addWidget(self.ui)
         self.setLayout(layout)
-        
+ 
+ 
         # setup document management
         self.__docView = DocView(manager)
+        self.__docEdit = DocEdit(manager)
         self.ui.docArea.setWidget(self.__docView)
-        self.__manager.documentAdded.connect(self.__docView.onDocumentAdded)
-        self.__manager.documentRemoved.connect(self.__docView.onDocumentRemoved)
-        self.__manager.documentChanged.connect(self.__docView.onDocumentChanged)
-        
+        self.ui.stack.addWidget(self.__docEdit)
+        self.__docEdit.editFinished.connect(self.__onEditFihished)
+        self.__docView.edit.connect(self.__onEdit)
+ 
+ 
         # setup node, api and network
         self.ui.peerView.setVisible(False)
         self.ui.logsView.setVisible(False)
@@ -138,5 +142,16 @@ class UIWidget(QtWidgets.QFrame):
         else:
             self.ui.reachabilityIndicator.setPixmap(QtGui.QPixmap(":/Collaboration/Icons/indicator_off.svg"))
      
-     
-     
+    @QtCore.Slot(str)
+    def __onEdit(self, uuid):
+        
+        self.__docEdit.setEditable(uuid)
+        self.ui.stack.setCurrentIndex(2)
+        self.ui.nodeButton.setEnabled(False)
+        self.ui.docButton.setEnabled(False)
+        
+    @QtCore.Slot()
+    def __onEditFihished(self):
+       self.ui.nodeButton.setEnabled(True)
+       self.ui.docButton.setEnabled(True)
+       self.ui.stack.setCurrentIndex(1)

@@ -23,117 +23,26 @@ from enum import Enum, auto
 from PySide import QtCore
 from qasync import asyncSlot
 
-
-class PeerModel(QtCore.QAbstractListModel):
-    # Data model handling peers in a document
-    
-    class Roles(Enum):
-        nodeid          = auto()
-        authorisation   = auto()
-        joined          = auto()
-
-
-    def __init__(self):
-        QtCore.QAbstractListModel.__init__(self)
-        
-        self.__peers = [] # peers are dicts with data for each role
-        
-    
-    def __getPeer(self, id):
-        for peer in self.__peers:
-            if peer[PeerModel.Roles.nodeid] == id:
-                return  peer
-        
-        return None
-    
-    def clear(self):
-        self.layoutAboutToBeChanged.emit()
-        self.__peers = []
-        self.layoutChanged.emit()
-    
-    
-    def addPeer(self, nodeid, auth, joined):
-        
-        if self.__getPeer(nodeid):
-            raise Exception("Cannot add peer, already in model")
-        
-        peer = {PeerModel.Roles.nodeid: nodeid,  
-                PeerModel.Roles.authorisation: auth, 
-                PeerModel.Roles.joined:  joined}
-        
-        self.layoutAboutToBeChanged.emit()
-        self.__peers.append(peer)
-        self.layoutChanged.emit()
-        
-    
-    def removePeer(self, nodeid):
-        
-        peer = self.__getPeer(nodeid)
-        if peer:
-            self.layoutAboutToBeChanged.emit()
-            self.__peers.remove(peer)
-            self.layoutChanged.emit()
-    
-    
-    def changePeer(self, nodeid, role, data):
-        
-        peer = self.__getPeer(nodeid)
-        if peer:
-            self.layoutAboutToBeChanged.emit()
-            peer[role]  = data
-            self.layoutChanged.emit()
-            
-    def peerByIndex(self, idx):
-        return self.__peers[idx][PeerModel.Roles.nodeid]
-    
-    def peerAuthByIndex(self, idx):
-        return self.__peers[idx][PeerModel.Roles.authorisation]
-            
-    def peerCount(self):
-        return len(self.__peers)
-    
-    def joinedCount(self):        
-        count = 0
-        for peer in self.__peers:
-            if peer[PeerModel.Roles.joined]:
-                count += 1
-        
-        return count
-    
-    
-    # QT Model implementation
-    # *************************
-        
-    def roleNames(self):
-        result = {}
-        for role in PeerModel.Roles:
-            result[role.value] = QtCore.QByteArray(bytes(role.name, 'utf-8'))
-        
-        return result
-
-    def data(self, index, role):
-
-        peer = self.__peers[index.row()]        
-        return peer[PeerModel.Roles(role)]
-
-    def rowCount(self, index):
-        return len(self.__peers)
-
-
 class ManagedDocument(QtCore.QObject, Helper.AsyncSlotObject):
     # Helps to manage documents on the OCP node, manages naming and peers
+    
+    class __Peer():
+        def __init__(self, id, auth, joined):
+            self.nodeid = id
+            self.auth = auth
+            self.joined = joined
     
     def __init__(self, id, connection):
         QtCore.QObject.__init__(self)
         
-        self.__peers = PeerModel()
+        self.peers = []
         self.__docId = id
         self.__connection = connection
         self.__readyEvt = asyncio.Event()
         
         connection.api.connectedChanged.connect(self.__connectChanged)
         asyncio.ensure_future(self.__asyncInit())
-        
+    
     
     async def __asyncInit(self):
         
@@ -148,7 +57,7 @@ class ManagedDocument(QtCore.QObject, Helper.AsyncSlotObject):
         await self.__connection.api.subscribe(self.__subkey, self.__peerAdded,  f"ocp.documents.{self.__docId}.peerAdded")
         await self.__connection.api.subscribe(self.__subkey, self.__peerRemoved,  f"ocp.documents.{self.__docId}.peerRemoved")
         self.__readyEvt.set()
-        
+      
     async def ready(self):
         await self.__readyEvt.wait()
 
@@ -188,71 +97,95 @@ class ManagedDocument(QtCore.QObject, Helper.AsyncSlotObject):
             joinedPeers = await self.__connection.api.call(f"ocp.documents.{self.__docId}.listPeers", joined=True)
             
             for peer in readPeers:
-                self.__peers.addPeer(peer, "Read", peer in joinedPeers)
+                self.peers.append(ManagedDocument.__Peer(peer, "Read", peer in joinedPeers))
             
             for peer in writePeers:
-                self.__peers.addPeer(peer, "Write", peer in joinedPeers)
+                self.peers.append(ManagedDocument.__Peer(peer, "Write", peer in joinedPeers))
             
-            self.__memberCountChanged.emit()
-            self.__joinedCountChanged.emit()
+            self.memberCountChanged.emit()
+            self.joinedCountChanged.emit()
             
         else:
-            self.__peers.clear()
-            self.__memberCountChanged.emit()
-            self.__joinedCountChanged.emit()
+            self.peers = []
+            self.memberCountChanged.emit()
+            self.joinedCountChanged.emit()
             
             
-    async def __peerAuthChanged(self, peer, auth):
-        self.__peers.changePeer(peer, PeerModel.Roles.authorisation, auth)
+    async def __peerAuthChanged(self, id, auth):
+        peer = self.__getPeer(id)
+        if peer:
+            peer.auth = auth
+            self.peerChanged.emit(peer)
     
     async def __peerActivityChanged(self, peer, joined):
-        self.__peers.changePeer(peer, PeerModel.Roles.joined, joined)
-        self.__joinedCountChanged.emit()
+        peer = self.__getPeer(id)
+        if peer:
+            peer.joined = joined        
+            self.peerChanged.emit(peer)
+            self.joinedCountChanged.emit()
     
-    async def __peerAdded(self, peer, auth):
-        self.__peers.addPeer(peer, auth, False)
+    async def __peerAdded(self, id, auth):
+        self.peers.append(ManagedDocument.__Peer(id, auth, False))
+            
+        self.peerAdded.emit(id)
         self.__memberCountChanged.emit()
     
-    async def __peerRemoved(self, peer):
-        self.__peers.removePeer(peer)
-        self.__memberCountChanged.emit()
+    async def __peerRemoved(self, id):
+        peer = self.__getPeer(id)
+        if peer:
+            self.peers.remove(peer)
+            self.peerRemoved.emit(id)
+            self.memberCountChanged.emit()
 
 
-    def __getPeers(self):
-        return self.__peers
+    def getPeer(self, id):
+        for peer in self.peers:
+            if peer.nodeid == id:
+                return  peer
+        
+        return None
+
+    # Qt Implementations
+    # **********************************************************************
+    
+    peerAdded   = QtCore.Signal(str)
+    peerRemoved = QtCore.Signal(str)
+    peerChanged = QtCore.Signal(str)
 
     def __getName(self):
         return "ToBeImplemented"
     
     def __getMemberCount(self):
-        return self.__peers.peerCount()
+        return len(self.peers)
     
-    def __getJoinedCount(self):
-        return self.__peers.joinedCount()
+    def __getJoinedCount(self):     
+        count = 0
+        for peer in self.peers:
+            if peer.joined:
+                count += 1
 
-    __nameChanged = QtCore.Signal()
-    __memberCountChanged = QtCore.Signal()
-    __joinedCountChanged = QtCore.Signal()
+        return count
     
-    name = QtCore.Property(str, __getName, notify=__nameChanged)
-    peers = QtCore.Property(QtCore.QObject, __getPeers, constant=True)
-    memberCount = QtCore.Property(int, __getMemberCount, notify=__memberCountChanged)
-    joinedCount = QtCore.Property(int, __getJoinedCount, notify=__joinedCountChanged)
+    nameChanged         = QtCore.Signal()
+    memberCountChanged  = QtCore.Signal()
+    joinedCountChanged  = QtCore.Signal()
+    
+    name        = QtCore.Property(str, __getName, notify=nameChanged)
+    memberCount = QtCore.Property(int, __getMemberCount, notify=memberCountChanged)
+    joinedCount = QtCore.Property(int, __getJoinedCount, notify=joinedCountChanged)
 
     @Helper.AsyncSlot(str)
     def setNameSlot(self, name):
         print(f"SetName with {name}")
 
-    @Helper.AsyncSlot(int)
-    async def removePeerSlot(self, idx):
-        peer = self.__peers.peerByIndex(idx)
+    @Helper.AsyncSlot(str)
+    async def removePeerSlot(self, peer):
         await self.removePeer(peer)
 
-    @Helper.AsyncSlot(int)
-    async def togglePeerRigthsSlot(self, idx):
+    @Helper.AsyncSlot(str)
+    async def togglePeerRigthsSlot(self, peer):
         
-        peer = self.__peers.peerByIndex(idx)
-        auth = self.__peers.peerAuthByIndex(idx)
+        auth = self.peers.peerAuth(peer)
         if auth == "Write":
             await self.changePeerAuth(peer, "Read")
         else:
