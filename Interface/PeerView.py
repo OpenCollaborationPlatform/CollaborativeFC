@@ -28,7 +28,7 @@ class PeerView(QtWidgets.QWidget):
         
         QtWidgets.QWidget.__init__(self, parent)
         
-        self.__manager = None
+        self.__docmanager = None
         self.__widgets = {}
         
         layout = QtWidgets.QVBoxLayout()
@@ -39,10 +39,10 @@ class PeerView(QtWidgets.QWidget):
         
     def setdocument(self, docmanager):
         
-        if self.__manager:
-            self.__manager.peerAdded.disconnect(self.__onPeerAdded)
-            self.__manager.peerRemoved.disconnect(self.__onPeerRemoved)
-            self.__manager.peerChanged.disconnect(self.__onPeerChanged)
+        if self.__docmanager:
+            self.__docmanager.peerAdded.disconnect(self.__onPeerAdded)
+            self.__docmanager.peerRemoved.disconnect(self.__onPeerRemoved)
+            self.__docmanager.peerChanged.disconnect(self.__onPeerChanged)
             
         if self.__widgets:
             for widget in self.__widgets.values():
@@ -52,16 +52,16 @@ class PeerView(QtWidgets.QWidget):
             
             self.__widgets = {}
             
-        self.__manager = docmanager
-        self.__manager.peerAdded.connect(self.__onPeerAdded)
-        self.__manager.peerRemoved.connect(self.__onPeerRemoved)
-        self.__manager.peerChanged.connect(self.__onPeerChanged)
-        
+        self.__docmanager = docmanager
+        self.__docmanager.peerAdded.connect(self.__onPeerAdded)
+        self.__docmanager.peerRemoved.connect(self.__onPeerRemoved)
+        self.__docmanager.peerChanged.connect(self.__onPeerChanged)
+                
         for peer in docmanager.peers:
-            widget = PeerWidget(self.__manager, peer.nodeid, self)
+            widget = PeerWidget(self.__docmanager, peer.nodeid, self)
             self.__widgets[peer.nodeid] = widget
             self.layout().insertWidget(0, widget)
-        
+
 
     @QtCore.Slot(str)
     def __onPeerAdded(self, peerId):
@@ -97,6 +97,7 @@ class PeerWidget(QtWidgets.QWidget):
         
         self.__docmanager = docmanager
         self.__peer = peer
+        self.__name =  ""
 
         self.ui = FreeCADGui.PySideUic.loadUi(":/Collaboration/Ui/Peer.ui")
         layout = QtWidgets.QVBoxLayout()
@@ -106,8 +107,9 @@ class PeerWidget(QtWidgets.QWidget):
         
         self.ui.rigthsButton.clicked.connect(lambda: self.__docmanager.removePeerSlot(self.__peer))
         self.ui.removeButton.clicked.connect(lambda: self.__docmanager.togglePeerRigthsSlot(self.__peer))
-        
+
         self.update()
+    
     
     def update(self):
         
@@ -115,12 +117,19 @@ class PeerWidget(QtWidgets.QWidget):
         if not peer:
             return
         
-        self.ui.idLabel.setText(peer.nodeid)
+        self.__name = peer.nodeid
+        name = self.__name
+        self.ui.idLabel.setText(name)
         self.ui.joinedLabel.setText(f"{peer.joined}")
         self.ui.rigthsLabel.setText(peer.auth)
         if peer.auth == "Write":
             self.ui.rigthsButton.setText("Set Read")
         else:
             self.ui.rigthsButton.setText("Set Write")
-            
-    
+
+    def paintEvent(self, event):
+        
+        name = self.ui.idLabel.fontMetrics().elidedText(self.__name, QtCore.Qt.ElideRight, self.ui.idLabel.width())
+        self.ui.idLabel.setText(name)
+        QtWidgets.QWidget.paintEvent(self, event)
+        

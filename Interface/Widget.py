@@ -35,7 +35,7 @@ class UIWidget(QtWidgets.QFrame):
         self.__manager = manager
 
         # We are a popup, make sure we look like it
-        self.setContentsMargins(1,1,1,1)
+        self.setContentsMargins(0,0,0,0)
         self.setWindowFlags(QtCore.Qt.FramelessWindowHint | QtCore.Qt.Popup)
         self.setGeometry(0, 0, 375, 500)   
         self.setFrameShape(QtWidgets.QFrame.StyledPanel)
@@ -45,7 +45,9 @@ class UIWidget(QtWidgets.QFrame):
         
         layout = QtWidgets.QVBoxLayout()
         layout.setContentsMargins(0,0,0,0)
+        layout.setSpacing(0)
         layout.addWidget(self.ui)
+        layout.addWidget(QtWidgets.QSizeGrip(self), 0, QtCore.Qt.AlignBottom | QtCore.Qt.AlignRight)
         self.setLayout(layout)
  
         # async slot handling for node/api
@@ -85,7 +87,7 @@ class UIWidget(QtWidgets.QFrame):
         self.__connection.network.nodeIdChanged.connect(self.__onNetworkUpdates)
         self.__connection.network.reachabilityChanged.connect(self.__onNetworkUpdates)
         self.ui.peerView.setModel(self.__connection.network.peers)
-        
+
     
     def show(self):
         #try to find the correct position for the popup
@@ -99,7 +101,11 @@ class UIWidget(QtWidgets.QFrame):
 
     # Qt slots 
     # ******************************************************************
-        
+    
+    def resizeEvent(self, event):
+        QtWidgets.QFrame.resizeEvent(self, event)
+        self.__docView.setMaximumWidth(event.size().width()-24) # 12 = 2x6 ui margin within ui file    
+
     @QtCore.Slot()
     def __onNodeRunningChanged(self):
         # the node object changed its running status

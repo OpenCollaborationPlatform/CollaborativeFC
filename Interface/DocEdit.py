@@ -20,16 +20,18 @@
 import FreeCADGui, asyncio, os
 from PySide2 import QtCore, QtGui, QtWidgets
 
+from Interface.AsyncSlotWidget import AsyncSlotWidget
 from Interface.PeerView import PeerView
 from Manager.Manager import Entity
 
-class DocEdit(QtWidgets.QWidget):
+class DocEdit(QtWidgets.QWidget, AsyncSlotWidget):
     
     editFinished = QtCore.Signal()
     
     def __init__(self, manager, parent=None):
         
-        super().__init__(parent)
+        QtWidgets.QWidget.__init__(self, parent)
+        AsyncSlotWidget.__init__(self, self)
         
         self.__manager = manager
 
@@ -40,6 +42,7 @@ class DocEdit(QtWidgets.QWidget):
         self.setLayout(layout)
         
         self.__peerView = PeerView()
+        self.__peerView.setMaximumWidth(self.ui.peerArea.width())
         self.ui.peerArea.setWidget(self.__peerView)
         
         self.ui.closeButton.clicked.connect(lambda: self.editFinished.emit())
@@ -52,12 +55,16 @@ class DocEdit(QtWidgets.QWidget):
         
         if self.__editedEntity.manager:
             self.__peerView.setdocument(self.__editedEntity.manager)
+            self.setAsyncObject(self.__editedEntity.manager)
         
         if self.__editedEntity.fcdoc:
             self.ui.nameInput.setText(self.__editedEntity.fcdoc.Label)
         else:
             self.ui.nameInput.setText(self.__editedEntity.id)
-            
+    
+    def resizeEvent(self, event):
+        QtWidgets.QWidget.resizeEvent(self, event)
+        self.__peerView.setMaximumWidth(event.size().width())
     
     @QtCore.Slot()
     def __onAddPeer(self):
@@ -71,4 +78,5 @@ class DocEdit(QtWidgets.QWidget):
         if not self.__editedEntity.manager:
             raise Exception("Document no available on node, cannot be edited")
         
-        self.__editedEntity.manager.setNameSlot(self, self.ui.nameInput.text)
+        if not self.__editedEntity.manager.name == self.ui.nameInput.text:
+            self.__editedEntity.manager.setNameSlot(self, self.ui.nameInput.text)

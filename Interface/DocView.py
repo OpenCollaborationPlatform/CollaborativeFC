@@ -37,7 +37,7 @@ class DocView(QtWidgets.QWidget, AsyncSlotWidget):
         self.setAsyncObject(manager)
         
         layout = QtWidgets.QVBoxLayout()
-        layout.setContentsMargins(2,2,2,2)
+        layout.setContentsMargins(0,0,0,0)
         layout.addStretch(1)
         layout.setSpacing(15)
         self.setLayout(layout)
@@ -45,6 +45,7 @@ class DocView(QtWidgets.QWidget, AsyncSlotWidget):
         self.__manager.documentAdded.connect(self.__onDocumentAdded)
         self.__manager.documentRemoved.connect(self.__onDocumentRemoved)
         self.__manager.documentChanged.connect(self.__onDocumentChanged)
+
 
     @QtCore.Slot(str)
     def __onEdit(self, uuid):
@@ -88,6 +89,7 @@ class DocWidget(QtWidgets.QWidget):
         
         self.__manager = manager
         self.__uuid = uuid
+        self.__name = ""
 
         self.ui = FreeCADGui.PySideUic.loadUi(":/Collaboration/Ui/Document.ui")
         layout = QtWidgets.QVBoxLayout()
@@ -114,10 +116,13 @@ class DocWidget(QtWidgets.QWidget):
             self.ui.joinedLabel.setText("-")
 
         if entity.fcdoc:
-            self.ui.nameLabel.setText(entity.fcdoc.Label)
+            self.__name = entity.fcdoc.Label
         else:
-            self.ui.nameLabel.setText(entity.id)
+            self.__name = entity.id
             
+        name = self.__name
+        self.ui.nameLabel.setText(name)
+        
         if entity.status == Entity.Status.shared:
             self.ui.shareButton.setText("Stop")
             self.ui.docButton.setText("Close")
@@ -134,6 +139,10 @@ class DocWidget(QtWidgets.QWidget):
             self.ui.shareButton.setText("Stop")
             self.ui.docButton.setText("Open")
             self.ui.editButton.setEnabled(True)
-            self.ui.statusIndicator.setPixmap(QtGui.QPixmap(":/Collaboration/Icons/indicator_off.svg"))
-            
-    
+            self.ui.statusIndicator.setPixmap(QtGui.QPixmap(":/Collaboration/Icons/indicator_off.svg"))   
+
+    def paintEvent(self, event):
+        
+        name = self.ui.nameLabel.fontMetrics().elidedText(self.__name, QtCore.Qt.ElideRight, self.ui.nameLabel.width())
+        self.ui.nameLabel.setText(name)
+        QtWidgets.QWidget.paintEvent(self, event)

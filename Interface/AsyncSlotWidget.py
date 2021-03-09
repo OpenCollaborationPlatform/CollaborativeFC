@@ -114,7 +114,7 @@ class AsyncSlotWidget():
         
         if self.__asyncObject:
             self.__asyncObject.onAsyncSlotStarted.disconnect(self.__onAsyncStart)
-            self.__asyncObject.onAsyncSlotFinished.diconnect(self.__onAsyncStop)
+            self.__asyncObject.onAsyncSlotFinished.disconnect(self.__onAsyncStop)
             
             for run in self.__running:
                 self.__onAsyncStop(run, "", "")
