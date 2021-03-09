@@ -149,4 +149,14 @@ class AsyncSlotWidget():
         if err or msg:            
             err = ErrorBox(err, msg, self.__parent)
             err.show()
+   
+   
+class AsyncSlotPromoter(QtCore.QObject, AsyncSlotWidget):
+    # Promotes any QWidget to behave as AsyncSlotWidget
     
+    def __init__(self, widget):
+        
+        AsyncSlotWidget.__init__(self, widget)
+        QtCore.QObject.__init__(self)
+        
+        

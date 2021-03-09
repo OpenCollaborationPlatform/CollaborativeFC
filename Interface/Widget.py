@@ -20,6 +20,7 @@
 import FreeCADGui, asyncio, os
 from PySide2 import QtCore, QtGui, QtWidgets
 
+from Interface.AsyncSlotWidget import AsyncSlotPromoter
 from Interface.DocView import DocView
 from Interface.DocEdit import DocEdit
 
@@ -47,6 +48,11 @@ class UIWidget(QtWidgets.QFrame):
         layout.addWidget(self.ui)
         self.setLayout(layout)
  
+        # async slot handling for node/api
+        self.__nodeAsyncWidget  = AsyncSlotPromoter(self.ui.nodeWidget)
+        self.__nodeAsyncWidget.setAsyncObject(self.__connection.node)
+        self.__apiAsyncWidget  = AsyncSlotPromoter(self.ui.apiWidget)
+        self.__apiAsyncWidget.setAsyncObject(self.__connection.api)
  
         # setup document management
         self.__docView = DocView(manager)
