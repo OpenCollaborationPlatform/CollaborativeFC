@@ -20,18 +20,21 @@
 import FreeCADGui, asyncio, os
 from PySide2 import QtCore, QtGui, QtWidgets
 
+from Interface.AsyncSlotWidget import AsyncSlotWidget
 from Manager.Manager import Entity
 
-class DocView(QtWidgets.QWidget):
+class DocView(QtWidgets.QWidget, AsyncSlotWidget):
     
     edit = QtCore.Signal(str)
     
     def __init__(self, manager, parent = None):
         
+        AsyncSlotWidget.__init__(self, self)
         QtWidgets.QWidget.__init__(self, parent)
         
         self.__manager = manager
         self.__widgets = {}
+        self.setAsyncObject(manager)
         
         layout = QtWidgets.QVBoxLayout()
         layout.setContentsMargins(2,2,2,2)

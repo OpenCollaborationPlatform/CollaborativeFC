@@ -358,7 +358,7 @@ class Manager(QtCore.QObject, Helper.AsyncSlotObject):
     @Helper.AsyncSlot(str)
     async def toggleCollaborateSlot(self, uuid):
         entity = self.getEntity("uuid", uuid)
-        if entity.status == Entity.Status.shared:
+        if entity.status == Entity.Status.shared or entity.status == Entity.Status.node:
             await self.stopCollaborate(entity)
         else:
             await self.collaborate(entity)
