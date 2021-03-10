@@ -35,14 +35,24 @@ class LogReader(QtCore.QAbstractListModel):
     def __init__(self, logpath):
         super().__init__()
         
-        self.__path    = logpath
-        self.__fileNo  = os.stat(logpath).st_ino
-        self.__lines   = collections.deque(maxlen=100)
-        
+        self.__path = logpath
+        self.__fileNo = os.stat(logpath).st_ino
+        self.__lines = collections.deque(maxlen=100)
+        self.__shutdown = False
+        self.__task = None
+    
+    def taskRun(self):
         self.__task = asyncio.ensure_future(self.follow())
+        
+    async def blockRun(self):
+        await self.follow()
     
     async def close(self):
-        self.__task.cancel()
+        
+        self.__shutdown = True
+        
+        if self.__task:
+            self.__task.cancel()
         
         if self.__file:
             await self.__file.close()
@@ -54,6 +64,9 @@ class LogReader(QtCore.QAbstractListModel):
         await self.__file.readline() # drop one line, as it is most likely truncated
         
         while True:
+            
+            if self.__shutdown:
+                return
             
             newlines = []
             while True:
@@ -70,7 +83,7 @@ class LogReader(QtCore.QAbstractListModel):
                                    
                 except Exception as e:
                     break
-                    
+                        
             if newlines:
                 # we do this here to not emit the signal on every new line. This is rather slow 
                 # if we have a large log file
@@ -79,6 +92,9 @@ class LogReader(QtCore.QAbstractListModel):
                 self.layoutChanged.emit()
 
             try:
+                if self.__shutdown:
+                    return
+            
                 #in case new file opened by rotating log provider
                 if os.stat(self.__path).st_ino != self.__fileNo:
                     new = aiofiles.open(self.__path, "r")
@@ -170,7 +186,7 @@ class Node(QtCore.QObject, Helper.AsyncSlotObject):
         elif sys.platform == "win32":
             self.__ocp = os.path.join(parent_dir, "OCPNodeWindows.exe")
             
-        #self.__ocp = "/home/stefan/Projects/Go/CollaborationNode/CollaborationNode"
+        self.__ocp = "/home/stefan/Projects/Go/CollaborationNode/CollaborationNode"
                
         #for testing we need to connect to a dedicated node       
         self.__test = False
@@ -198,18 +214,20 @@ class Node(QtCore.QObject, Helper.AsyncSlotObject):
         self.__apiUri    = "unknown"
         
         asyncio.ensure_future(self.__asyncInit())
+        asyncio.ensure_future(self.__startLogging())
      
     
     async def __asyncInit(self):
         await self.__update()           
         
+    async def __startLogging(self):
         # open logfile if available
         dir = await self.__fetchConfig("directory", self.running)  
         self.__logFile   = os.path.join(dir, "Logs",  "ocp.log")
         if os.path.isfile(self.__logFile) and not self.__logReader:
-            self.__logReader = LogReader(self.__logFile)
-            self.logModelChanged.emit()
-
+                self.__logReader = LogReader(self.__logFile)
+                self.logModelChanged.emit()
+                await self.__logReader.blockRun()
 
     async def run(self):
         # handles the full setup process till a OCP node is running       
@@ -317,6 +335,7 @@ class Node(QtCore.QObject, Helper.AsyncSlotObject):
             self.__logFile   = os.path.join(dir, "Logs",  "ocp.log")
             if os.path.isfile(self.__logFile) and not self.__logReader:
                 self.__logReader = LogReader(self.__logFile)
+                self.__logReader.taskRun()
                 self.logModelChanged.emit()
 
         # get the latest information and notify that we are running!
@@ -405,7 +424,7 @@ class Node(QtCore.QObject, Helper.AsyncSlotObject):
         
     @QtCore.Property(str, notify=p2pPortChanged)
     def p2pPort(self):
-        return self.__p2pPort
+        return str(self.__p2pPort)
     
     @QtCore.Property(str, notify=apiUriChanged)
     def apiUri(self):
@@ -413,7 +432,7 @@ class Node(QtCore.QObject, Helper.AsyncSlotObject):
         
     @QtCore.Property(str, notify=apiPortChanged)
     def apiPort(self):
-        return self.__apiPort
+        return str(self.__apiPort)
     
     @QtCore.Property(QtCore.QObject, notify=logModelChanged)
     def logModel(self):

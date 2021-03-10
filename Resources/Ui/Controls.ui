@@ -368,7 +368,7 @@
                </widget>
               </item>
               <item row="2" column="2">
-               <widget class="QLineEdit" name="uriPort">
+               <widget class="QLineEdit" name="apiPort">
                 <property name="sizePolicy">
                  <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
                   <horstretch>1</horstretch>
@@ -754,6 +754,9 @@
         <spacer name="verticalSpacer">
          <property name="orientation">
           <enum>Qt::Vertical</enum>
+         </property>
+         <property name="sizeType">
+          <enum>QSizePolicy::Expanding</enum>
          </property>
          <property name="sizeHint" stdset="0">
           <size>

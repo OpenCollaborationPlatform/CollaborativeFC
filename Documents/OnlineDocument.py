@@ -50,9 +50,8 @@ class OnlineDocument():
         
         self.logger.debug("Created")
  
-    async def ready(self):
-        await self.onlineObs.ready()
-        await self.data.ready()
+    async def setup(self):
+        await self.onlineObs.setup()
  
     async def close(self):
         # we close the online doc. That means closing the observer and all objects/viewproviders

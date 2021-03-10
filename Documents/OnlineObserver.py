@@ -34,13 +34,10 @@ class OnlineObserver():
       
         self.onlineDoc = odoc
         self.logger = logging.getLogger("Online observer " + odoc.id[-5:])
-        self.runners = {}
-        self.readyEvt = asyncio.Event()
-        
-        asyncio.ensure_future(self.__asyncInit())
-       
+        self.runners = {}      
 
-    async def __asyncInit(self):
+    async def setup(self):
+        # setups all async things
         
         self.callbacks = {
                 "Objects.onObjectCreated": self.__cbNewObject,
@@ -81,14 +78,11 @@ class OnlineObserver():
             for cb in self.callbacks.keys():
                 await self.onlineDoc.connection.api.subscribe(key, self.__run, uri+cb, options=SubscribeOptions(match="wildcard", details_arg="details"))
 
-            self.readyEvt.set()
             #self.onlineDoc.connection.api.subscribe(self.__runDocProperties, uri+"Properties", options=SubscribeOptions(match="prefix", details_arg="details"))
            
         except Exception as e:
             self.logger.error("Setup failed: ", e)
 
-    async def ready(self):
-        await self.readyEvt.wait()
      
     async def close(self):
         tasks = []

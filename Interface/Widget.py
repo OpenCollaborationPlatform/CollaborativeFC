@@ -74,7 +74,15 @@ class UIWidget(QtWidgets.QFrame):
         self.__onNodeRunningChanged()
         self.__connection.node.logModelChanged.connect(lambda: self.ui.logsView.setModel(self.__connection.node.logModel))
         self.__connection.node.runningChanged.connect(self.__onNodeRunningChanged)
+        self.__connection.node.p2pUriChanged.connect(self.__listenDetailsUpdate)
+        self.__connection.node.p2pPortChanged.connect(self.__listenDetailsUpdate)
+        self.__connection.node.apiUriChanged.connect(self.__listenDetailsUpdate)
+        self.__connection.node.apiPortChanged.connect(self.__listenDetailsUpdate)
         self.ui.startupButton.released.connect(self.__connection.node.toggleRunningSlot)
+        self.ui.p2pUri.editingFinished.connect(self.__p2pDataChanged)
+        self.ui.p2pPort.editingFinished.connect(self.__p2pDataChanged)
+        self.ui.apiUri.editingFinished.connect(self.__apiDataChanged)
+        self.ui.apiPort.editingFinished.connect(self.__apiDataChanged)
         
         self.__onApiConnectedChanged()        
         self.__connection.api.connectedChanged.connect(self.__onApiConnectedChanged)
@@ -115,11 +123,19 @@ class UIWidget(QtWidgets.QFrame):
             self.ui.nodeLabel.setText("OCP node running")
             self.ui.startupButton.setText("Shutdown")
             self.ui.connectButton.setEnabled(True)
+            self.ui.p2pUri.setEnabled(False)
+            self.ui.p2pPort.setEnabled(False)
+            self.ui.apiUri.setEnabled(False)
+            self.ui.apiPort.setEnabled(False)
         else:
             self.ui.nodeIndicator.setPixmap(QtGui.QPixmap(":/Collaboration/Icons/indicator_off.svg"))
             self.ui.nodeLabel.setText("No OCP node running")
             self.ui.startupButton.setText("Startup")
             self.ui.connectButton.setEnabled(False)
+            self.ui.p2pUri.setEnabled(True)
+            self.ui.p2pPort.setEnabled(True)
+            self.ui.apiUri.setEnabled(True)
+            self.ui.apiPort.setEnabled(True)
 
     @QtCore.Slot()
     def __onApiConnectedChanged(self):
@@ -153,6 +169,27 @@ class UIWidget(QtWidgets.QFrame):
             self.ui.reachabilityIndicator.setPixmap(QtGui.QPixmap(":/Collaboration/Icons/indicator_on.svg"))
         else:
             self.ui.reachabilityIndicator.setPixmap(QtGui.QPixmap(":/Collaboration/Icons/indicator_off.svg"))
+     
+    @QtCore.Slot()
+    def __p2pDataChanged(self):
+        uri = self.ui.p2pUri.text()
+        port = self.ui.p2pPort.text()
+        if uri != self.__connection.node.p2pUri or port != self.__connection.node.p2pPort:
+            self.__connection.node.setP2PDetails(uri, port)
+        
+    @QtCore.Slot()
+    def __apiDataChanged(self):
+        uri = self.ui.apiUri.text()
+        port = self.ui.apiPort.text()
+        if uri != self.__connection.node.apiUri or port != self.__connection.node.apiPort:
+            self.__connection.node.setAPIDetails(uri, port)
+
+    @QtCore.Slot()
+    def __listenDetailsUpdate(self):
+        self.ui.p2pPort.setText(self.__connection.node.p2pPort)
+        self.ui.p2pUri.setText(self.__connection.node.p2pUri)
+        self.ui.apiPort.setText(self.__connection.node.apiPort)
+        self.ui.apiUri.setText(self.__connection.node.apiUri)
      
     @QtCore.Slot(str)
     def __onEdit(self, uuid):

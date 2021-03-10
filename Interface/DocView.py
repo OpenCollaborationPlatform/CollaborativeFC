@@ -65,6 +65,7 @@ class DocView(QtWidgets.QWidget, AsyncSlotWidget):
             return 
         
         widget = self.__widgets[uuid]
+        widget.close()
         widget.edit.disconnect(self.__onEdit)
         widget.setVisible(False)
         self.layout().removeWidget(widget)
@@ -90,6 +91,7 @@ class DocWidget(QtWidgets.QWidget):
         self.__manager = manager
         self.__uuid = uuid
         self.__name = ""
+        self.__connected = False
 
         self.ui = FreeCADGui.PySideUic.loadUi(":/Collaboration/Ui/Document.ui")
         layout = QtWidgets.QVBoxLayout()
@@ -103,17 +105,43 @@ class DocWidget(QtWidgets.QWidget):
         
         self.update()
     
+    def close(self):
+        
+        if not self.__connected:
+            return
+        
+        entity = self.__manager.getEntity("uuid", self.__uuid)
+        if entity and entity.manager:
+            entity.manager.memberCountChanged.disconnect(self.update)
+            entity.manager.joinedCountChanged.disconnect(self.update)
+
+
+    @QtCore.Slot()
     def update(self):
         
         entity = self.__manager.getEntity("uuid", self.__uuid)
+        if not entity:
+            raise Exception("Invalid uuid in DocumentWidget")
+        
         self.ui.statusLabel.setText(entity.status.name)
         
         if entity.manager:
             self.ui.memberLabel.setText(f"{entity.manager.memberCount}")
             self.ui.joinedLabel.setText(f"{entity.manager.joinedCount}")
+            
+            if not self.__connected:
+                # the doc manager was newly added
+                entity.manager.memberCountChanged.connect(self.update)
+                entity.manager.joinedCountChanged.connect(self.update)
+                self.__connected = True
+            
         else:
             self.ui.memberLabel.setText("-")
             self.ui.joinedLabel.setText("-")
+            
+            if self.__connected:
+                # the doc manager was removed
+                self.__connected = False
 
         if entity.fcdoc:
             self.__name = entity.fcdoc.Label
@@ -141,8 +169,10 @@ class DocWidget(QtWidgets.QWidget):
             self.ui.editButton.setEnabled(True)
             self.ui.statusIndicator.setPixmap(QtGui.QPixmap(":/Collaboration/Icons/indicator_off.svg"))   
 
+
     def paintEvent(self, event):
         
         name = self.ui.nameLabel.fontMetrics().elidedText(self.__name, QtCore.Qt.ElideRight, self.ui.nameLabel.width())
         self.ui.nameLabel.setText(name)
         QtWidgets.QWidget.paintEvent(self, event)
+        

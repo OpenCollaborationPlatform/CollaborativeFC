@@ -76,10 +76,12 @@ class Manager(QtCore.QObject, Helper.AsyncSlotObject):
         self.__connection = connection
         
         self.__connection.api.connectedChanged.connect(self.__connectionChanged)
-        asyncio.ensure_future(self.__asyncInit(connection))   
+        asyncio.ensure_future(self.__asyncInit())   
     
     
-    async def __asyncInit(self, con):
+    async def __asyncInit(self):
+        
+        await self.__dataservice.setup()
               
         try:
             #we register ourself for some key events
@@ -92,7 +94,9 @@ class Manager(QtCore.QObject, Helper.AsyncSlotObject):
                 doclist = await self.__connection.api.call(u"ocp.documents.list")
             
                 for doc in doclist:
-                    entity = Entity(id = doc, status = Entity.Status.node, onlinedoc = None, fcdoc = None)
+                    docManager = ManagedDocument(doc, self.__connection)
+                    await docManager.setup()
+                    entity = Entity(id = doc, status = Entity.Status.node, onlinedoc = None, fcdoc = None, manager=docManager)
                     self.__entities.append(entity)
                     self.documentAdded.emit(entity.uuid)
             
@@ -110,7 +114,7 @@ class Manager(QtCore.QObject, Helper.AsyncSlotObject):
                 if not self.hasEntity("id", doc):
                     entity = Entity(id = doc, status = Entity.Status.node, onlinedoc = None,
                                     fcdoc = None, manager=ManagedDocument(doc, self.__connection))
-                    await entity.manager.ready()
+                    await entity.manager.setup()
                     self.__entities.append(entity)
                     self.documentAdded.emit(entity.uuid)
                 
@@ -189,7 +193,7 @@ class Manager(QtCore.QObject, Helper.AsyncSlotObject):
                
         entity = Entity(id = id, status = Entity.Status.node, onlinedoc = None, 
                         fcdoc = None, manager=ManagedDocument(id, self.__connection))
-        await entity.manager.ready()
+        await entity.manager.setup()
         self.__entities.append(entity)
         self.documentAdded.emit(entity.uuid)
 
@@ -197,7 +201,7 @@ class Manager(QtCore.QObject, Helper.AsyncSlotObject):
     async def onOCPDocumentOpened(self, id): 
         # opened means a new node document in our node that was created by someone else, we just joined.
         # hence the processing is exactly the same as created
-        return self.onOCPDocumentCreated(id)
+        return await self.onOCPDocumentCreated(id)
             
         
     async def onOCPDocumentClosed(self, id):
@@ -283,9 +287,9 @@ class Manager(QtCore.QObject, Helper.AsyncSlotObject):
             
             entity.id = res
             entity.onlinedoc = OnlineDocument(res, entity.fcdoc, self.__connection, self.__dataservice)
-            await entity.onlinedoc.ready()
+            await entity.onlinedoc.setup()
             entity.manager = ManagedDocument(res, self.__connection)
-            await entity.manager.ready()
+            await entity.manager.setup()
             await entity.onlinedoc.asyncSetup()
                 
         elif entity.status == Entity.Status.node:
@@ -294,7 +298,7 @@ class Manager(QtCore.QObject, Helper.AsyncSlotObject):
             self.__blockLocalEvents = False
             entity.fcdoc = doc
             entity.onlinedoc = OnlineDocument(entity.id, doc, self.__connection, self.__dataservice)
-            await entity.onlinedoc.ready()
+            await entity.onlinedoc.setup()
             await entity.onlinedoc.asyncLoad() 
                 
         elif entity.status == Entity.Status.invited:
@@ -304,9 +308,9 @@ class Manager(QtCore.QObject, Helper.AsyncSlotObject):
             self.__blockLocalEvents = False
             entity.fcdoc = doc
             entity.onlinedoc = OnlineDocument(entity.id, doc, self.__connection, self.__dataservice)
-            await entity.onlinedoc.ready()
+            await entity.onlinedoc.setup()
             entity.manager = ManagedDocument(entity.id, self.__connection)
-            await entity.manager.ready()
+            await entity.manager.setup()
             await entity.onlinedoc.asyncLoad() 
 
         entity.status = Entity.Status.shared

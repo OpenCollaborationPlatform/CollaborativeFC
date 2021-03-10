@@ -75,14 +75,15 @@ class PeerView(QtWidgets.QWidget):
         if not peerId in self.__widgets:
             return 
         
-        widget = self.__widgets[peerId]
-        widget.setVisible(False)
-        self.layout().removeWidget(widget)
-        widget.deleteLater()
+        widget = self.__widgets.pop(peerId, None)
+        if widget:
+            widget.setVisible(False)
+            self.layout().removeWidget(widget)
+            widget.deleteLater()
      
     @QtCore.Slot(str)
     def __onPeerChanged(self, peerId):
-        
+       
         if not peerId in self.__widgets:
             return 
         
@@ -91,12 +92,12 @@ class PeerView(QtWidgets.QWidget):
 
 class PeerWidget(QtWidgets.QWidget):
        
-    def __init__(self, docmanager, peer, parent):
+    def __init__(self, docmanager, peerId, parent):
         
         super().__init__(parent)
         
         self.__docmanager = docmanager
-        self.__peer = peer
+        self.__peerId = peerId
         self.__name =  ""
 
         self.ui = FreeCADGui.PySideUic.loadUi(":/Collaboration/Ui/Peer.ui")
@@ -105,27 +106,27 @@ class PeerWidget(QtWidgets.QWidget):
         layout.addWidget(self.ui)
         self.setLayout(layout)
         
-        self.ui.rigthsButton.clicked.connect(lambda: self.__docmanager.removePeerSlot(self.__peer))
-        self.ui.removeButton.clicked.connect(lambda: self.__docmanager.togglePeerRigthsSlot(self.__peer))
+        self.ui.removeButton.clicked.connect(lambda: self.__docmanager.removePeerSlot(self.__peerId))
+        self.ui.rigthsButton.clicked.connect(lambda: self.__docmanager.togglePeerRigthsSlot(self.__peerId))
 
         self.update()
     
     
     def update(self):
         
-        peer = self.__docmanager.getPeer(self.__peer)
+        peer = self.__docmanager.getPeer(self.__peerId)
         if not peer:
             return
         
         self.__name = peer.nodeid
-        name = self.__name
-        self.ui.idLabel.setText(name)
+        self.ui.idLabel.setText(self.__name)
         self.ui.joinedLabel.setText(f"{peer.joined}")
         self.ui.rigthsLabel.setText(peer.auth)
         if peer.auth == "Write":
             self.ui.rigthsButton.setText("Set Read")
         else:
             self.ui.rigthsButton.setText("Set Write")
+
 
     def paintEvent(self, event):
         

@@ -118,20 +118,15 @@ class API(QtCore.QObject, Helper.AsyncSlotObject):
         if key in self.__registered:
             #remove regiter entries and clsoe sessions
             del self.__registered[key]
-            for session in self.__registeredSessions[key]:
-                await session.unregister()
-            
-            self.__registeredSessions.pop(key, None)
-            
+            for session in self.__registeredSessions.pop(key, []):
+                await session.unregister()          
         
         if key in self.__subscribed:
             #remove subscribe entries and close sessions
             del self.__subscribed[key]
-            for session in self.__subscribedSessions[key]:
+            for session in self.__subscribedSessions.pop(key, []):
                 await session.unsubscribe()
-            
-            self.__subscribedSessions.pop(key, None)
-        
+
             
     async def call(self, *args, **kwargs):
         # calls api function

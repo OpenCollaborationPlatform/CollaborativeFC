@@ -1,5 +1,5 @@
 
-import asyncio, functools
+import asyncio, functools, traceback
 from autobahn.wamp import ApplicationError
 from PySide2 import QtCore
 
@@ -42,9 +42,13 @@ class AsyncSlotObject():
             self.onAsyncSlotFinished.emit(id, None, None)
             
         except ApplicationError as e:
+            if not isOCPError(e):
+                traceback.print_exc()
+                
             self.onAsyncSlotFinished.emit(id, e.error, ' '.join([str(a) for a in e.args]))
             
         except Exception as e:
+            traceback.print_exc()
             self.onAsyncSlotFinished.emit(id, None, f"{e}")
 
 

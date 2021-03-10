@@ -57,10 +57,7 @@ class DocEdit(QtWidgets.QWidget, AsyncSlotWidget):
             self.__peerView.setdocument(self.__editedEntity.manager)
             self.setAsyncObject(self.__editedEntity.manager)
         
-        if self.__editedEntity.fcdoc:
-            self.ui.nameInput.setText(self.__editedEntity.fcdoc.Label)
-        else:
-            self.ui.nameInput.setText(self.__editedEntity.id)
+        self.ui.nameInput.setText(self.__editedEntity.manager.name)
     
     def resizeEvent(self, event):
         QtWidgets.QWidget.resizeEvent(self, event)
@@ -71,12 +68,14 @@ class DocEdit(QtWidgets.QWidget, AsyncSlotWidget):
         if not self.__editedEntity.manager:
             raise Exception("Document no available on node, cannot be edited")
         
-        self.__editedEntity.manager.addPeerSlot(self, self.ui.nodeIdInput.text, self.ui.editRigthsInput.checked)
+        self.__editedEntity.manager.addPeerSlot(self.ui.nodeIdInput.text(), self.ui.editRigthsInput.isChecked())
+        self.ui.nodeIdInput.setText("")
+        self.ui.editRigthsInput.setChecked(False)
     
     @QtCore.Slot()
     def __onSetName(self):
         if not self.__editedEntity.manager:
             raise Exception("Document no available on node, cannot be edited")
         
-        if not self.__editedEntity.manager.name == self.ui.nameInput.text:
-            self.__editedEntity.manager.setNameSlot(self, self.ui.nameInput.text)
+        #if not self.__editedEntity.manager.name == self.ui.nameInput.text:
+        #    self.__editedEntity.manager.setNameSlot(self.ui.nameInput.text)

@@ -38,17 +38,11 @@ class ManagedDocument(QtCore.QObject, Helper.AsyncSlotObject):
         self.peers = []
         self.__docId = id
         self.__connection = connection
-        self.__readyEvt = asyncio.Event()
         
-        connection.api.connectedChanged.connect(self.__connectChanged)
-        asyncio.ensure_future(self.__asyncInit())
-    
-    
-    async def __asyncInit(self):
-        
-        # fetch the currently registered peers as well as the active ones
-        # (no await, as is async slot)
-        self.__connectChanged()
+        connection.api.connectedChanged.connect(self.__connectChanged)    
+      
+    async def setup(self):
+        # Setups all document relevant things. Must be called after creation
         
         # subscribe to peer update, registration and active
         self.__subkey = f"ManagedDocument_{self.__docId}"
@@ -56,10 +50,10 @@ class ManagedDocument(QtCore.QObject, Helper.AsyncSlotObject):
         await self.__connection.api.subscribe(self.__subkey, self.__peerActivityChanged,  f"ocp.documents.{self.__docId}.peerActivityChanged")
         await self.__connection.api.subscribe(self.__subkey, self.__peerAdded,  f"ocp.documents.{self.__docId}.peerAdded")
         await self.__connection.api.subscribe(self.__subkey, self.__peerRemoved,  f"ocp.documents.{self.__docId}.peerRemoved")
-        self.__readyEvt.set()
-      
-    async def ready(self):
-        await self.__readyEvt.wait()
+        
+        # fetch the currently registered peers as well as the active ones
+        await self.__processConnectionChange()
+        
 
     async def close(self):
         #unsubscribe the events
@@ -90,6 +84,10 @@ class ManagedDocument(QtCore.QObject, Helper.AsyncSlotObject):
     
     @asyncSlot()
     async def __connectChanged(self):
+        await self.__processConnectionChange()
+        
+    async def __processConnectionChange(self):
+        # needs to be a sepeate method to slot, as calling the slot from setup() would lead to task spawned in task error
         
         if self.__connection.api.connected:
             readPeers = await self.__connection.api.call(f"ocp.documents.{self.__docId}.listPeers", auth="Read")
@@ -98,40 +96,47 @@ class ManagedDocument(QtCore.QObject, Helper.AsyncSlotObject):
             
             for peer in readPeers:
                 self.peers.append(ManagedDocument.__Peer(peer, "Read", peer in joinedPeers))
+                self.peerAdded.emit(peer)
             
             for peer in writePeers:
                 self.peers.append(ManagedDocument.__Peer(peer, "Write", peer in joinedPeers))
+                self.peerAdded.emit(peer)
             
             self.memberCountChanged.emit()
             self.joinedCountChanged.emit()
             
         else:
+            for peer in self.peers:
+                self.peerRemoved.emit(peer)
+                
             self.peers = []
             self.memberCountChanged.emit()
             self.joinedCountChanged.emit()
             
             
     async def __peerAuthChanged(self, id, auth):
-        peer = self.__getPeer(id)
+        peer = self.getPeer(id)
         if peer:
             peer.auth = auth
-            self.peerChanged.emit(peer)
+            self.peerChanged.emit(id)
+        else:
+            print("peer not available")
     
-    async def __peerActivityChanged(self, peer, joined):
-        peer = self.__getPeer(id)
+    async def __peerActivityChanged(self, id, joined):
+        peer = self.getPeer(id)
         if peer:
             peer.joined = joined        
-            self.peerChanged.emit(peer)
+            self.peerChanged.emit(id)
             self.joinedCountChanged.emit()
     
     async def __peerAdded(self, id, auth):
         self.peers.append(ManagedDocument.__Peer(id, auth, False))
             
         self.peerAdded.emit(id)
-        self.__memberCountChanged.emit()
+        self.memberCountChanged.emit()
     
     async def __peerRemoved(self, id):
-        peer = self.__getPeer(id)
+        peer = self.getPeer(id)
         if peer:
             self.peers.remove(peer)
             self.peerRemoved.emit(id)
@@ -175,7 +180,7 @@ class ManagedDocument(QtCore.QObject, Helper.AsyncSlotObject):
     joinedCount = QtCore.Property(int, __getJoinedCount, notify=joinedCountChanged)
 
     @Helper.AsyncSlot(str)
-    def setNameSlot(self, name):
+    async def setNameSlot(self, name):
         print(f"SetName with {name}")
 
     @Helper.AsyncSlot(str)
@@ -183,18 +188,18 @@ class ManagedDocument(QtCore.QObject, Helper.AsyncSlotObject):
         await self.removePeer(peer)
 
     @Helper.AsyncSlot(str)
-    async def togglePeerRigthsSlot(self, peer):
+    async def togglePeerRigthsSlot(self, peerid):
         
-        auth = self.peers.peerAuth(peer)
-        if auth == "Write":
-            await self.changePeerAuth(peer, "Read")
+        peer = self.getPeer(peerid)
+        if peer.auth == "Write":
+            await self.changePeerAuth(peerid, "Read")
         else:
-            await self.changePeerAuth(peer, "Write")
+            await self.changePeerAuth(peerid, "Write")
 
     @Helper.AsyncSlot(str, bool)
     async def addPeerSlot(self, id, edit):
         auth = "Read"
         if edit:
             auth = "Write"
-                
+            
         await self.addPeer(id, auth)
