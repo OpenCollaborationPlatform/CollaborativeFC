@@ -90,15 +90,7 @@ class Manager(QtCore.QObject, Helper.AsyncSlotObject):
             await self.__connection.api.subscribe("manager", self.onOCPDocumentClosed, u"ocp.documents.closed")
             await self.__connection.api.subscribe("manager", self.onOCPDocumentInvited, u"ocp.documents.invited")
 
-            if self.__connection.api.connected:
-                doclist = await self.__connection.api.call(u"ocp.documents.list")
-            
-                for doc in doclist:
-                    docManager = ManagedDocument(doc, self.__connection)
-                    await docManager.setup()
-                    entity = Entity(id = doc, status = Entity.Status.node, onlinedoc = None, fcdoc = None, manager=docManager)
-                    self.__entities.append(entity)
-                    self.documentAdded.emit(entity.uuid)
+            await self.__handleConnectionChanged()
             
         except Exception as e:
             print("Document Handler connection init error: {0}".format(e))
@@ -106,15 +98,35 @@ class Manager(QtCore.QObject, Helper.AsyncSlotObject):
     
     @asyncSlot()
     async def __connectionChanged(self):
+        await self.__handleConnectionChanged()
+        
+        
+    async def __handleConnectionChanged(self):
+        # Updates the entities according to the conenction status
+        #
+        # Required as async function as __asyncInit cannot call asyncSlot, as it would spawn a task
+        # from within a task
         
         if self.__connection.api.connected:
             
+            # all open documents
             doclist = await self.__connection.api.call(u"ocp.documents.list")
             for doc in doclist:
                 if not self.hasEntity("id", doc):
                     entity = Entity(id = doc, status = Entity.Status.node, onlinedoc = None,
                                     fcdoc = None, manager=ManagedDocument(doc, self.__connection))
+                    
                     await entity.manager.setup()
+                    self.__entities.append(entity)
+                    self.documentAdded.emit(entity.uuid)
+                    
+            # all invited documents
+            doclist = await self.__connection.api.call(u"ocp.documents.invitations")
+            for doc in doclist:
+                if not self.hasEntity("id", doc):
+                    entity = Entity(id = doc, status = Entity.Status.invited, onlinedoc = None,
+                                    fcdoc = None, manager=None)
+                    
                     self.__entities.append(entity)
                     self.documentAdded.emit(entity.uuid)
                 
@@ -127,14 +139,18 @@ class Manager(QtCore.QObject, Helper.AsyncSlotObject):
                     
                 if entity.status == Entity.Status.node:
                     await entity.manager.close()
+                    entity.manager = None
                     self.__entities.remove(entity)
                     self.documentRemoved.emit(entity.uuid)
                     
                 if entity.status == Entity.Status.shared:
                     await entity.onlinedoc.close()
                     await entity.manager.close()
-                    self.__entities.remove(entity)
-                    self.documentRemoved.emit(entity.uuid)
+                    entity.onlinedoc = None
+                    entity.manager = None 
+                    entity.id = None
+                    entity.status = Entity.Status.local
+                    self.documentChanged.emit(entity.uuid)
 
 
     #FreeCAD event handling: Not blocking (used by document observers)
@@ -206,33 +222,51 @@ class Manager(QtCore.QObject, Helper.AsyncSlotObject):
         
     async def onOCPDocumentClosed(self, id):
         
-        #we do not check if entity exists, as a raise does not bother us
         entity = self.getEntity('id', id)
-               
-        if entity.status == Entity.Status.node or entity.status == Entity.Status.invited:
-            #it if is a pure node document we can remove it
-            if entity.manager:
-                await entity.manager.close()
-            self.__entities.remove(entity)
-            self.documentRemoved.emit(entity.uuid)
+        if not entity:
+            return 
         
-        elif entity.status == Entity.Status.shared:
-            #it was shared before, hence now with it being closed on the node it is only availble locally
-            if entity.onlinedoc:
-                await entity.onlinedoc.close()
-                entity.onlinedoc = None
-            if entity.manager:
-                await entity.manager.close()
-                entity.manager = None
-                
+        if entity.onlinedoc:
+            await entity.onlinedoc.close()
+            entity.onlinedoc = None
+        
+        if entity.manager:
+            await entity.manager.close()
+            entity.manager = None
+               
+        if entity.status == Entity.Status.shared:
+            #it was shared before, hence now with it being closed on the node it is only availble locally          
             entity.status = Entity.Status.local
             entity.id = None
             self.documentChanged.emit(entity.uuid)
+            
+        else:
+            # it is a pure node document, we can remove it
+            # in case it is anything else than status==node something went wrong, and removing it is fine
+            self.__entities.remove(entity)
+            self.documentRemoved.emit(entity.uuid)
         
     
-    def onOCPDocumentInvited(self):
-        #TODO not implemented on note yet
-        pass
+    async def onOCPDocumentInvited(self, doc, add):
+        
+        entity = self.getEntity('id', doc)
+        
+        if add:
+            if entity:
+                return 
+            
+            entity = Entity(id = doc, status = Entity.Status.invited, onlinedoc = None,
+                                    fcdoc = None, manager=None)
+                    
+            self.__entities.append(entity)
+            self.documentAdded.emit(entity.uuid)
+            
+        else:
+            if not entity or entity.status != Entity.Status.invited:
+                return 
+            
+            self.__entities.remove(entity)
+            self.documentRemoved.emit(entity.uuid)        
         
     
     
@@ -294,20 +328,18 @@ class Manager(QtCore.QObject, Helper.AsyncSlotObject):
                 
         elif entity.status == Entity.Status.node:
             self.__blockLocalEvents = True
-            doc = FreeCAD.newDocument(documentname)
+            entity.fcdoc = FreeCAD.newDocument(documentname)
             self.__blockLocalEvents = False
-            entity.fcdoc = doc
-            entity.onlinedoc = OnlineDocument(entity.id, doc, self.__connection, self.__dataservice)
+            entity.onlinedoc = OnlineDocument(entity.id, entity.fcdoc, self.__connection, self.__dataservice)
             await entity.onlinedoc.setup()
             await entity.onlinedoc.asyncLoad() 
                 
         elif entity.status == Entity.Status.invited:
             await self.__connection.api.call(u"ocp.documents.open", entity.id)
             self.__blockLocalEvents = True
-            doc = FreeCAD.newDocument(documentname)
+            entity.fcdoc = FreeCAD.newDocument(documentname)
             self.__blockLocalEvents = False
-            entity.fcdoc = doc
-            entity.onlinedoc = OnlineDocument(entity.id, doc, self.__connection, self.__dataservice)
+            entity.onlinedoc = OnlineDocument(entity.id, entity.fcdoc, self.__connection, self.__dataservice)
             await entity.onlinedoc.setup()
             entity.manager = ManagedDocument(entity.id, self.__connection)
             await entity.manager.setup()
@@ -315,6 +347,7 @@ class Manager(QtCore.QObject, Helper.AsyncSlotObject):
 
         entity.status = Entity.Status.shared
         self.documentChanged.emit(entity.uuid)
+        
    
     async def stopCollaborate(self, entity):
         # For the shared entity, this call stops the collaboration by closing it on the node, but keeping it local.
