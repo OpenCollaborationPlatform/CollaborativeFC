@@ -59,6 +59,7 @@ class LogReader(QtCore.QAbstractListModel):
 
     async def follow(self):
         
+        await asyncio.sleep(1)
         self.__file = await aiofiles.open(self.__path, "rb") # use rb to allow seek with offset from end
         await self.__file.seek(int(-10e3), 2) # only use last 10kB
         await self.__file.readline() # drop one line, as it is most likely truncated
@@ -186,7 +187,7 @@ class Node(QtCore.QObject, Helper.AsyncSlotObject):
         elif sys.platform == "win32":
             self.__ocp = os.path.join(parent_dir, "OCPNodeWindows.exe")
             
-        #self.__ocp = "/home/stefan/Projects/Go/CollaborationNode/CollaborationNode"
+        self.__ocp = "/home/stefan/Projects/Go/CollaborationNode/CollaborationNode"
                
         #for testing we need to connect to a dedicated node       
         self.__test = False

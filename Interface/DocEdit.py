@@ -52,6 +52,8 @@ class DocEdit(QtWidgets.QWidget, AsyncSlotWidget):
     def setEditable(self, uuid):
         
         self.__editedEntity = self.__manager.getEntity("uuid", uuid)
+        if not self.__editedEntity:
+            return
         
         if self.__editedEntity.manager:
             self.__peerView.setdocument(self.__editedEntity.manager)

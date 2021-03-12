@@ -35,7 +35,7 @@ class BusyIndicator(QtWidgets.QWidget):
             size = 50
             self.setGeometry(0, 0, size, size)
         
-        self.pixmap = QtGui.QPixmap("/home/stefan/Projects/Collaboration/Resources/Icons/busy.svg")
+        self.pixmap = QtGui.QPixmap(":/Collaboration/Icons/busy.svg")
         self.pixmap = self.pixmap.scaled(size, size, QtCore.Qt.KeepAspectRatio, QtCore.Qt.SmoothTransformation)
         self.angle = 0
         

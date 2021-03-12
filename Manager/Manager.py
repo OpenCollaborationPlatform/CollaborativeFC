@@ -222,10 +222,11 @@ class Manager(QtCore.QObject, Helper.AsyncSlotObject):
         
     async def onOCPDocumentClosed(self, id):
         
-        entity = self.getEntity('id', id)
-        if not entity:
+        
+        if not self.hasEntity('id', id):
             return 
         
+        entity = self.getEntity('id', id)
         if entity.onlinedoc:
             await entity.onlinedoc.close()
             entity.onlinedoc = None
@@ -248,11 +249,9 @@ class Manager(QtCore.QObject, Helper.AsyncSlotObject):
         
     
     async def onOCPDocumentInvited(self, doc, add):
-        
-        entity = self.getEntity('id', doc)
-        
+       
         if add:
-            if entity:
+            if self.hasEntity('id', doc):
                 return 
             
             entity = Entity(id = doc, status = Entity.Status.invited, onlinedoc = None,
@@ -262,7 +261,10 @@ class Manager(QtCore.QObject, Helper.AsyncSlotObject):
             self.documentAdded.emit(entity.uuid)
             
         else:
-            if not entity or entity.status != Entity.Status.invited:
+            if not self.hasEntity('id', doc):
+                return
+            
+            if entity.status != Entity.Status.invited:
                 return 
             
             self.__entities.remove(entity)
@@ -373,7 +375,7 @@ class Manager(QtCore.QObject, Helper.AsyncSlotObject):
             if getattr(entity, key) == val:
                 return entity
         
-        raise Exception(f'no such entity found: {key} == {val}')
+        return None
 
     def hasEntity(self, key, val):
         #returns the entity for the given key/value pair, e.g. "fcdoc":doc. Careful: if status is used
