@@ -114,6 +114,7 @@ class DocWidget(QtWidgets.QWidget):
         if entity and entity.manager:
             entity.manager.memberCountChanged.disconnect(self.update)
             entity.manager.joinedCountChanged.disconnect(self.update)
+            entity.manager.majorityChanged.disconnect(self.update)
 
 
     @QtCore.Slot()
@@ -128,16 +129,19 @@ class DocWidget(QtWidgets.QWidget):
         if entity.manager:
             self.ui.memberLabel.setText(f"{entity.manager.memberCount}")
             self.ui.joinedLabel.setText(f"{entity.manager.joinedCount}")
+            self.ui.majorityLabel.setText(f"{entity.manager.majority}")
             
             if not self.__connected:
                 # the doc manager was newly added
                 entity.manager.memberCountChanged.connect(self.update)
                 entity.manager.joinedCountChanged.connect(self.update)
+                entity.manager.majorityChanged.connect(self.update)
                 self.__connected = True
             
         else:
             self.ui.memberLabel.setText("-")
             self.ui.joinedLabel.setText("-")
+            self.ui.majorityLabel.setText("-")
             
             if self.__connected:
                 # the doc manager was removed

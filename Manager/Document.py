@@ -38,6 +38,7 @@ class ManagedDocument(QtCore.QObject, Helper.AsyncSlotObject):
         self.peers = []
         self.__docId = id
         self.__connection = connection
+        self.__majority = False
         
         connection.api.connectedChanged.connect(self.__connectChanged)    
       
@@ -50,6 +51,7 @@ class ManagedDocument(QtCore.QObject, Helper.AsyncSlotObject):
         await self.__connection.api.subscribe(self.__subkey, self.__peerActivityChanged,  f"ocp.documents.{self.__docId}.peerActivityChanged")
         await self.__connection.api.subscribe(self.__subkey, self.__peerAdded,  f"ocp.documents.{self.__docId}.peerAdded")
         await self.__connection.api.subscribe(self.__subkey, self.__peerRemoved,  f"ocp.documents.{self.__docId}.peerRemoved")
+        await self.__connection.api.subscribe(self.__subkey, self.__majorityChanged,  f"ocp.documents.{self.__docId}.majorityChanged")
         
         # fetch the currently registered peers as well as the active ones
         await self.__processConnectionChange()
@@ -105,6 +107,9 @@ class ManagedDocument(QtCore.QObject, Helper.AsyncSlotObject):
             self.memberCountChanged.emit()
             self.joinedCountChanged.emit()
             
+            self.__majority = await self.__connection.api.call(f"ocp.documents.{self.__docId}.hasMajority")
+            self.majorityChanged.emit()
+            
         else:
             for peer in self.peers:
                 self.peerRemoved.emit(peer)
@@ -141,6 +146,12 @@ class ManagedDocument(QtCore.QObject, Helper.AsyncSlotObject):
             self.peers.remove(peer)
             self.peerRemoved.emit(id)
             self.memberCountChanged.emit()
+            
+    async def __majorityChanged(self, hasMajority):
+        
+        if self.__majority != hasMajority:
+            self.__majority = hasMajority
+            self.majorityChanged.emit()
 
 
     def getPeer(self, id):
@@ -171,13 +182,19 @@ class ManagedDocument(QtCore.QObject, Helper.AsyncSlotObject):
 
         return count
     
+    def __getMajority(self):
+        return self.__majority
+    
+    
     nameChanged         = QtCore.Signal()
     memberCountChanged  = QtCore.Signal()
     joinedCountChanged  = QtCore.Signal()
-    
+    majorityChanged     = QtCore.Signal()
+
     name        = QtCore.Property(str, __getName, notify=nameChanged)
     memberCount = QtCore.Property(int, __getMemberCount, notify=memberCountChanged)
     joinedCount = QtCore.Property(int, __getJoinedCount, notify=joinedCountChanged)
+    majority    = QtCore.Property(int, __getMajority, notify=majorityChanged)
 
     @Helper.AsyncSlot(str)
     async def setNameSlot(self, name):
