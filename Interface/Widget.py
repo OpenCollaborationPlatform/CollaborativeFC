@@ -49,6 +49,21 @@ class UIWidget(QtWidgets.QFrame):
         layout.addWidget(self.ui)
         layout.addWidget(QtWidgets.QSizeGrip(self), 0, QtCore.Qt.AlignBottom | QtCore.Qt.AlignRight)
         self.setLayout(layout)
+        
+        # Set the correct sizes dependent on system setting
+        fontSize = 1.5*self.ui.nodeLabel.font().pointSize()
+        largeFont = self.ui.nodeLabel.font()
+        largeFont.setPointSize(fontSize)
+        self.ui.nodeLabel.setFont(largeFont)
+        largeSize  = 1.2*QtGui.QFontMetrics(largeFont).capHeight()
+        self.ui.nodeIndicator.setMaximumSize(largeSize, largeSize)
+        self.ui.apiLabel.setFont(largeFont)
+        self.ui.apiIndicator.setMaximumSize(largeSize, largeSize)
+        self.ui.networkLabel.setFont(largeFont)
+        self.ui.networkIndicator.setMaximumSize(largeSize, largeSize)
+        self.ui.reachabilityMainLabel.setFont(largeFont)
+        self.ui.reachabilityLabel.setFont(largeFont)
+        self.ui.reachabilityIndicator.setMaximumSize(largeSize, largeSize)
  
         # async slot handling for node/api
         self.__nodeAsyncWidget  = AsyncSlotPromoter(self.ui.nodeWidget)

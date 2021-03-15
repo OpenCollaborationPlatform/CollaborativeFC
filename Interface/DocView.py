@@ -99,6 +99,14 @@ class DocWidget(QtWidgets.QWidget):
         layout.addWidget(self.ui)
         self.setLayout(layout)
         
+        # Set the correct sizes dependent on system setting
+        fontSize = 1.2*self.ui.nameLabel.font().pointSize()
+        largeFont = self.ui.nameLabel.font()
+        largeFont.setPointSize(fontSize)
+        self.ui.nameLabel.setFont(largeFont)
+        largeSize = 1.2*QtGui.QFontMetrics(largeFont).capHeight()
+        self.ui.statusIndicator.setMaximumSize(largeSize, largeSize)
+                
         self.ui.shareButton.clicked.connect(lambda: self.__manager.toggleCollaborateSlot(self.__uuid))
         self.ui.docButton.clicked.connect(lambda: self.__manager.toggleOpenSlot(self.__uuid))
         self.ui.editButton.clicked.connect(lambda: self.edit.emit(self.__uuid))

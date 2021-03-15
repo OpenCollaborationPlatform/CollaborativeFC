@@ -79,7 +79,7 @@
         <string>Read Only</string>
        </property>
        <property name="autoRaise">
-        <bool>true</bool>
+        <bool>false</bool>
        </property>
       </widget>
      </item>
@@ -92,7 +92,7 @@
         <string>Remove</string>
        </property>
        <property name="autoRaise">
-        <bool>true</bool>
+        <bool>false</bool>
        </property>
       </widget>
      </item>
