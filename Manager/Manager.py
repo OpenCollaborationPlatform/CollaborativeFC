@@ -241,6 +241,10 @@ class Manager(QtCore.QObject, Helper.AsyncSlotObject):
             # check if we are invited
             if id in invitations:
                 entity.status = Entity.Status.invited
+                self.documentChanged.emit(entity.uuid)
+            else:
+                self.__entities.remove(entity)
+                self.documentRemoved.emit(entity.uuid)
                
         elif entity.status == Entity.Status.shared:
             #it was shared before, hence now with it being closed on the node it is only availble locally          
