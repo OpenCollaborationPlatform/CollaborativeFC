@@ -121,7 +121,7 @@ class DocWidget(QtWidgets.QWidget):
         
         entity = self.__manager.getEntity("uuid", self.__uuid)
         if not entity:
-            raise Exception("Invalid uuid in DocumentWidget")
+            return
         
         self.ui.statusLabel.setText(entity.status.name)
         
@@ -155,20 +155,29 @@ class DocWidget(QtWidgets.QWidget):
             self.ui.shareButton.setText("Stop")
             self.ui.docButton.setText("Close")
             self.ui.editButton.setEnabled(True)
+            self.ui.docButton.setEnabled(True)
             self.ui.statusIndicator.setPixmap(QtGui.QPixmap(":/Collaboration/Icons/indicator_on.svg"))
             
         elif entity.status == Entity.Status.local:
             self.ui.shareButton.setText("Share")
             self.ui.docButton.setText("Close")
             self.ui.editButton.setEnabled(False)
+            self.ui.docButton.setEnabled(True)
             self.ui.statusIndicator.setPixmap(QtGui.QPixmap(":/Collaboration/Icons/indicator_off.svg"))
         
         elif entity.status == Entity.Status.node:
             self.ui.shareButton.setText("Stop")
             self.ui.docButton.setText("Open")
             self.ui.editButton.setEnabled(True)
-            self.ui.statusIndicator.setPixmap(QtGui.QPixmap(":/Collaboration/Icons/indicator_off.svg"))   
-
+            self.ui.docButton.setEnabled(True)
+            self.ui.statusIndicator.setPixmap(QtGui.QPixmap(":/Collaboration/Icons/indicator_off.svg"))
+        
+        elif entity.status == Entity.Status.invited:
+            self.ui.shareButton.setText("Join")
+            self.ui.docButton.setText("Open")
+            self.ui.editButton.setEnabled(False)
+            self.ui.docButton.setEnabled(False)
+            self.ui.statusIndicator.setPixmap(QtGui.QPixmap(":/Collaboration/Icons/indicator_off.svg"))
 
     def paintEvent(self, event):
         

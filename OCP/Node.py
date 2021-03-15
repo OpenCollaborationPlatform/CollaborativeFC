@@ -187,7 +187,7 @@ class Node(QtCore.QObject, Helper.AsyncSlotObject):
         elif sys.platform == "win32":
             self.__ocp = os.path.join(parent_dir, "OCPNodeWindows.exe")
             
-        self.__ocp = "/home/stefan/Projects/Go/CollaborationNode/CollaborationNode"
+        #self.__ocp = "/home/stefan/Projects/Go/CollaborationNode/CollaborationNode"
                
         #for testing we need to connect to a dedicated node       
         self.__test = False

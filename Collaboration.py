@@ -42,10 +42,9 @@ logging.getLogger('qasync').setLevel(logging.ERROR)
 import asyncio, txaio
 from PySide2 import QtCore
 app = QtCore.QCoreApplication.instance()
-loop = qasync.QEventLoop(app)
+loop = qasync.QEventLoop(app, already_running=True)
 txaio.config.loop = loop #workaround as component.start(loop=) does not propagate the loop correctly
-asyncio.set_event_loop(loop)       
-
+asyncio.set_event_loop(loop)
 
 
 # setup all the collaboration infrastructure

@@ -234,16 +234,26 @@ class Manager(QtCore.QObject, Helper.AsyncSlotObject):
         if entity.manager:
             await entity.manager.close()
             entity.manager = None
+        
+        invitations = await self.__connection.api.call(u"ocp.documents.invitations")
+        
+        if entity.status == Entity.Status.node:
+            # check if we are invited
+            if id in invitations:
+                entity.status = Entity.Status.invited
                
-        if entity.status == Entity.Status.shared:
+        elif entity.status == Entity.Status.shared:
             #it was shared before, hence now with it being closed on the node it is only availble locally          
             entity.status = Entity.Status.local
             entity.id = None
             self.documentChanged.emit(entity.uuid)
             
+            if id in invitations:
+                #we have now a local one + the invitation
+                await self.onOCPDocumentInvited(id, True)
+            
         else:
-            # it is a pure node document, we can remove it
-            # in case it is anything else than status==node something went wrong, and removing it is fine
+            # in case it is anything else than status==node || invited something went wrong, and removing it is fine
             self.__entities.remove(entity)
             self.documentRemoved.emit(entity.uuid)
         
