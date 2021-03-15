@@ -339,8 +339,9 @@ class Node(QtCore.QObject, Helper.AsyncSlotObject):
                 self.__logReader.taskRun()
                 self.logModelChanged.emit()
 
-        # get the latest information and notify that we are running!
-        await self.__update()                    
+        # notify that we are running! (don't use update(), as this takes forever on windows)
+        self.__running = True
+        self.runningChanged.emit()
               
     
     async def __checkRunning(self):
