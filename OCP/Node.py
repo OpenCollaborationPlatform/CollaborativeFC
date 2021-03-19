@@ -17,6 +17,7 @@
 # *   Suite 330, Boston, MA  02111-1307, USA                             *
 # ************************************************************************
 
+import ocp
 import os, sys, logging, asyncio, collections, json
 import aiofiles
 import Helper
@@ -177,17 +178,9 @@ class Node(QtCore.QObject, Helper.AsyncSlotObject):
         
         QtCore.QObject.__init__(self)
         
-        parent_dir = os.path.abspath(os.path.dirname(__file__))
-    
-        # get the path to use for the OCP node
-        if sys.platform == "linux" or sys.platform == "linux2":
-            self.__ocp = os.path.join(parent_dir, "OCPNodeLinux")
-        elif sys.platform == "darwin":
-            self.__ocp = os.path.join(parent_dir, "OCPNodeMac")
-        elif sys.platform == "win32":
-            self.__ocp = os.path.join(parent_dir, "OCPNodeWindows.exe")
-            
-        self.__ocp = "/home/stefan/Projects/Go/CollaborationNode/CollaborationNode"
+        # for development it's easier to use the local node!
+        self.__ocp = ocp.node_path
+        #self.__ocp = "/home/stefan/Projects/Go/CollaborationNode/CollaborationNode"
                
         #for testing we need to connect to a dedicated node       
         self.__test = False
