@@ -9,6 +9,7 @@
 		<file>Ui/Error.ui</file>
 		<file>Ui/Controls.ui</file>
 		<file>Ui/Peer.ui</file>
+		<file>Ui/Installer.ui</file>
 		<file>Ui/Document.ui</file>
 		<file>Ui/DocumentEdit.ui</file>
 		<file>Ui/Document.qml</file>
