@@ -40,12 +40,12 @@ class _PipInstaller(QtCore.QObject, AsyncSlotObject):
         self.__requirements = os.path.join(folder, "requirements.txt")
         with open(self.__requirements) as f:
             content = f.readlines()
-            content = [line.strip() for line in content]
-            self.requirementsModel.setStringList(content)
+            self.__packages = [line.strip() for line in content]
+            self.requirementsModel.setStringList(self.__packages)
         
         
     @AsyncSlot()
-    async def toggleSlot(self):        
+    async def toggleInstallSlot(self):        
         # install all requirements from requirements.txt
         
         if self.__process:
@@ -78,7 +78,6 @@ class _PipInstaller(QtCore.QObject, AsyncSlotObject):
             await collector(self.__process, self.outputModel)
             self.__process = None
 
-
 class InstallView(QtWidgets.QWidget):
        
     def __init__(self, parent = None):
@@ -94,7 +93,7 @@ class InstallView(QtWidgets.QWidget):
         self.setLayout(layout)
         
         self.ui.textView.setModel(self.__installer.requirementsModel)
-        self.ui.button.clicked.connect(self.__installer.toggleSlot)
+        self.ui.button.clicked.connect(self.__installer.toggleInstallSlot)
         
         self.__installer.onAsyncSlotStarted.connect(self.onStartSlot)
         self.__installer.onAsyncSlotFinished.connect(self.onStopSlot)
@@ -114,4 +113,3 @@ class InstallView(QtWidgets.QWidget):
             global Collaboration
             import Collaboration
             importlib.reload(Collaboration)
-
