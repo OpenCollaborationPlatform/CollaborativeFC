@@ -19,9 +19,7 @@
 
 import FreeCADGui, asyncio, os
 from PySide2 import QtCore, QtGui, QtWidgets
-
 from Interface.AsyncSlotWidget import AsyncSlotWidget
-from Manager.Manager import Entity
 
 class DocView(QtWidgets.QWidget, AsyncSlotWidget):
     
@@ -163,28 +161,28 @@ class DocWidget(QtWidgets.QWidget):
         name = self.__name
         self.ui.nameLabel.setText(name)
         
-        if entity.status == Entity.Status.shared:
+        if entity.status == self.__manager.entityStatus("shared"):
             self.ui.shareButton.setText("Stop")
             self.ui.docButton.setText("Close")
             self.ui.editButton.setEnabled(True)
             self.ui.docButton.setEnabled(True)
             self.ui.statusIndicator.setPixmap(QtGui.QPixmap(":/Collaboration/Icons/indicator_on.svg"))
             
-        elif entity.status == Entity.Status.local:
+        elif entity.status == self.__manager.entityStatus("local"):
             self.ui.shareButton.setText("Share")
             self.ui.docButton.setText("Close")
             self.ui.editButton.setEnabled(False)
             self.ui.docButton.setEnabled(True)
             self.ui.statusIndicator.setPixmap(QtGui.QPixmap(":/Collaboration/Icons/indicator_off.svg"))
         
-        elif entity.status == Entity.Status.node:
+        elif entity.status == self.__manager.entityStatus("node"):
             self.ui.shareButton.setText("Stop")
             self.ui.docButton.setText("Open")
             self.ui.editButton.setEnabled(True)
             self.ui.docButton.setEnabled(True)
             self.ui.statusIndicator.setPixmap(QtGui.QPixmap(":/Collaboration/Icons/indicator_off.svg"))
         
-        elif entity.status == Entity.Status.invited:
+        elif entity.status == self.__manager.entityStatus("invited"):
             self.ui.shareButton.setText("Join")
             self.ui.docButton.setText("Open")
             self.ui.editButton.setEnabled(False)

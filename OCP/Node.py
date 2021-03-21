@@ -20,7 +20,7 @@
 import ocp
 import os, sys, logging, asyncio, collections, json
 import aiofiles
-import Helper
+import Utils
 from qasync import asyncSlot
 from PySide2 import QtCore
 
@@ -171,8 +171,8 @@ class LogReader(QtCore.QAbstractListModel):
 
     
 
-#Helper class to call the running node via CLI
-class Node(QtCore.QObject, Helper.AsyncSlotObject):
+#Utils class to call the running node via CLI
+class Node(QtCore.QObject, Utils.AsyncSlotObject):
     
     def __init__(self, logger):
         
@@ -433,18 +433,18 @@ class Node(QtCore.QObject, Helper.AsyncSlotObject):
     def logModel(self):
         return self.__logReader
 
-    @Helper.AsyncSlot()
+    @Utils.AsyncSlot()
     async def toggleRunningSlot(self):
         if self.running:
             await self.shutdown()
         else:
             await self.run()
     
-    @Helper.AsyncSlot()
+    @Utils.AsyncSlot()
     async def updateDetails(self):        
         await self.__update()        
 
-    @Helper.AsyncSlot(str, str)
+    @Utils.AsyncSlot(str, str)
     async def setP2PDetails(self, uri, port):
         
         if await self.__checkRunning():
@@ -465,7 +465,7 @@ class Node(QtCore.QObject, Helper.AsyncSlotObject):
         await process.wait()
 
     
-    @Helper.AsyncSlot(str, str)
+    @Utils.AsyncSlot(str, str)
     async def setAPIDetails(self, uri, port):
         
         if await self.__checkRunning():

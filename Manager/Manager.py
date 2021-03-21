@@ -19,10 +19,10 @@
 
 import FreeCAD, FreeCADGui, asyncio, os
 
-import Helper
+import Utils
 from Documents.Dataservice      import DataService
 from Documents.OnlineDocument   import OnlineDocument
-from Manager.Document           import ManagedDocument
+from Manager import ManagedDocument
 
 from qasync import asyncSlot
 from PySide import QtCore
@@ -56,13 +56,13 @@ class Entity():
         self.uuid = str(uuid.uuid4())
         
 
-class Manager(QtCore.QObject, Helper.AsyncSlotObject):
+class Manager(QtCore.QObject, Utils.AsyncSlotObject):
     #Manager that handles all entities for collaboration:
     # - the local ones that are unshared
     # - the ones we have been invited too but not yet joined
     # - the ones open at the node but not yet in FC
     # - the one we share
-    
+       
     def __init__(self, collab_path, connection):  
         
         QtCore.QObject.__init__(self)
@@ -400,6 +400,12 @@ class Manager(QtCore.QObject, Helper.AsyncSlotObject):
         
         return False
     
+    def entityStatus(self, name):
+        # returns the entity status enum value from name
+        # (helper class to not need to import Entity)
+        
+        return Entity.Status[name]
+    
     
     # QT implementation
     # **************************************************************************************************
@@ -408,7 +414,7 @@ class Manager(QtCore.QObject, Helper.AsyncSlotObject):
     documentRemoved = QtCore.Signal(str)
     documentChanged = QtCore.Signal(str)
     
-    @Helper.AsyncSlot(str)
+    @Utils.AsyncSlot(str)
     async def toggleCollaborateSlot(self, uuid):
         entity = self.getEntity("uuid", uuid)
         if entity.status == Entity.Status.shared or entity.status == Entity.Status.node:
@@ -416,7 +422,7 @@ class Manager(QtCore.QObject, Helper.AsyncSlotObject):
         else:
             await self.collaborate(entity)
         
-    @Helper.AsyncSlot(str)
+    @Utils.AsyncSlot(str)
     async def toggleOpenSlot(self, uuid):
         entity = self.getEntity("uuid", uuid)
         if entity.fcdoc:

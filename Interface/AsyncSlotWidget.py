@@ -17,7 +17,7 @@
 # *   Suite 330, Boston, MA  02111-1307, USA                             *
 # ************************************************************************
 
-import FreeCADGui, Helper
+import FreeCADGui, Utils
 from PySide2 import QtWidgets, QtCore, QtGui
 
 class BusyIndicator(QtWidgets.QWidget):
@@ -109,7 +109,7 @@ class AsyncSlotWidget():
         
     def setAsyncObject(self, obj):
         
-        if not issubclass(type(obj), Helper.AsyncSlotObject):
+        if not issubclass(type(obj), Utils.AsyncSlotObject):
             raise Exception("AsyncSlotWidget requires a AsyncSlotObject to work")
         
         if self.__asyncObject:

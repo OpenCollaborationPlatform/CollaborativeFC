@@ -22,7 +22,6 @@ from PySide2 import QtCore, QtGui, QtWidgets
 
 from Interface.AsyncSlotWidget import AsyncSlotWidget
 from Interface.PeerView import PeerView
-from Manager.Manager import Entity
 
 class DocEdit(QtWidgets.QWidget, AsyncSlotWidget):
     

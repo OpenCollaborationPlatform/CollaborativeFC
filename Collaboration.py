@@ -17,59 +17,50 @@
 # *   Suite 330, Boston, MA  02111-1307, USA                             *
 # ************************************************************************
 
-__title__ = "FreeCAD Collaboration API"
-__author__ = "Stefan Troeger"
-__url__ = "http://www.freecadweb.org"
+# check if we have installed all required modules
+# ******************************************************
+try:
+    import ocp
+    import autobahn
+    import msgpack
+    import qasync
+    import aiofiles
+    __available = True
+except Exception:
+    # if we do not further initialize everything the installer stays visible in the UI
+    __available = False
 
 
-# make sure the vendor folder is used for dependencies
-# *******************************************************
-import sys, os
-parent_dir = os.path.abspath(os.path.dirname(__file__))
-vendor_dir = os.path.join(parent_dir, 'Vendor')
-sys.path.append(vendor_dir)
+if __available:
+    
+    # txaio workaround
+    # ******************************************
+    import asyncio, txaio
+    txaio.config.loop = asyncio.get_event_loop() #workaround as component.start(loop=) does not propagate the loop correctly
 
 
-# handle basic logging first
-# *******************************************************
-import logging, qasync
-logging.basicConfig(level=logging.DEBUG, stream=sys.stdout, format="[%(levelname)8s] %(name)25s:   %(message)s")
-logging.getLogger('qasync').setLevel(logging.ERROR)
+    # setup all the collaboration infrastructure
+    # ******************************************
+    import os
+    from PySide import QtCore
+    from Manager import Manager
+    import Documents.Observer as Observer
+    from OCP import OCPConnection
 
 
-# setup the qt based event loop for asyncio
-# *******************************************************
-import asyncio, txaio
-from PySide2 import QtCore
-app = QtCore.QCoreApplication.instance()
-loop = qasync.QEventLoop(app, already_running=True)
-txaio.config.loop = loop #workaround as component.start(loop=) does not propagate the loop correctly
-asyncio.set_event_loop(loop)
+    #The Collaboration module provides functions to work on documents with others
+    #for now use simple global variables!
+    connection  = OCPConnection()
+    manager     = Manager(os.path.dirname(__file__), connection)
 
+    # bring the UI out of setup mode
+    import Interface
+    Interface.uiWidget.setup(manager, connection)
 
-# setup all the collaboration infrastructure
-# ******************************************
-from PySide import QtCore
-from Manager.Manager import Manager
-import Documents.Observer as Observer
-from Interface.Widget import UIWidget
-from OCP.Connection import OCPConnection
+    #initialize the global FreeCAD document observer
+    Observer.initialize(manager)
 
-
-#handle the resources required
-#******************************************************
-from Resources import resources
-
-#The Collaboration module provides functions to work on documents with others
-#for now use simple global variables!
-connection  = OCPConnection()
-manager     = Manager(os.path.dirname(__file__), connection)
-widget      = UIWidget(manager, connection)
-
-#initialize the global FreeCAD document observer
-Observer.initialize(manager)
-
-if os.getenv('OCP_TEST_RUN', "0") == "1":
-    #connect to test server
-    import Test
-    tester = Test.Handler(connection, manager)
+    if os.getenv('OCP_TEST_RUN', "0") == "1":
+        #connect to test server
+        import Test
+        tester = Test.Handler(connection, manager)

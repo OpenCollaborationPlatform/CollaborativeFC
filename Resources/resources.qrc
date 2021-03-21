@@ -12,14 +12,5 @@
 		<file>Ui/Installer.ui</file>
 		<file>Ui/Document.ui</file>
 		<file>Ui/DocumentEdit.ui</file>
-		<file>Ui/Document.qml</file>
-		<file>Ui/Node.qml</file>
-		<file>Ui/Main.qml</file>
-		<file>Ui/LogView.qml</file>
-		<file>Ui/Header.qml</file>
-		<file>Ui/PeerView.qml</file>
-		<file>Ui/Documents.qml</file>
-		<file>Ui/BusyErrorElement.qml</file>
-		<file>Ui/DocumentPeer.qml</file>
 	</qresource>
 </RCC>

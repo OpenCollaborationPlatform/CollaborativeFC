@@ -20,8 +20,6 @@
 import FreeCADGui, asyncio, os
 from PySide2 import QtCore, QtGui, QtWidgets
 
-from Manager.Manager import Entity
-
 class PeerView(QtWidgets.QWidget):
        
     def __init__(self, parent = None):

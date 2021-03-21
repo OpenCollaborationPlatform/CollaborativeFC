@@ -18,12 +18,12 @@
 # ************************************************************************
 
 import asyncio
-import Helper
+import Utils
 from enum import Enum, auto
 from PySide import QtCore
 from qasync import asyncSlot
 
-class ManagedDocument(QtCore.QObject, Helper.AsyncSlotObject):
+class ManagedDocument(QtCore.QObject, Utils.AsyncSlotObject):
     # Helps to manage documents on the OCP node, manages naming and peers
     
     class __Peer():
@@ -196,15 +196,15 @@ class ManagedDocument(QtCore.QObject, Helper.AsyncSlotObject):
     joinedCount = QtCore.Property(int, __getJoinedCount, notify=joinedCountChanged)
     majority    = QtCore.Property(int, __getMajority, notify=majorityChanged)
 
-    @Helper.AsyncSlot(str)
+    @Utils.AsyncSlot(str)
     async def setNameSlot(self, name):
         print(f"SetName with {name}")
 
-    @Helper.AsyncSlot(str)
+    @Utils.AsyncSlot(str)
     async def removePeerSlot(self, peer):
         await self.removePeer(peer)
 
-    @Helper.AsyncSlot(str)
+    @Utils.AsyncSlot(str)
     async def togglePeerRigthsSlot(self, peerid):
         
         peer = self.getPeer(peerid)
@@ -213,7 +213,7 @@ class ManagedDocument(QtCore.QObject, Helper.AsyncSlotObject):
         else:
             await self.changePeerAuth(peerid, "Write")
 
-    @Helper.AsyncSlot(str, bool)
+    @Utils.AsyncSlot(str, bool)
     async def addPeerSlot(self, id, edit):
         auth = "Read"
         if edit:

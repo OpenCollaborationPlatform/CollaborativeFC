@@ -23,17 +23,17 @@ from PySide2 import QtCore, QtGui, QtWidgets
 from Interface.AsyncSlotWidget import AsyncSlotPromoter
 from Interface.DocView import DocView
 from Interface.DocEdit import DocEdit
+from Interface.Installer import InstallView
 
 
 class UIWidget(QtWidgets.QFrame):
     
-    def __init__(self, manager, connection):
-        
+    def __init__(self):
         super().__init__()
         
-        self.__connection = connection
-        self.__manager = manager
-
+        self.__docView = None
+        self.__docEdit = None
+       
         # We are a popup, make sure we look like it
         self.setContentsMargins(0,0,0,0)
         self.setWindowFlags(QtCore.Qt.FramelessWindowHint | QtCore.Qt.Popup)
@@ -64,6 +64,17 @@ class UIWidget(QtWidgets.QFrame):
         self.ui.reachabilityMainLabel.setFont(largeFont)
         self.ui.reachabilityLabel.setFont(largeFont)
         self.ui.reachabilityIndicator.setMaximumSize(largeSize, largeSize)
+        
+        # setup the installer
+        self.__installer = InstallView()
+        self.ui.stack.addWidget(self.__installer)
+        self.ui.stack.setCurrentIndex(2)
+        self.ui.tabWidget.setEnabled(False)
+        
+    def setup(self, manager, connection):
+        
+        self.__connection = connection
+        self.__manager = manager
  
         # async slot handling for node/api
         self.__nodeAsyncWidget  = AsyncSlotPromoter(self.ui.nodeWidget)
@@ -77,8 +88,7 @@ class UIWidget(QtWidgets.QFrame):
         self.ui.docArea.setWidget(self.__docView)
         self.ui.stack.addWidget(self.__docEdit)
         self.__docEdit.editFinished.connect(self.__onEditFihished)
-        self.__docView.edit.connect(self.__onEdit)
- 
+        self.__docView.edit.connect(self.__onEdit) 
  
         # setup node, api and network
         self.ui.peerView.setVisible(False)
@@ -111,6 +121,10 @@ class UIWidget(QtWidgets.QFrame):
         self.__connection.network.reachabilityChanged.connect(self.__onNetworkUpdates)
         self.ui.peerView.setModel(self.__connection.network.peers)
 
+        # don't show the installer anymore
+        self.ui.stack.setCurrentIndex(0)
+        self.ui.tabWidget.setEnabled(True)
+
     
     def show(self):
         #try to find the correct position for the popup
@@ -127,7 +141,8 @@ class UIWidget(QtWidgets.QFrame):
     
     def resizeEvent(self, event):
         QtWidgets.QFrame.resizeEvent(self, event)
-        self.__docView.setMaximumWidth(event.size().width()-24) # 12 = 2x6 ui margin within ui file    
+        if self.__docView:
+            self.__docView.setMaximumWidth(event.size().width()-24) # 12 = 2x6 ui margin within ui file
 
     @QtCore.Slot()
     def __onNodeRunningChanged(self):
@@ -210,12 +225,10 @@ class UIWidget(QtWidgets.QFrame):
     def __onEdit(self, uuid):
         
         self.__docEdit.setEditable(uuid)
-        self.ui.stack.setCurrentIndex(2)
-        self.ui.nodeButton.setEnabled(False)
-        self.ui.docButton.setEnabled(False)
+        self.ui.stack.setCurrentIndex(3)
+        self.ui.tabWidet.setEnabled(False)
         
     @QtCore.Slot()
     def __onEditFihished(self):
-       self.ui.nodeButton.setEnabled(True)
-       self.ui.docButton.setEnabled(True)
+       self.ui.tabWidet.setEnabled(True)
        self.ui.stack.setCurrentIndex(1)

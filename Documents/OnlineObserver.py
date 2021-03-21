@@ -18,7 +18,6 @@
 # ************************************************************************
 
 import FreeCAD, logging, os, asyncio, traceback
-import Helper
 import Documents.Property       as Property
 import Documents.Object         as Object
 import Documents.AsyncRunner    as AsyncRunner
