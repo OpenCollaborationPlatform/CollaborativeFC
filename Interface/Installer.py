@@ -45,39 +45,37 @@ class _PipInstaller(QtCore.QObject, AsyncSlotObject):
         
         
     @AsyncSlot()
-    async def install(self):        
+    async def toggleSlot(self):        
         # install all requirements from requirements.txt
-        
-        cmd = f"pip install -r {self.__requirements}"
-        self.__process = await asyncio.create_subprocess_shell(cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
-        
-        #wait fetch all outputs and add it to the output model
-        async def collector(process, model):
-            while process.returncode == None:
-                try:
-                    data = await asyncio.wait_for(process.stdout.readline(), timeout=1)
-                except asyncio.TimeoutError:
-                    continue
-                    
-                line = data.decode('ascii').rstrip()
-                if line == "":
-                    await asyncio.sleep(0.1)
-                    continue
-                
-                if model.insertRow(model.rowCount()):
-                    index = model.index(model.rowCount() - 1, 0)
-                    model.setData(index, line)
-                
-        # runs till finished or process was canceled
-        await collector(self.__process, self.outputModel)
-        
-    @AsyncSlot()
-    async def cancel(self):
-        # cancel any running installation process
         
         if self.__process:
             self.__process.terminate()
             await self.__process.wait()
+            self.__process = None
+            
+        else:
+            cmd = f"pip install -r {self.__requirements}"
+            self.__process = await asyncio.create_subprocess_shell(cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+            
+            #wait fetch all outputs and add it to the output model
+            async def collector(process, model):
+                while process.returncode == None:
+                    try:
+                        data = await asyncio.wait_for(process.stdout.readline(), timeout=1)
+                    except asyncio.TimeoutError:
+                        continue
+                        
+                    line = data.decode('ascii').rstrip()
+                    if line == "":
+                        await asyncio.sleep(0.1)
+                        continue
+                    
+                    if model.insertRow(model.rowCount()):
+                        index = model.index(model.rowCount() - 1, 0)
+                        model.setData(index, line)
+                    
+            # runs till finished or process was canceled
+            await collector(self.__process, self.outputModel)
             self.__process = None
 
 
@@ -96,7 +94,7 @@ class InstallView(QtWidgets.QWidget):
         self.setLayout(layout)
         
         self.ui.textView.setModel(self.__installer.requirementsModel)
-        self.ui.button.clicked.connect(self.__installer.install)
+        self.ui.button.clicked.connect(self.__installer.toggleSlot)
         
         self.__installer.onAsyncSlotStarted.connect(self.onStartSlot)
         self.__installer.onAsyncSlotFinished.connect(self.onStopSlot)
@@ -105,15 +103,11 @@ class InstallView(QtWidgets.QWidget):
     def onStartSlot(self, id):
         self.ui.textView.setModel(self.__installer.outputModel)
         self.ui.button.setText("Cancel")
-        self.ui.button.clicked.disconnect(self.__installer.install)
-        self.ui.button.clicked.connect(self.__installer.cancel)
         
     @QtCore.Slot(int, str, str)
     def onStopSlot(self, id, err, msg):
         self.ui.textView.setModel(self.__installer.requirementsModel)
         self.ui.button.setText("Install")
-        self.ui.button.clicked.connect(self.__installer.install)
-        self.ui.button.clicked.disconnect(self.__installer.cancel)
         
         if not err and not msg:
             # globally import the infrastructure
