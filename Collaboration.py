@@ -23,7 +23,6 @@ try:
     import ocp
     import autobahn
     import msgpack
-    import qasync
     import aiofiles
     __available = True
 except Exception:

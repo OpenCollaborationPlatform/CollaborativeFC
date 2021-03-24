@@ -1,5 +1,4 @@
 ocp
 msgpack
 autobahn[serialization]
-qasync
 aiofiles

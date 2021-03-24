@@ -17,7 +17,7 @@
 # *   Suite 330, Boston, MA  02111-1307, USA                             *
 # ************************************************************************
 
-import FreeCADGui, asyncio, os, importlib
+import FreeCADGui, asyncio, os, sys, importlib
 from PySide2 import QtCore, QtGui, QtWidgets
 from Utils import AsyncSlotObject, AsyncSlot
 
@@ -54,8 +54,9 @@ class _PipInstaller(QtCore.QObject, AsyncSlotObject):
             self.__process = None
             
         else:
-            cmd = f"pip install -r {self.__requirements}"
-            self.__process = await asyncio.create_subprocess_shell(cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+            cmd = f"python -m pip install -r {self.__requirements}"
+            cwd = os.path.dirname(sys.executable)
+            self.__process = await asyncio.create_subprocess_shell(cmd, cwd=cwd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
             
             #wait fetch all outputs and add it to the output model
             async def collector(process, model):
