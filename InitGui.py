@@ -25,7 +25,7 @@ __url__ = "http://www.freecadweb.org"
 # handle basic logging
 # *******************************************************
 import logging, Qasync, sys
-logging.basicConfig(level=logging.DEBUG, stream=sys.stdout, format="[%(levelname)8s] %(name)25s:   %(message)s")
+logging.basicConfig(level=logging.WARN, stream=sys.stdout, format="[%(levelname)8s] %(name)25s:   %(message)s")
 logging.getLogger('Qasync').setLevel(logging.ERROR)
 logging.getLogger('qasync').setLevel(logging.ERROR)
 logging.getLogger('asyncio').setLevel(logging.ERROR)
