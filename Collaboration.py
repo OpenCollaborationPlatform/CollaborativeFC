@@ -19,18 +19,34 @@
 
 # check if we have installed all required modules
 # ******************************************************
+importfail = []
 try:
     import ocp
-    import autobahn
-    import msgpack
-    import aiofiles
-    __available = True
 except Exception:
-    # if we do not further initialize everything the installer stays visible in the UI
-    __available = False
+    importfail.append("ocp")
+    pass
 
+try: 
+    import autobahn
+except Exception:
+    importfail.append("autobahn[serialization]")
+    pass
 
-if __available:
+try: 
+    import msgpack
+except Exception:
+    importfail.append("msgpack")
+    pass
+
+try:
+    import aiofiles
+except Exception:
+    importfail.append("aiofiles")
+    pass    
+
+import Interface
+
+if not importfail:
     
     # txaio workaround
     # ******************************************
@@ -53,7 +69,6 @@ if __available:
     manager     = Manager(os.path.dirname(__file__), connection)
 
     # bring the UI out of setup mode
-    import Interface
     Interface.uiWidget.setup(manager, connection)
 
     #initialize the global FreeCAD document observer
@@ -63,3 +78,6 @@ if __available:
         #connect to test server
         import Test
         tester = Test.Handler(connection, manager)
+
+else:
+    Interface.uiWidget.setMissingPackages(importfail)

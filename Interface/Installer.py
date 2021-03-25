@@ -117,6 +117,9 @@ class InstallView(QtWidgets.QWidget):
         self.__installer.onAsyncSlotStarted.connect(self.onStartSlot)
         self.__installer.onAsyncSlotFinished.connect(self.onStopSlot)
         
+    def setMissingPackages(self, packages):        
+        self.__installer.requirementsModel.setStringList(packages)
+        
     @QtCore.Slot(int)
     def onStartSlot(self, id):
         self.ui.textView.setModel(self.__installer.outputModel)

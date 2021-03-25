@@ -125,6 +125,8 @@ class UIWidget(QtWidgets.QFrame):
         self.ui.stack.setCurrentIndex(0)
         self.ui.tabWidget.setEnabled(True)
 
+    def setMissingPackages(self, packages):
+        self.__installer.setMissingPackages(packages)
     
     def show(self):
         #try to find the correct position for the popup
