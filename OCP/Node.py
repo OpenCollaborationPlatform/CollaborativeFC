@@ -20,6 +20,7 @@
 import ocp
 import os, sys, logging, asyncio, collections, json
 import aiofiles
+from aiofiles import os as aioos
 import Utils
 from Qasync import asyncSlot
 from PySide2 import QtCore
@@ -61,9 +62,12 @@ class LogReader(QtCore.QAbstractListModel):
     async def follow(self):
         
         await asyncio.sleep(1)
+        stat  = await aioos.stat(self.__path)
         self.__file = await aiofiles.open(self.__path, "rb") # use rb to allow seek with offset from end
-        await self.__file.seek(int(-10e3), 2) # only use last 10kB
-        await self.__file.readline() # drop one line, as it is most likely truncated
+
+        if stat.st_size > 10e3:
+            await self.__file.seek(int(-10e3), 2) # only use last 10kB
+            await self.__file.readline() # drop one line, as it is most likely truncated
         
         while True:
             
