@@ -20,12 +20,12 @@ Data {
         
         //every document object needs to be added to the DAG for later processing in 
         //transactions. This does not apply to ViewProviders
-        .onObjectCreated: function(name) {                
+        /*.onObjectCreated: function(name) {                
                 Document.DAG.AddNode(name)
         }            
         .onObjectRemoved: function(name) {
                 Document.DAG.RemoveNode(name)
-        }
+        }*/
     }
     
     /* View Providers */
@@ -42,6 +42,7 @@ Data {
      * properties as well as expressions. To ease this we just recreate the FreeCAD DAG by the available info 
      * from FreeCAD document objects 
      */
+    /*
     Graph {        
         .name: "DAG"
         .node: string
@@ -116,7 +117,7 @@ Data {
             
             return result
         }
-    }
+    }*/
     
     //mainly required for testing purposes
     event sync
