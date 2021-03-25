@@ -17,7 +17,7 @@
 # *   Suite 330, Boston, MA  02111-1307, USA                             *
 # ************************************************************************
 
-import FreeCADGui, asyncio, os, sys, importlib
+import FreeCADGui, asyncio, os, sys, importlib, platform
 from PySide2 import QtCore, QtGui, QtWidgets
 from Utils import AsyncSlotObject, AsyncSlot
 
@@ -54,7 +54,25 @@ class _PipInstaller(QtCore.QObject, AsyncSlotObject):
             self.__process = None
             
         else:
-            cmd = f"python -m pip install -r {self.__requirements}"
+            pyCmd = "python"
+            if platform.system() == "Linux":
+                # in linux it can happen that FreeCAD uses python3, while the system python executable is python 2. Then the installation would 
+                # install the requirements for the wrong python version. Check for this case
+                fcPy = sys.version_info[0]
+                process = await asyncio.create_subprocess_shell("python --version", stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+                out, err = await process.communicate()
+        
+                if not out:
+                    raise Exception("Unable to detect the default python version")               
+                if err and err.decode() != "":
+                    raise Exception("Unable to detect the default python version: ", err.decode())
+                
+                sysPy = out.decode()[-5]
+                if sysPy != fcPy:
+                    pyCmd += str(fcPy)
+
+            
+            cmd = f"{pyCmd} -m pip install -r {self.__requirements}"
             cwd = os.path.dirname(sys.executable)
             self.__process = await asyncio.create_subprocess_shell(cmd, cwd=cwd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
             
