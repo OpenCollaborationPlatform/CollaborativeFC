@@ -216,7 +216,7 @@ class Node(QtCore.QObject, Utils.AsyncSlotObject):
      
     
     async def __asyncInit(self):
-        await self.__update()           
+            await self.__update()           
         
     async def __startLogging(self):
         # open logfile if available
@@ -362,34 +362,39 @@ class Node(QtCore.QObject, Utils.AsyncSlotObject):
     
     async def __update(self):
                
-        # we need to check if the node is running at the beginning, to get correct config data
-        running = await self.__checkRunning()
-        
-        p2pPort = await self.__fetchConfig("p2p.port", running)
-        if self.__p2pPort != p2pPort:
-            self.__p2pPort = p2pPort
-            self.p2pPortChanged.emit()
+        try:
+            # we need to check if the node is running at the beginning, to get correct config data
+            running = await self.__checkRunning()
             
-        p2pUri  = await self.__fetchConfig("p2p.uri", running)
-        if self.__p2pUri != p2pUri:
-            self.__p2pUri = p2pUri
-            self.p2pUriChanged.emit()
-            
-        apiPort = await self.__fetchConfig("api.port", running)
-        if self.__apiPort != apiPort:
-            self.__apiPort = apiPort
-            self.apiPortChanged.emit()
-            
-        apiUri  = await self.__fetchConfig("api.uri", running)
-        if self.__apiUri != apiUri:
-            self.__apiUri = apiUri
-            self.apiUriChanged.emit()
-            
-        # we need to set the running change at the end, in case anyone looks for a change and tries to 
-        # access connection data once the node is running
-        if running != self.__running:
-            self.__running = running
-            self.runningChanged.emit()
+            p2pPort = await self.__fetchConfig("p2p.port", running)
+            if self.__p2pPort != p2pPort:
+                self.__p2pPort = p2pPort
+                self.p2pPortChanged.emit()
+                
+            p2pUri  = await self.__fetchConfig("p2p.uri", running)
+            if self.__p2pUri != p2pUri:
+                self.__p2pUri = p2pUri
+                self.p2pUriChanged.emit()
+                
+            apiPort = await self.__fetchConfig("api.port", running)
+            if self.__apiPort != apiPort:
+                self.__apiPort = apiPort
+                self.apiPortChanged.emit()
+                
+            apiUri  = await self.__fetchConfig("api.uri", running)
+            if self.__apiUri != apiUri:
+                self.__apiUri = apiUri
+                self.apiUriChanged.emit()
+                
+            # we need to set the running change at the end, in case anyone looks for a change and tries to 
+            # access connection data once the node is running
+            if running != self.__running:
+                self.__running = running
+                self.runningChanged.emit()
+                
+        except Exception as e:
+            # this should not happen, but the call is not essential, hence we do not inform the user directly. Just use logging
+            self.__logger.warn(f"Unable to fetch updates: {str(e)}")
         
     
     async def __updateLoop(self):
