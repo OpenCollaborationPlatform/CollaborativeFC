@@ -24,7 +24,7 @@ from Documents.Dataservice      import DataService
 from Documents.OnlineDocument   import OnlineDocument
 from Manager import ManagedDocument
 
-from qasync import asyncSlot
+from Qasync import asyncSlot
 from PySide import QtCore
 import uuid
 from autobahn.wamp.types import CallResult

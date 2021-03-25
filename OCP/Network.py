@@ -19,7 +19,7 @@
 
 import asyncio
 from PySide import QtCore
-from qasync import asyncSlot
+from Qasync import asyncSlot
 
 class Network(QtCore.QObject):
     # Provides information about the OCP network. Uses the API conenction to the OCP node

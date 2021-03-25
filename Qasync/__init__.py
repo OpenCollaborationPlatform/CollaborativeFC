@@ -15,7 +15,7 @@ __author__ = (
     "Arve Knudsen <arve.knudsen@gmail.com>",
 )
 __version__ = "0.14.0"
-__url__ = "https://github.com/CabbageDevelopment/qasync"
+__url__ = "https://github.com/CabbageDevelopment/Qasync"
 __license__ = "BSD"
 __all__ = ["QEventLoop", "QThreadExecutor", "asyncSlot", "asyncClose"]
 
@@ -161,7 +161,7 @@ class QThreadExecutor:
 
     Same API as `concurrent.futures.Executor`
 
-    >>> from qasync import QThreadExecutor
+    >>> from Qasync import QThreadExecutor
     >>> with QThreadExecutor(5) as executor:
     ...     f = executor.submit(lambda x: 2 + x, 2)
     ...     r = f.result()

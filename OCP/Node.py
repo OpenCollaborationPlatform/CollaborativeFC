@@ -21,7 +21,7 @@ import ocp
 import os, sys, logging, asyncio, collections, json
 import aiofiles
 import Utils
-from qasync import asyncSlot
+from Qasync import asyncSlot
 from PySide2 import QtCore
 
 class LogReader(QtCore.QAbstractListModel):

@@ -22,7 +22,7 @@
 import asyncio, logging
 from autobahn.asyncio.component import Component
 from PySide2 import QtCore
-from qasync import asyncSlot
+from Qasync import asyncSlot
 import Utils
 import FreeCAD
 

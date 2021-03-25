@@ -21,7 +21,7 @@ import asyncio
 import Utils
 from enum import Enum, auto
 from PySide import QtCore
-from qasync import asyncSlot
+from Qasync import asyncSlot
 
 class ManagedDocument(QtCore.QObject, Utils.AsyncSlotObject):
     # Helps to manage documents on the OCP node, manages naming and peers

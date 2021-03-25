@@ -226,9 +226,9 @@ class UIWidget(QtWidgets.QFrame):
         
         self.__docEdit.setEditable(uuid)
         self.ui.stack.setCurrentIndex(3)
-        self.ui.tabWidet.setEnabled(False)
+        self.ui.tabWidget.setEnabled(False)
         
     @QtCore.Slot()
     def __onEditFihished(self):
-       self.ui.tabWidet.setEnabled(True)
+       self.ui.tabWidget.setEnabled(True)
        self.ui.stack.setCurrentIndex(1)

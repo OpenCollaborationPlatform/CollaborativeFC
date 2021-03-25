@@ -20,9 +20,9 @@
 
 import asyncio, txaio, os, logging
 from autobahn.asyncio.component import Component
-from qasync import QEventLoop
+from Qasync import QEventLoop
 from PySide import QtCore
-from qasync import asyncSlot
+from Qasync import asyncSlot
 from OCP.Node       import Node
 from OCP.API        import API
 from OCP.Network    import Network
