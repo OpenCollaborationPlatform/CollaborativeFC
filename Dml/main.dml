@@ -16,16 +16,19 @@ Data {
         
         .value: Object{
             .name: "DocumentObject"
+            
+            Transaction {
+                .name: "DOTransaction"
+                
+                .recursive: true
+                .automatic: true
+                
+                function DependentObjects() {
+                    
+                    return parent.
+                }
+            }
         }
-        
-        //every document object needs to be added to the DAG for later processing in 
-        //transactions. This does not apply to ViewProviders
-        /*.onObjectCreated: function(name) {                
-                Document.DAG.AddNode(name)
-        }            
-        .onObjectRemoved: function(name) {
-                Document.DAG.RemoveNode(name)
-        }*/
     }
     
     /* View Providers */
@@ -37,87 +40,6 @@ Data {
         }
     }
     
-    /* FreeCAD interdependencies is defined via the dependency graph. It could theoretically be build from all
-     * Properties, as FreeCAD does itself, however, this is complicated. It requires knowledge over all link 
-     * properties as well as expressions. To ease this we just recreate the FreeCAD DAG by the available info 
-     * from FreeCAD document objects 
-     */
-    /*
-    Graph {        
-        .name: "DAG"
-        .node: string
-        .edge: none
-        .directed: true
-        
-        //sets the FreeCAD outlist of a document object (list of object names)
-        function SetObjectOutList(name, list) {
-            
-            //the FreeCAD outlist gives us the graph children. For dependencies the object depends
-            //on the out list objects. Hence in our graph we add edges from outlist object to obj.
-            
-            
-            //remove all edges that are currently there but not in the list
-            var edges = this.ToNode(name)
-            var remove = this.subtract(edges, list)
-            for(var i=0; i<remove.length; i++) {
-                this.RemoveEdgeBetween(remove[i], name)
-            }
-            
-            //add all edges that are in the nodelist but not available
-            var add = this.subtract(list, edges)
-            for(var i=0; i<add.length; i++) {
-                
-                if (!this.HasNode(add[i])) {
-                    continue
-                }
-                this.NewEdge(add[i], name)
-                
-                //we check if the newly connected object is in a Transaction different than 
-                //ours. If so we need to fail, as this would connect two transaction subtrees
-                //var child = Document.Objects.Get(add[i])
-                //if (child.Transaction.InOtherTransaction()) {
-                //    throw "Object in outlist is in different transaction: cannot make the change"
-                //}
-            }
-        }
-        
-        //gets the FreeCAD outlist of a document object (list of object names)
-        const function GetObjectOutList(name) {            
-            return this.ToNode(name)
-        }
-        
-        //gets the FreeCAD inlist of a document object (list of object names)
-        const function GetObjectInlist(name) {
-            return this.FromNode(name)
-        }
-        
-        //returns all objects, that depend on the given one (list of objects)
-        const function GetDependentObjects(name) {
-            names = this.ReachableNodes(name)
-            var objs = []
-            for(var i=0; i<names.length; i++) {
-                objs.push(Document.Objects.Get(names[i]))
-            }
-            return objs
-        }
-        
-        //helper function: return the first array without elements from the second
-        const function subtract(base, remove) {
-
-            result = base.slice()
-            for( var i=result.length - 1; i>=0; i--){
-                
-                for( var j=0; j<remove.length; j++){
-                    
-                    if(result[i] && (result[i] === remove[j])){
-                        result.splice(i, 1);
-                    }
-                }
-            }
-            
-            return result
-        }
-    }*/
     
     //mainly required for testing purposes
     event sync

@@ -184,7 +184,7 @@ class Node(QtCore.QObject, Utils.AsyncSlotObject):
         
         # for development it's easier to use the local node!
         self.__ocp = ocp.node_path
-        #self.__ocp = "/home/stefan/Projects/Go/CollaborationNode/CollaborationNode"
+        self.__ocp = "/home/stefan/Projects/OCP/OCP"
                
         #for testing we need to connect to a dedicated node       
         self.__test = False
