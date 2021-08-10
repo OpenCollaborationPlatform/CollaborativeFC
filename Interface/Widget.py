@@ -199,6 +199,8 @@ class UIWidget(QtWidgets.QFrame):
         
         if self.__connection.network.reachability == "Public":
             self.ui.reachabilityIndicator.setPixmap(QtGui.QPixmap(":/Collaboration/Icons/indicator_on.svg"))
+        elif self.__connection.network.reachability == "Private":
+            self.ui.reachabilityIndicator.setPixmap(QtGui.QPixmap(":/Collaboration/Icons/indicator_err.svg"))
         else:
             self.ui.reachabilityIndicator.setPixmap(QtGui.QPixmap(":/Collaboration/Icons/indicator_off.svg"))
      
