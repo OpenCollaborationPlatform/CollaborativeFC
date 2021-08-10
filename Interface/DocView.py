@@ -102,7 +102,7 @@ class DocWidget(QtWidgets.QWidget):
         largeFont = self.ui.nameLabel.font()
         largeFont.setPointSize(fontSize)
         self.ui.nameLabel.setFont(largeFont)
-        largeSize = 1.2*QtGui.QFontMetrics(largeFont).capHeight()
+        largeSize = QtGui.QFontMetrics(largeFont).ascent()
         self.ui.statusIndicator.setMaximumSize(largeSize, largeSize)
                 
         self.ui.shareButton.clicked.connect(lambda: self.__manager.toggleCollaborateSlot(self.__uuid))

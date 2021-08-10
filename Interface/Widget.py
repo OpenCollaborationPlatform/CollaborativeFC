@@ -55,7 +55,7 @@ class UIWidget(QtWidgets.QFrame):
         largeFont = self.ui.nodeLabel.font()
         largeFont.setPointSize(fontSize)
         self.ui.nodeLabel.setFont(largeFont)
-        largeSize  = 1.2*QtGui.QFontMetrics(largeFont).capHeight()
+        largeSize  = QtGui.QFontMetrics(largeFont).ascent()
         self.ui.nodeIndicator.setMaximumSize(largeSize, largeSize)
         self.ui.apiLabel.setFont(largeFont)
         self.ui.apiIndicator.setMaximumSize(largeSize, largeSize)
