@@ -22,6 +22,7 @@ import Documents.Property       as Property
 import Documents.Object         as Object
 import Documents.AsyncRunner    as AsyncRunner
 import Documents.Observer       as Observer
+import Documents.Syncer         as Syncer
 from Documents.OnlineObject import OnlineObject
 from Documents.OnlineObject import OnlineViewProvider
 from autobahn.wamp.types    import SubscribeOptions, CallOptions
@@ -117,7 +118,19 @@ class OnlineObserver():
             args = (path[0], path[2],) + args  #first key is object name, third key is property name
 
         fnc = self.callbacks[key]
-        self.getRunner(args[0]).run(fnc, *args) #first argument is name
+        
+        # For object creation we use a special syncer to keep them in order 
+        if "onObjectCreated" in details.topic:
+            
+            # runner name starts with number, as this is invalid freecad name and hence can never be used by FC
+            self.logger.debug(f"Object created event: {args[0]}")
+            blocker = Syncer.BlockSyncer()
+            self.getRunner("11_creator").run(fnc, *args)
+            self.getRunner("11_creator").syncronize(Syncer.RestartBlockSyncer(blocker))
+            self.getRunner(args[0]).syncronize(blocker)
+     
+        else:
+            self.getRunner(args[0]).run(fnc, *args) #first argument is name
         
     
     async def __runDocProperties(self, *args, details=None):

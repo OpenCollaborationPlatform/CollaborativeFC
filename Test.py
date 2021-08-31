@@ -172,7 +172,7 @@ class Handler():
         try:
             entities = self.__manager.getEntities()
             for entity in entities:
-                if entity.id == docId:
+                if entity.onlinedoc and entity.id == docId:
                     await entity.onlinedoc.waitTillCloseout(30)
                     
         except Exception as e: 
