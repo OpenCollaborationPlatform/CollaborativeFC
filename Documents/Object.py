@@ -40,8 +40,11 @@ def __fcobject_cleanup(obj):
         if obj.TypeId  == "Spreadsheet::Sheet":
             obj.recompute()  #Spreadsheet setup dynamic alias properties in recompute
             
-        elif hasattr(obj, "purgeTouched"):
-            obj.purgeTouched()
+        if obj.isDerivedFrom("App::DocumentObject"):
+            obj.purgeTouched()            
+        else:
+            # it could happen that changing a viewprovider property touched something on the doc object
+            obj.Object.purgeTouched()
 
 # Simplify object handling by combining observer blockingand object cleanup
 @contextmanager
@@ -146,21 +149,30 @@ def setPropertyStatus(obj, prop, status):
     with __fcobject_processing(obj):
     
         if  float(".".join(FreeCAD.Version()[0:2])) >= 0.19:
-            #to set the status multiple things need to happen:
-            # 1. remove all string status entries we do not support
-            supported = obj.getPropertyStatus()
-            filterd = [s for s in status if not isinstance(s, str) or s in supported]
 
-            # 2. check which are to be added, and add those
-            current = obj.getPropertyStatus(prop)
-            add = [s for s in filterd if not s in current]
-            obj.setPropertyStatus(prop, add)
+            if status:
+                #to set the status multiple things need to happen:
+                # 1. remove all string status entries we do not support
+                supported = obj.getPropertyStatus()
+                filterd = [s for s in status if not isinstance(s, str) or s in supported]
+
+                # 2. check which are to be added, and add those
+                current = obj.getPropertyStatus(prop)
+                add = [s for s in filterd if not s in current]
+                obj.setPropertyStatus(prop, add)
+                
+                # 3. check which are to be removed, and remove those
+                remove = [s for s in current if not s in filterd]
+                signed = [-s for s in remove if isinstance(s, int) ]
+                signed += ["-"+s for s in remove if isinstance(s, str) ]
+                obj.setPropertyStatus(prop, signed)
             
-            # 3. check which are to be removed, and remove those
-            remove = [s for s in current if not s in filterd]
-            signed = [-s for s in remove if isinstance(s, int) ]
-            signed += ["-"+s for s in remove if isinstance(s, str) ]
-            obj.setPropertyStatus(prop, signed)                
+            else:
+                # None status means removing all of them!
+                remove = obj.getPropertyStatus(prop)
+                signed = [-s for s in remove if isinstance(s, int) ]
+                signed += ["-"+s for s in remove if isinstance(s, str) ]
+                obj.setPropertyStatus(prop, signed)
         
         else:
             obj.setEditorMode(prop, Property.statusToEditorMode(status))

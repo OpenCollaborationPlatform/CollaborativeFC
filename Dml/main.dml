@@ -22,11 +22,6 @@ Data {
                 
                 .recursive: true
                 .automatic: true
-                
-                function DependentObjects() {
-                    
-                    return parent.
-                }
             }
         }
     }

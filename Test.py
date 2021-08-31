@@ -48,6 +48,21 @@ class Handler():
         #Note: Attach to handler, as adding to logger itself does not propagate to child loggers
         #logging.getLogger().handlers[0].addFilter(ErrorFilter())
         
+        # set the test loglevel      
+        loglevel = os.getenv('OCP_TEST_LOG_LEVEL', "Warn")
+        if loglevel == "Warn":
+            loglevel = logging.WARN
+        elif loglevel == "Error":
+            loglevel = logging.ERROR
+        elif loglevel == "Info":
+            loglevel = logging.INFO
+        elif loglevel == "Debug":
+            loglevel = logging.DEBUG
+        elif loglevel == "Trace":
+            loglevel = logging.DEBUG
+            
+        logging.getLogger().setLevel(loglevel)
+        
         #run the handler
         asyncio.ensure_future(self._startup(connection))
         
@@ -111,12 +126,13 @@ class Handler():
             for entity in self.__manager.getEntities():
                 if entity.onlinedoc != None and entity.id == docId:
                     await entity.onlinedoc.waitTillCloseout(timeout)
+                    self.__logger.debug(f"Closeout finished for {docId}")
                     return True
             
             return False
                     
         except Exception as e: 
-            print(f"Trigger syncronize failed, cannot wait for closeout of current actions: {e}")
+            self.__logger.error(f"Trigger syncronize failed, cannot wait for closeout of current actions: {e}")
             return False
 
 
@@ -189,5 +205,3 @@ class Handler():
         )
 
         return await locals()['__ex']()
-
-

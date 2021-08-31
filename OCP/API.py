@@ -21,6 +21,7 @@
 
 import asyncio, logging
 from autobahn.asyncio.component import Component
+from autobahn import wamp
 from PySide2 import QtCore
 from Qasync import asyncSlot
 import Utils
@@ -134,6 +135,15 @@ class API(QtCore.QObject, Utils.AsyncSlotObject):
         if not self.connected: 
             raise Exception("Not connected to Node, cannot call API function")
         
+        # add a default timeout if the caller did no do already
+        if "options" in kwargs:
+            opts = kwargs["options"]
+            if not opts.timeout:
+                opts.timeout = 5000
+        else:
+            kwargs["options"] = wamp.CallOptions(timeout=5000)
+            
+        # call
         return await self.__session.call(*args, **kwargs)
         
     

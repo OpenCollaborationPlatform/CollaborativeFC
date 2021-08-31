@@ -12,12 +12,11 @@ Map {
         }
 
         //set up 
-        var container = this
-        var obj = container.New(name)
+        var obj = this.New(name)
         obj.fcName = name
         obj.typeid = typeid
         
-        container.onObjectCreated.Emit(name, typeid)
+        this.onObjectCreated.Emit(name, typeid)
         return obj
     }
     

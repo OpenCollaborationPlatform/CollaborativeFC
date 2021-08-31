@@ -81,6 +81,8 @@ class FreeCADOnlineObject():
         #       neither on the node nor in the FC object
         
         try:
+            self.logger.debug(f"Download")
+            
             #first check if we are available online to setup. Could happen that e.g. we load before the viewprovider was uploaded
             if not await self.Reader.isAvailable():
                 return
@@ -88,23 +90,25 @@ class FreeCADOnlineObject():
             #add the extensions (do that before properties, as extensions adds props too)
             extensions = await self.Reader.extensions()
             for extension in extensions:
+                self.logger.debug(f"Add extension {extension}")
                 Object.createExtension(obj, extension)
             
             oProps = await self.Reader.propertyList()
             if not oProps:
                 #no properties mean we loaded directly after object creation, before default property setup. Nothing is written yet
                 return
-            props = self.obj.PropertiesList
+            defProps = self.obj.PropertiesList
             
             # check if we need to remove some local props
-            remove = set(props) - set(oProps)
+            remove = set(defProps) - set(oProps)
             if remove:
                 self.logger.debug(f"Local object has too many properties, remove {remove}")
                 Object.removeDynamicProperties(obj, remove)
                     
             # create the dynamic properties
-            add = set(oProps) - set(props)
+            add = set(oProps) - set(defProps)
             infos = await self.Reader.propertiesInfos(add)
+            self.logger.debug(f"Create and set dynamic properties {add}")
             Object.createDynamicProperties(obj, add, infos)
             
             # set all property values. Note that data can be None in case the property was never written (default value)
@@ -119,11 +123,20 @@ class FreeCADOnlineObject():
             self.logger.debug(f"Read properties {writeProps}")
             Object.setProperties(obj, writeProps, writeValues)
             
+            # set the correct status for the non-dnamic properties
+            infos = await self.Reader.propertiesInfos(defProps)
+            status = [info["status"] for info in infos]
+            self.logger.debug(f"Set status of default properties {defProps} to {status}")
+            for prop, stat in zip(defProps, status):
+                Object.setPropertyStatus(obj, prop, stat)
+
+            self.logger.debug(f"Object download finished")
+            
         except Exception as e:
             self.logger.error(f"Downloading object failed: {e}")
             traceback.print_exc()
-        
-        
+      
+
     async def upload(self, obj):
         # Creates and uploads the object data into the ocp node
         # Note: this fuction works async, but cannot handle any changes during execution,
@@ -293,7 +306,8 @@ class OnlineViewProvider(FreeCADOnlineObject):
         #collect all property values and infos
         infos = []
         for prop in self.obj.PropertiesList:
-            infos.append(Property.createInformation(self.obj, prop))
+            info = Property.createInformation(self.obj, prop)
+            infos.append(info)
             
         #check if we need to handle a syncronisation
         if sync:
