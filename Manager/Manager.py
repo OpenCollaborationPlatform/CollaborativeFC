@@ -324,7 +324,10 @@ class Manager(QtCore.QObject, Utils.AsyncSlotObject):
         # - Opened in FC if open on node
         # - Opened on node and created in FC when invited
         # - Doing nothing if already shared
-                    
+        
+        if not entity:
+            raise "Entity is None type, cannot collaborate"
+        
         if entity.status == Entity.Status.local:
             dmlpath = os.path.join(self.__collab_path, "Dml")
             res = await self.__connection.api.call(u"ocp.documents.create", dmlpath)

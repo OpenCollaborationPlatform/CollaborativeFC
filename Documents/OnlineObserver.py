@@ -126,8 +126,8 @@ class OnlineObserver():
             self.logger.debug(f"Object created event: {args[0]}")
             blocker = Syncer.BlockSyncer()
             self.getRunner("11_creator").run(fnc, *args)
-            self.getRunner("11_creator").syncronize(Syncer.RestartBlockSyncer(blocker))
-            self.getRunner(args[0]).syncronize(blocker)
+            self.getRunner("11_creator").sync(Syncer.RestartBlockSyncer(blocker))
+            self.getRunner(args[0]).sync(blocker)
      
         else:
             self.getRunner(args[0]).run(fnc, *args) #first argument is name

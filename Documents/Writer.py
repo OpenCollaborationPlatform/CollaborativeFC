@@ -208,10 +208,11 @@ class OCPObjectWriter():
             
     
     def changeProperty(self, prop, value, outlist):        
-        #change a property to new value and outlist. Note: Value must be already in serializabe format
+        # change a property to new value and outlist. Note: Value must be already in serializabe format
+        # Not async as it will be batched by runner
         
         self.propChangeCache[prop] = value
-        #self.propChangeOutlist = outlist #we are only interested in the last set outlist, not intermediate steps
+        self.propChangeOutlist = outlist #we are only interested in the last set outlist, not intermediate steps
     
     
     async def __getCidForData(self, data):               
@@ -235,7 +236,9 @@ class OCPObjectWriter():
         #copy everything before first async op
         props = self.propChangeCache.copy()
         self.propChangeCache.clear()
-        #out = self.propChangeOutlist.copy()
+        out = self.propChangeOutlist.copy()
+        self.propChangeOutlist.clear()
+        out.sort()
                
         try:
                 
@@ -250,15 +253,16 @@ class OCPObjectWriter():
                         
                     tasks.append(run(props, prop))
 
-            #also in parallel: query the current outlist
-            #if self.objGroup == "Objects":
-            #    outlist = []
-            #    async def getOutlist():
-            #        uri = f"ocp.documents.{self.docId}.content.Document.DAG.GetObjectOutList"
-            #        outlist = await self.connection.api.call(uri, self.name)
-            #        outlist.sort()
+            #also in parallel: query the current outlist (to not update everytime a property changes)
+            if self.objGroup == "Objects":
+                outlist = []
+                async def getOutlist():
+                    uri = f"ocp.documents.{self.docId}.content.Document.{self.objGroup}.{self.name}.dependencies"
+                    outlist = await self.connection.api.call(uri)
+                    if outlist:
+                        outlist.sort()
                     
-            #    tasks.append(getOutlist())
+                tasks.append(getOutlist())
 
 
             #execute all parallel tasks
@@ -279,12 +283,10 @@ class OCPObjectWriter():
                     raise Exception(f"Properties {failed} failed")
 
             #finally process the outlist
-            #if self.objGroup == "Objects":
-            #    out.sort()
-            #    if out != outlist:
-            #        self.logger.debug(f"Set Outlist")
-            #        uri = f"ocp.documents.{self.docId}.content.Document.DAG.SetObjectOutList"
-            #        await self.connection.api.call(uri, self.name, out)
+            if self.objGroup == "Objects" and out != outlist:
+                self.logger.debug(f"Set Outlist")
+                uri = f"ocp.documents.{self.docId}.content.Document.{self.objGroup}.{self.name}.dependencies"
+                await self.connection.api.call(uri, out)
                 
         except Exception as e:
             self.logger.error(f"Batch writing properties {list(props.keys())} failed: {e}")

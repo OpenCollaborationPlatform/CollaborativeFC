@@ -23,6 +23,8 @@ import Documents.Syncer     as Syncer
 import Documents.Observer   as Observer
 from Documents.OnlineObserver   import OnlineObserver
 from Documents.OnlineObject     import OnlineObject, OnlineViewProvider
+from Documents.AsyncRunner      import DocumentRunner
+
 from autobahn.wamp.exception    import ApplicationError
 
 class OnlineDocument():
@@ -41,14 +43,15 @@ class OnlineDocument():
         self.objects = {}
         self.viewproviders = {}
         self.logger = logging.getLogger("Document " + id[-5:])
-        self.sync = None
-        
-        self.synced = bool(os.getenv('FC_OCP_SYNC_MODE', "0"))
+        self.sync = None        
+        self.synced = os.getenv('FC_OCP_SYNC_MODE', "0") == "1"
             
         #Online documents cannot use the FreeCAD Transaction framework
         doc.UndoMode = 0
         
         self.logger.debug("Created")
+        if self.synced:
+            self.logger.info('Use non-default sync mode "Document-Sync"')
  
     async def setup(self):
         await self.onlineObs.setup()
@@ -328,8 +331,13 @@ class OnlineDocument():
             self.sync = Syncer.AcknowledgeBlockSyncer(len(self.objects))
             for obj in self.objects.values():
                 obj.synchronize(self.sync)
+                
+            asyncio.ensure_future(self.__recomputeDocument(self.sync))
+        
+        else:
+            runner = DocumentRunner.getSenderRunner(self.id, self.logger)
+            runner.run(self.__recomputeDocument(self.sync))
             
-        asyncio.ensure_future(self.__recomputeDocument(self.sync))
         
         
     async def __recomputeDocument(self, sync):
@@ -339,18 +347,20 @@ class OnlineDocument():
             await sync.wait()
         
         #close the transaction
-        #try:     
-        #    self.logger.debug("Close transaction")
-        #    uri = f"ocp.documents.{self.id}.content.Transaction.Close"
-        #    await self.connection.api.call(uri)           
+        try:     
+            self.logger.debug("Close transaction")
+            uri = f"ocp.documents.{self.id}.content.Transaction.IsOpen"
+            if await self.connection.api.call(uri):
+                uri = f"ocp.documents.{self.id}.content.Transaction.Close"
+                await self.connection.api.call(uri)
 
-        #except Exception as e:
-        #    self.logger.error(f"Closing transaction failed: {e}")
+        except Exception as e:
+            self.logger.error(f"Closing transaction failed: {e}")
             
-        #finally:
-        if sync:
-            sync.restart()
-            self.sync = None
+        finally:
+            if sync:
+                sync.restart()
+                self.sync = None
 
 
     async def _docPrints(self):
