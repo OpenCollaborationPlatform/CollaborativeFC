@@ -7,7 +7,7 @@ Data {
     property string typeid
     property string fcName
     
-    event onSetupFinished    //no args. Emited from FreeCAD
+    event onSetupFinished    //no args. Emitted from FreeCAD
     event onObjectRecomputed //no args
     event onExtensionCreated //extension
     event onExtensionRemoved //extension

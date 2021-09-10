@@ -29,7 +29,7 @@
       </font>
      </property>
      <property name="text">
-      <string>Error occured during operation:</string>
+      <string>Error occurred during operation:</string>
      </property>
     </widget>
    </item>

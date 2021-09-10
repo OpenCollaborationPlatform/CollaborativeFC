@@ -171,7 +171,7 @@ class OnlineObserver():
         try:
             self.logger.debug(f"Object ({name}): New ({typeID})")
             
-            #maybe the object exists already (e.g. auto created by annother added object like App::Part Origin)
+            #maybe the object exists already (e.g. auto created by another added object like App::Part Origin)
             if hasattr(self.onlineDoc.document, name):
                 #TODO: check if typeid matches
                 return
@@ -360,7 +360,7 @@ class OnlineObserver():
     async def __cbObjectOnSetupFinished(self, name):
         #FreeCAD python object often get new properties with new versions. This is usually handled in the 
         #"onDocumentRestored" by checking if all properties are available and adding them if not. To enable 
-        #cross version compatibility we need to call this function to ensure all relevant properties are avaiable
+        #cross version compatibility we need to call this function to ensure all relevant properties are available
         #Note:  ideally we would not disable the the doc observer to just catch the new probs. However, it is highly 
         #       likely that some other parallel running coroutine did this. Hence we need to figure out the new properties
         #       ourself
@@ -380,7 +380,7 @@ class OnlineObserver():
                         oobj.changeProperty(prop)
             
         except Exception as e:
-            self.logger.error(f"Object ({name}): Version upgade after setup failed: {e}")
+            self.logger.error(f"Object ({name}): Version upgrade after setup failed: {e}")
 
        
     async def __cbChangeViewProvider(self, name, prop, value):
@@ -427,7 +427,7 @@ class OnlineObserver():
             Object.createDynamicProperty(obj.ViewObject, prop, typeID, group, documentation, status)
             
         except Exception as e:
-            self.logger.error("Dynamic propert adding failed: {0}".format(e))
+            self.logger.error("Dynamic property adding failed: {0}".format(e))
         
     
     
@@ -495,7 +495,7 @@ class OnlineObserver():
 
 
     async def __cbViewProviderOnSetupFinished(self, name):
-        #see object equivalent for explanaiton
+        #see object equivalent for explanation
         try:
             obj = self.onlineDoc.document.getObject(name).ViewObject
             self.logger.debug(f"ViewProvider ({name}): Finish Setup")
@@ -511,7 +511,7 @@ class OnlineObserver():
                         ovp.changeProperty(prop)
             
         except Exception as e:
-            self.logger.error(f"Object ({name}): Version upgade after setup failed: {e}")
+            self.logger.error(f"Object ({name}): Version upgrade after setup failed: {e}")
             
         finally:           
             Observer.activateFor(self.onlineDoc.document)
