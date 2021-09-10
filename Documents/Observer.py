@@ -21,7 +21,7 @@ import asyncio
 from contextlib import contextmanager 
 import FreeCAD, FreeCADGui
 
-#Global variable to allow observer activation/deactivation handing for other parts of the code
+#Global variable to allow observer activation/deactivation handling for other parts of the code
 __Observer = None
 
 def initialize(docManager):
@@ -123,8 +123,8 @@ class __ObserverBase():
         # we do not allow double deactivation. Reason is simple:
         # deactivation should be used when some change to document is done that triggers the observer. This is always
         # bound to a single coroutine, and then the doc is activated again for normal processing. Double deactivation means
-        # a coroutine keeps the doc blocked while annother coroutin is working. That is an error as all kind of actions can happen on the 
-        # doc while the initial routine is awaited. Loosing al this info is faulty. Hence double deactivation marks a implementation error
+        # a coroutine keeps the doc blocked while another coroutin is working. That is an error as all kind of actions can happen on the 
+        # doc while the initial routine is awaited. Losing all this info is faulty. Hence double deactivation marks a implementation error
         if doc in self.inactive:
             raise Exception(f"Document {doc} already deactivated: not allowed to happen")
         
@@ -161,16 +161,16 @@ class __ObserverBase():
             self.objExtensions[obj] = []
             
         before = self.objExtensions[obj]
-        
+
         now = []
         for extension in self.__fc018_extensions.keys():
             try: 
                 if obj.hasExtension(extension):
                     now.append(extension)
             except:
-                #it raises if no such exception is registered,  wht could happen if a module is not yet loaded
+                #it raises if no such exception is registered,  what could happen if a module is not yet loaded
                 continue
-                           
+
         #get the new ones
         added = [item for item in now if item not in before]
         

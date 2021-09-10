@@ -76,7 +76,7 @@ class EquallityBatcher():
     
 
 class MultiBatcher():
-    #Batches together task of multiple batchers undependend of order. As long as the tasks are 
+    #Batches together task of multiple batchers nondependent of order. As long as the tasks are 
     #handable by any of the batchers this batcher swallows it. During execute all  batchers are
     #executed in provided order
     

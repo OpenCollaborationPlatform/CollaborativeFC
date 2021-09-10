@@ -17,7 +17,7 @@
 # *   Suite 330, Boston, MA  02111-1307, USA                             *
 # ************************************************************************
 
-# This module provides FC object translation layers beween the syncronous FreeCAD execution and asyncronous 
+# This module provides FC object translation layers between the synchronous FreeCAD execution and asynchronous 
 # OCP node document. The classes provide a normal python API and create and execute async actions from 
 # those calls. The sync API is non blocking, and all errors and cleanups are also processed async.
 
@@ -77,7 +77,7 @@ class FreeCADOnlineObject():
     async def download(self, obj):
         # Loads the OCP node data for this object into the FreeCAD one. If changes exist 
         # the local version will be overridden
-        # Note: this fuction works async, but cannot handle any changes during execution,
+        # Note: this function works async, but cannot handle any changes during execution,
         #       neither on the node nor in the FC object
         
         try:
@@ -126,7 +126,7 @@ class FreeCADOnlineObject():
         
     async def upload(self, obj):
         # Creates and uploads the object data into the ocp node
-        # Note: this fuction works async, but cannot handle any changes during execution,
+        # Note: this function works async, but cannot handle any changes during execution,
         #       neither on the node nor in the FC object
         
         try:
@@ -144,7 +144,7 @@ class FreeCADOnlineObject():
             #we process the other tasks in parallel
             tasks = []
             
-            #upload all extenions
+            #upload all extensions
             ext = Object.getExtensions(obj)
             for e in ext:
                 tasks.append(self.Writer.addExtension(e))
@@ -198,7 +198,7 @@ class OnlineObject(FreeCADOnlineObject):
             
         self._runner.run(self.Writer.setup, self.obj.TypeId, self.obj.PropertiesList, infos)
         
-        #check if there are properties that need the defult values uploaded
+        #check if there are properties that need the default values uploaded
         props = Property.getNonDefaultValueProperties(self.obj)
         for prop in props:
             self._runner.run(self.Writer.changeProperty, prop, Property.convertPropertyToWamp(self.obj, prop), [])
@@ -210,7 +210,7 @@ class OnlineObject(FreeCADOnlineObject):
     def remove(self):
         self._runner.run(self.Writer.remove)
         
-        #we cannot use the runner to run close on itself, because it would wait for itself till it finishs: 
+        #we cannot use the runner to run close on itself, because it would wait for itself till it finishes: 
         #that is a guaranteed timeout
         async def __closeout():
             #waits till runner finished all tasks and than closes it
@@ -302,7 +302,7 @@ class OnlineViewProvider(FreeCADOnlineObject):
         #setup ourself
         self._runner.run(self.Writer.setup, self.obj.TypeId, self.obj.PropertiesList, infos)
         
-        #check if there are properties that need the defult values uploaded
+        #check if there are properties that need the default values uploaded
         props = Property.getNonDefaultValueProperties(self.obj)
         for prop in props:
             self._runner.run(self.Writer.changeProperty(prop, Property.convertPropertyToWamp(self.obj, prop), []))  
@@ -333,8 +333,8 @@ class OnlineViewProvider(FreeCADOnlineObject):
         value = Property.convertPropertyToWamp(self.obj, prop)
         
         if float(".".join(FreeCAD.Version()[0:2])) == 0.18:
-            #work around missing proxy callback in ViewProvider. This may add to some delay, as proxy change is ony forwarded 
-            #when annother property changes afterwards, however, at least the order of changes is keept
+            #work around missing proxy callback in ViewProvider. This may add to some delay, as proxy change is only forwarded 
+            #when another property changes afterwards, however, at least the order of changes is kept
             if hasattr(self.obj, 'Proxy'):
                 if not self.proxydata is self.obj.Proxy:
                     self.proxydata = self.obj.Proxy

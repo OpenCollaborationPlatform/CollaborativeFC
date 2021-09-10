@@ -116,7 +116,7 @@ class API(QtCore.QObject, Utils.AsyncSlotObject):
     async def closeKey(self, key):
 
         if key in self.__registered:
-            #remove regiter entries and clsoe sessions
+            #remove register entries and close sessions
             del self.__registered[key]
             for session in self.__registeredSessions.pop(key, []):
                 await session.unregister()          

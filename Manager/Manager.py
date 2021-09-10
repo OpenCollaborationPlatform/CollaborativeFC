@@ -102,7 +102,7 @@ class Manager(QtCore.QObject, Utils.AsyncSlotObject):
         
         
     async def __handleConnectionChanged(self):
-        # Updates the entities according to the conenction status
+        # Updates the entities according to the connection status
         #
         # Required as async function as __asyncInit cannot call asyncSlot, as it would spawn a task
         # from within a task
@@ -203,7 +203,7 @@ class Manager(QtCore.QObject, Utils.AsyncSlotObject):
     
     async def onOCPDocumentCreated(self, id):
 
-        #could be that we alread have this id (e.g. if we created it ourself)
+        #could be that we already have this id (e.g. if we created it ourself)
         if self.hasEntity('id', id):
             return
                
@@ -247,7 +247,7 @@ class Manager(QtCore.QObject, Utils.AsyncSlotObject):
                 self.documentRemoved.emit(entity.uuid)
                
         elif entity.status == Entity.Status.shared:
-            #it was shared before, hence now with it being closed on the node it is only availble locally          
+            #it was shared before, hence now with it being closed on the node it is only available locally          
             entity.status = Entity.Status.local
             entity.id = None
             self.documentChanged.emit(entity.uuid)
@@ -290,7 +290,7 @@ class Manager(QtCore.QObject, Utils.AsyncSlotObject):
     #**********************************************************************
     
     def getOnlineDocument(self, fcdoc):
-        #return the correcponding OnlineDocument for a given FreeCAD local Document. Returns None is none is available
+        #return the corresponding OnlineDocument for a given FreeCAD local Document. Returns None is none is available
         
         #check if it is a GuiDocument and use the App one instead
         if hasattr(fcdoc, "ActiveView"):
@@ -378,7 +378,7 @@ class Manager(QtCore.QObject, Utils.AsyncSlotObject):
             await self.__connection.api.call(u"ocp.documents.close", entity.id)
             
         else:
-            raise Exception(f"Cannot stop colaboration when status is {entity.status.name}")
+            raise Exception(f"Cannot stop collaboration when status is {entity.status.name}")
 
     
 

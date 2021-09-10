@@ -38,7 +38,7 @@ Map {
         
         function Init(typeID, group, documentation, status) {          
                  
-            //prevent status property change emiting
+            //prevent status property change emitting
             this.onPropertyChanged.Disable()
             try {
                 this.status = status
@@ -70,12 +70,12 @@ Map {
         }
         
         //FC 0.18 compatibility function. As it does not support full 0.19 status we need to handle the two 
-        //dynamic editor modes seperatly, without removing all 0.19 stati it does not know about.
+        //dynamic editor modes separately, without removing all 0.19 stati it does not know about.
         function SetEditorMode(mode) {
         
             status = this.status.slice()
             
-            //remove occurances of "ReadOnly" and "Hidden" to allow simple addition of modes afterwards
+            //remove occurrences of "ReadOnly" and "Hidden" to allow simple addition of modes afterwards
             idx = status.indexOf('Hidden')
             if (idx > -1) {
                 delete status[idx]
@@ -144,7 +144,7 @@ Map {
     function SetValues(props, values) {
 
         //we iterate from the back to allow us to remove entries from props and values,
-        //if they do not exist. This adds robustnes: even if one property fails, the others are
+        //if they do not exist. This adds robustness: even if one property fails, the others are
         //written
 
         var failed = new Array()

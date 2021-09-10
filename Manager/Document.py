@@ -89,7 +89,7 @@ class ManagedDocument(QtCore.QObject, Utils.AsyncSlotObject):
         await self.__processConnectionChange()
         
     async def __processConnectionChange(self):
-        # needs to be a sepeate method to slot, as calling the slot from setup() would lead to task spawned in task error
+        # needs to be a separate method to slot, as calling the slot from setup() would lead to task spawned in task error
         
         if self.__connection.api.connected:
             readPeers = await self.__connection.api.call(f"ocp.documents.{self.__docId}.listPeers", auth="Read")

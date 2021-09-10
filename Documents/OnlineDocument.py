@@ -96,8 +96,8 @@ class OnlineDocument():
                     
             #we need to block till the last document recompute is done, to ensure that we are not part of that recompute cycle
             #Note:  Do not use full syncer, as this includes an AcknowledgeSyncer which is setup for the amount of objects.
-            #       Adding it to the new obect adds an additional Acknowledge, which may lead to the fact that the recompute happens
-            #       before all othe rrunners are done
+            #       Adding it to the new object adds an additional Acknowledge, which may lead to the fact that the recompute happens
+            #       before all other runners are done
             if self.sync:
                 oobj.setup(self.sync.Block)
             else:
@@ -130,7 +130,7 @@ class OnlineDocument():
         oobj.synchronize(Syncer.WaitAcknowledgeSyncer(ackno))
         oobj.remove()
         
-        #aswell as the online observer one
+        #as well as the online observer one
         asyncio.ensure_future(self.onlineObs.closeRunner(obj.Name))
         
         
@@ -396,7 +396,7 @@ class OnlineDocument():
         
         try:
             #first we need to get into view mode for the document, to have a steady picture of the current state of things and
-            #to not get interupted
+            #to not get interrupted
             await self.connection.api.call(f"ocp.documents.{self.id}.view", True)
             
             #create all document objects!
