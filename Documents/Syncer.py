@@ -1,11 +1,11 @@
-#Syncers are classs to achieve syncronisation with multiple async runners and an outside process.
-#They are intended to be used with Asyncrunners "syncronize" methods, which adds their "excecute" method
+#Syncers are class to achieve syncronisation with multiple async runners and an outside process.
+#They are intended to be used with Asyncrunners "synchronize" methods, which adds their "execute" method
 #to the current task list
 
 import asyncio
     
 class AcknowledgeSyncer():
-    #Allows to wait till num synced runners have excecuted the syncer. 
+    #Allows to wait till num synced runners have executed the syncer. 
     #waitAllAchnowledge blocks till this happens. The runners are not blocked, 
     #they directly execute their tasks after the syncer.
     
@@ -16,7 +16,7 @@ class AcknowledgeSyncer():
         if self.count == 0:
             self.event.set()
 
-    async def excecute(self):
+    async def execute(self):
         self.count -= 1
         if self.count <= 0:
             self.event.set()
@@ -32,7 +32,7 @@ class WaitAcknowledgeSyncer():
         self.__syncer = ackSyncer
         self.__timeout = timeout
         
-    async def excecute(self):
+    async def execute(self):
         await self.__syncer.waitAllAchnowledge(self.__timeout)
 
 
@@ -42,7 +42,7 @@ class BlockSyncer():
     def __init__(self):
         self.event = asyncio.Event()
 
-    async def excecute(self):
+    async def execute(self):
         await self.event.wait()
 
     def restart(self):
@@ -58,7 +58,7 @@ class RestartBlockSyncer():
     def __init__(self, blockSyncer):
         self.__block = blockSyncer
         
-    async def excecute(self):
+    async def execute(self):
         self.__block.restart()
 
 
@@ -69,9 +69,9 @@ class AcknowledgeBlockSyncer():
         self.Acknowledge = AcknowledgeSyncer(num)
         self.Block = BlockSyncer()
        
-    async def excecute(self):
-        await self.Acknowledge.excecute()
-        await self.Block.excecute()
+    async def execute(self):
+        await self.Acknowledge.execute()
+        await self.Block.execute()
             
     async def wait(self):
         await self.Acknowledge.waitAllAchnowledge()
