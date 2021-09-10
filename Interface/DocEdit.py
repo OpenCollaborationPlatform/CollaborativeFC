@@ -69,9 +69,9 @@ class DocEdit(QtWidgets.QWidget, AsyncSlotWidget):
         if not self.__editedEntity.manager:
             raise Exception("Document no available on node, cannot be edited")
         
-        self.__editedEntity.manager.addPeerSlot(self.ui.nodeIdInput.text(), self.ui.editRigthsInput.isChecked())
+        self.__editedEntity.manager.addPeerSlot(self.ui.nodeIdInput.text(), self.ui.editRightsInput.isChecked())
         self.ui.nodeIdInput.setText("")
-        self.ui.editRigthsInput.setChecked(False)
+        self.ui.editRightsInput.setChecked(False)
     
     @QtCore.Slot()
     def __onSetName(self):

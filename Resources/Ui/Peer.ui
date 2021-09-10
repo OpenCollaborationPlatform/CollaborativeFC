@@ -71,7 +71,7 @@
       </spacer>
      </item>
      <item>
-      <widget class="QToolButton" name="rigthsButton">
+      <widget class="QToolButton" name="rightsButton">
        <property name="focusPolicy">
         <enum>Qt::NoFocus</enum>
        </property>
@@ -103,12 +103,12 @@
      <item>
       <widget class="QLabel" name="label_2">
        <property name="text">
-        <string>Rigths:</string>
+        <string>Rights:</string>
        </property>
       </widget>
      </item>
      <item>
-      <widget class="QLabel" name="rigthsLabel">
+      <widget class="QLabel" name="rightsLabel">
        <property name="text">
         <string>TextLabel</string>
        </property>

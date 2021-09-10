@@ -205,7 +205,7 @@ class ManagedDocument(QtCore.QObject, Utils.AsyncSlotObject):
         await self.removePeer(peer)
 
     @Utils.AsyncSlot(str)
-    async def togglePeerRigthsSlot(self, peerid):
+    async def togglePeerRightsSlot(self, peerid):
         
         peer = self.getPeer(peerid)
         if peer.auth == "Write":
