@@ -1,7 +1,9 @@
 # FCCollaboration
-FreeCAD add-on for concurrent edits
+FreeCAD add-on for concurrent edits, alpha state
 
 Allows to share and edit documents with others concurrently. Based on the Open Collaboration Platform.
+
+[![Alpha version preview](https://img.youtube.com/vi/fKSW4EgJups/0.jpg)](http://www.youtube.com/watch?v=fKSW4EgJups)
 
 ## Installation
 1. Add this repository as custom repository to the addon manager (configure menu): https://github.com/OpenCollaborationPlatform/CollaborativeFC
@@ -51,3 +53,8 @@ To add others you need to know their node id. Currently ther is now way to find 
 
 Once added your document will show up at the other node as type invited, and the person can choose to join the document.
 
+## Alpha state limitations:
+1. Links into other documents do not work
+2. Does not work reliable with different FreeCAD versions. All 0.18 or all 0.19 should work, but not a mix
+3. Concurrent editing will fail at the moment. You can work in both FreeCAD instances and it should be mirrored, but if you do it at the same time synchronization is not guaranteed yet. E.g. if one instance has a longrunning update on a model, and the other instance edits stuff during the update, it currently breaks.
+4. If you are brave enough to test it over different PCs most likely it will fail quite fast
