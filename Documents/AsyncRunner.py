@@ -136,7 +136,7 @@ class OrderedRunner():
     
     
     def sync(self, syncer):
-        self.run(syncer.excecute)
+        self.run(syncer.execute)
 
 
 class BatchedOrderedRunner():
@@ -234,7 +234,7 @@ class BatchedOrderedRunner():
         return [task.name() for task in self.__tasks]
         
     def sync(self, syncer):
-        self.run(syncer.excecute)
+        self.run(syncer.execute)
         
 
 class DocumentBatchedOrderedRunner():

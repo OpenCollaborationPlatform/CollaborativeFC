@@ -139,9 +139,9 @@
       </widget>
      </item>
      <item>
-      <widget class="QCheckBox" name="editRigthsInput">
+      <widget class="QCheckBox" name="editRightsInput">
        <property name="text">
-        <string>Edit rigths</string>
+        <string>Edit rights</string>
        </property>
       </widget>
      </item>
