@@ -17,9 +17,20 @@
 # *   Suite 330, Boston, MA  02111-1307, USA                             *
 # ************************************************************************
 
+from enum import Enum, auto
+
+# error classes:
+class ErrorClass(Enum):
+    internal = auto()
+    connection = auto()
+    application = auto()
+    type = auto()
+    user = auto()
+    none = auto()
+
 Key_Not_Available = "key_not_available"
 
-def isOCPError(error, errclass=None, source=None, reason=None):
+def isOCPError(error, errclass: ErrorClass=ErrorClass.none, source: str=None, reason: str=None):
         
     if not hasattr(error, "error"):
         return False
@@ -29,7 +40,7 @@ def isOCPError(error, errclass=None, source=None, reason=None):
         return False
     
     comps = uri.split(".")
-    if errclass and comps[2] != errclass:
+    if errclass != ErrorClass.none and [2] != errclass.name:
         return False
         
     if source and comps[3] != source:
@@ -39,3 +50,4 @@ def isOCPError(error, errclass=None, source=None, reason=None):
         return False
     
     return True
+

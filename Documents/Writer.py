@@ -57,7 +57,7 @@ class OCPObjectWriter():
         self.dynPropCache       = {}
         self.statusPropCache    = {}
         self.propChangeCache    = {}
-        #self.propChangeOutlist  = []
+        self.propChangeOutlist  = []
         self.setupStage         = True
 
     

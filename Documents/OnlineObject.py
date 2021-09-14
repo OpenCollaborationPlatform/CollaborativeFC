@@ -30,6 +30,7 @@ import Documents.Object   as Object
 from Documents.AsyncRunner import BatchedOrderedRunner, DocumentRunner
 from Documents.Writer import OCPObjectWriter
 from Documents.Reader import OCPObjectReader
+from Utils.Errorhandling import isOCPError
 
 
 class FreeCADOnlineObject():
@@ -51,7 +52,7 @@ class FreeCADOnlineObject():
 
         self.Writer = OCPObjectWriter(name, objGroup, onlinedoc, self.logger)
         self.Reader = OCPObjectReader(name, objGroup, onlinedoc, self.logger)
-
+        
 
     async def _docPrints(self):
         uri = u"ocp.documents.{0}.prints".format(self._docId)
@@ -76,7 +77,7 @@ class FreeCADOnlineObject():
     
     async def download(self, obj):
         # Loads the OCP node data for this object into the FreeCAD one. If changes exist 
-        # the local version will be overridden
+        # the local version will be overridden, hene can be used to reset a object
         # Note: this fuction works async, but cannot handle any changes during execution,
         #       neither on the node nor in the FC object
         
@@ -176,7 +177,7 @@ class FreeCADOnlineObject():
         except Exception as e:
             self.logger.error(f"Uploading object failed: {e}")
             traceback.print_exc()
-            
+        
 
 class OnlineObject(FreeCADOnlineObject):
     
@@ -196,6 +197,9 @@ class OnlineObject(FreeCADOnlineObject):
 
         cbs = [b.copy() for b in batchers]            
         self._runner.registerBatcher(Batcher.MultiBatcher(cbs))
+        
+        # error handling
+        self._runner.registerErrorHandler(isOCPError, self.download, obj)
         
         
     def setup(self, syncer=None):
@@ -294,6 +298,9 @@ class OnlineViewProvider(FreeCADOnlineObject):
             
         cbs = [b.copy() for b in batchers]            
         self._runner.registerBatcher(Batcher.MultiBatcher(cbs))
+        
+        # error handling
+        self._runner.registerErrorHandler(isOCPError, self.download, obj)
         
           
     def setup(self, sync=None):

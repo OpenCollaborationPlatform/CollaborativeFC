@@ -110,6 +110,8 @@ def removeDynamicProperties(obj, props):
         
 
 def createExtension(obj, ext):
+    # Adds the extension if not already available in the object
+    # (does not error if already available)
     
     if obj.hasExtension(ext):
         return
