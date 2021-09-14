@@ -58,7 +58,7 @@ if FreeCAD.GuiUp:
 group = FreeCAD.ParamGet("User parameter:BaseApp/Workbench/Global/Toolbar")
 
 # as the GUI for custom global toolbars always rename them to "Custom_X" we need to search if 
-# a colaboration toolbar is already set up
+# a collaboration toolbar is already set up
 alreadySetup = False
 for i in range(1,1000):
     if group.HasGroup("Custom_" + str(i)):

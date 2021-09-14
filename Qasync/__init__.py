@@ -544,7 +544,7 @@ class _QEventLoop:
         try:
             callback(*args)
         finally:
-            # The notifier might have been overriden by the
+            # The notifier might have been overridden by the
             # callback. We must not re-enable it in that case.
             if notifiers.get(fd, None) is notifier:
                 notifier.setEnabled(True)

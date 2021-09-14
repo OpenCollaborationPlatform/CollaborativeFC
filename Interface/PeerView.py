@@ -111,7 +111,7 @@ class PeerWidget(QtWidgets.QWidget):
         self.ui.idLabel.setFont(largeFont)
         
         self.ui.removeButton.clicked.connect(lambda: self.__docmanager.removePeerSlot(self.__peerId))
-        self.ui.rigthsButton.clicked.connect(lambda: self.__docmanager.togglePeerRigthsSlot(self.__peerId))
+        self.ui.rightsButton.clicked.connect(lambda: self.__docmanager.togglePeerRightsSlot(self.__peerId))
 
         self.update()
     
@@ -125,11 +125,11 @@ class PeerWidget(QtWidgets.QWidget):
         self.__name = peer.nodeid
         self.ui.idLabel.setText(self.__name)
         self.ui.joinedLabel.setText(f"{peer.joined}")
-        self.ui.rigthsLabel.setText(peer.auth)
+        self.ui.rightsLabel.setText(peer.auth)
         if peer.auth == "Write":
-            self.ui.rigthsButton.setText("Set Read")
+            self.ui.rightsButton.setText("Set Read")
         else:
-            self.ui.rigthsButton.setText("Set Write")
+            self.ui.rightsButton.setText("Set Write")
 
 
     def paintEvent(self, event):

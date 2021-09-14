@@ -33,7 +33,7 @@ __typeToStatusMap__ = {
     "Output": 27
 }
 
-#list of proeprty types which do not have a consistant default value
+#list of property types which do not have a consistent default value
 __non_default_property_types__ = [
     "App::PropertyUUID"
 ]

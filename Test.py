@@ -44,7 +44,7 @@ class Handler():
         self.__session = None
         self.__logger  = logging.getLogger("Test handler")
         
-        #register the Error raise filter to ensure that during testing all errror messages lead to test stop
+        #register the Error raise filter to ensure that during testing all error messages lead to test stop
         #Note: Attach to handler, as adding to logger itself does not propagate to child loggers
         #logging.getLogger().handlers[0].addFilter(ErrorFilter())
         
@@ -86,7 +86,7 @@ class Handler():
     
     
     async def __onJoin(self, session, details):
-        #litte remark that we joined (needed for test executable, it waits for this)
+        #little remark that we joined (needed for test executable, it waits for this)
         FreeCAD.Console.PrintMessage("Connection to OCP test server established\n")
         
         #store the session for later use
@@ -132,17 +132,17 @@ class Handler():
             return False
                     
         except Exception as e: 
-            self.__logger.error(f"Trigger syncronize failed, cannot wait for closeout of current actions: {e}")
+            self.__logger.error(f"Trigger synchronize failed, cannot wait for closeout of current actions: {e}")
             return False
 
 
     async def synchronize(self, docId, numFCs):
-        #Syncronize all other involved FC instances. When this returns one can call waitForSync on the TestServer. The numFCs must not 
+        #Synchronize all other involved FC instances. When this returns one can call waitForSync on the TestServer. The numFCs must not 
         #include the FC instance it is called on, only the remaining ones
         #Note:
         #   We trigger the FC instances to sync themself via the DML doc. This is to make sure that the sync is called only after all 
         #   operations have been received by the FC instance. 
-        #   1. Do all known opeations
+        #   1. Do all known operations
         #   2. Emit sync event in DML document
         
         self.__logger.debug(f"Start syncronisation for: {docId[-5:]}")
@@ -176,7 +176,7 @@ class Handler():
                     await entity.onlinedoc.waitTillCloseout(30)
                     
         except Exception as e: 
-            print(f"Participation in syncronize failed, cannot wait for closeout of current actions: {e}")
+            print(f"Participation in synchronize failed, cannot wait for closeout of current actions: {e}")
             return
 
         #call testserver that we received and executed the sync!

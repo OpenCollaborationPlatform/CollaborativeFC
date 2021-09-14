@@ -83,7 +83,7 @@ class DocumentRunner():
 class OrderedRunner(_TaskErrorHandler):
     #AsyncRunner which runs task in order
    
-    #runns all tasks syncronous
+    #runs all tasks synchronous
     def __init__(self, logger):
         
         _TaskErrorHandler.__init__(self)
@@ -126,7 +126,7 @@ class OrderedRunner(_TaskErrorHandler):
                 await self.__syncEvent.wait()
                 self.__finishEvent.clear()
                         
-                #work the tasks syncronous
+                #work the tasks synchronous
                 task = self.__tasks.pop(0)
                 while task:
                     self.__current = task.name()
@@ -167,7 +167,7 @@ class OrderedRunner(_TaskErrorHandler):
     
     
     def sync(self, syncer):
-        self.run(syncer.excecute)
+        self.run(syncer.execute)
 
 
 class BatchedOrderedRunner(_TaskErrorHandler):
@@ -178,7 +178,7 @@ class BatchedOrderedRunner(_TaskErrorHandler):
     #1. register batch handler. This is a async function which is called after all batchable functions are executed
     #2. run functions that have a batchhandler assigned. Those functions must not be awaitables, but default functions.
 
-    #runns all tasks syncronous and batches tasks together if possible
+    #runs all tasks synchronous and batches tasks together if possible
     def __init__(self, logger):
         
         _TaskErrorHandler.__init__(self)
@@ -274,11 +274,11 @@ class BatchedOrderedRunner(_TaskErrorHandler):
         return [task.name() for task in self.__tasks]
         
     def sync(self, syncer):
-        self.run(syncer.excecute)
+        self.run(syncer.execute)
         
 
 class DocumentBatchedOrderedRunner():
-    #A Async runner that syncronizes over the whole document, and has the same API as the BatchedOrderedRunner to be 
+    #A Async runner that synchronizes over the whole document, and has the same API as the BatchedOrderedRunner to be 
     #compatible replacement
     
     def __init__(self, runner):

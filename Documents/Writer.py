@@ -89,9 +89,9 @@ class OCPObjectWriter():
     
     async def __createProperty(self, dynamic, prop, info):
         #adds a new property with its property information
-        #could be added as normal or as dynamic property, dependend on dyn boolean
+        #could be added as normal or as dynamic property, dependent on dyn boolean
         
-        # Note: no try/catch, as method is private and the error is always catched from caller
+        # Note: no try/catch, as method is private and the error is always caught from caller
         if dynamic:
             self.logger.debug(f"Create dynamic property {prop}")
             fnc = "CreateDynamicProperty"
@@ -106,9 +106,9 @@ class OCPObjectWriter():
     
     async def __createProperties(self, dynamic, props, infos):
         #adds a list of properties and a list with their property infos
-        #could be added as normal or as dynamic property, dependend on "dynamic" boolean
+        #could be added as normal or as dynamic property, dependent on "dynamic" boolean
         
-        # Note: no try/catch, as method is private and the error is always catched from caller
+        # Note: no try/catch, as method is private and the error is always caught from caller
         if dynamic:
             self.logger.debug(f"Create dynamic properties {props}")
             fnc = "CreateDynamicProperties"
