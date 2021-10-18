@@ -23,38 +23,14 @@ import Utils
 from Documents.Dataservice      import DataService
 from Documents.OnlineDocument   import OnlineDocument
 from Manager import ManagedDocument
+from Entity  import Entity
 
 from Qasync import asyncSlot
 from PySide import QtCore
 import uuid
 from autobahn.wamp.types import CallResult
 from enum import Enum, auto
-
-
-class Entity():
-    ''' data structure describing a entity in the collaboration framework. A entity is a things that can be calloborated on, e.g.:
-        - A local Freecad document
-        - A invited ocp document on the node
-        - A open document on the node, not available locally 
-        - etc.
-    '''
-    
-    class Status(Enum):
-        unknown = auto()
-        local   = auto()    # entity is available only in local freecad session
-        node    = auto()    # entity is available only on ocp node (has a manager, but no onlinedoc)
-        invited = auto()    # entity is not even open on the ocp node, but someone else added the node as a member of a document
-        shared  = auto()    # entity is open on ocp node and in local freecad session (has a manager and a onlinedoc)
-        
-    def __init__(self, id = None, status = Status.unknown, onlinedoc = None, fcdoc = None, manager = None ):
-        
-        self.id = id
-        self.status = status
-        self.fcdoc = fcdoc
-        self.onlinedoc = onlinedoc
-        self.manager = manager
-        self.uuid = str(uuid.uuid4())
-        
+     
 
 class Manager(QtCore.QObject, Utils.AsyncSlotObject):
     #Manager that handles all entities for collaboration:
@@ -165,9 +141,13 @@ class Manager(QtCore.QObject, Utils.AsyncSlotObject):
             return
         
         #If a document was opened in freecad this function makes it known to the Handler. 
-        entity = Entity(id = None, status = Entity.Status.local, onlinedoc = None, fcdoc = doc, manager=None)
-        self.__entities.append(entity)
+        entity = Entity(self.__connection, self.__dataservice)
+        self.__entities.append(entity)       
         self.documentAdded.emit(entity.uuid)
+        
+        # process the state change
+        entity.fcdocument = doc
+        entity.processEvent(Entity.Events.fcopend)
         
         
     def onFCDocumentClosed(self, doc):
@@ -178,25 +158,9 @@ class Manager(QtCore.QObject, Utils.AsyncSlotObject):
         if self.__blockLocalEvents:
             return
         
-        entity = self.getEntity('fcdoc', doc)
-        
-        if entity.status == Entity.Status.local:
-            # we can remove the entity if it is local only
-            self.__entities.remove(entity)
-            self.documentRemoved.emit(entity.uuid)
-            
-        elif entity.status == Entity.Status.shared:
-            # but if shared we change it to be on node only
-            entity.status = Entity.Status.node
-            entity.fcdoc = None
-            if entity.onlinedoc:
-                asyncio.ensure_future(entity.onlinedoc.close())
-                entity.onlinedoc = None 
-                
-            self.documentChanged.emit(entity.uuid)
+        entity = self.getEntity('fcdocument', doc)
+        entity.processEvent(Entity.Events.fcclosed)
  
-
-
 
     #OCP event handling  (used as wamp event callbacks)
     #**********************************************************************
@@ -207,11 +171,13 @@ class Manager(QtCore.QObject, Utils.AsyncSlotObject):
         if self.hasEntity('id', id):
             return
                
-        entity = Entity(id = id, status = Entity.Status.node, onlinedoc = None, 
-                        fcdoc = None, manager=ManagedDocument(id, self.__connection))
+        entity = Entity(self.__connection, self.__dataservice)
         await entity.manager.setup()
         self.__entities.append(entity)
         self.documentAdded.emit(entity.uuid)
+        
+        entity.uuid = id
+        entity.processEvent(Entity.Events.collaborate)
 
         
     async def onOCPDocumentOpened(self, id): 

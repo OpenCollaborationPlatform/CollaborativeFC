@@ -1,2 +1,3 @@
-from Manager.Document import ManagedDocument
-from Manager.Manager import Entity, Manager
+from Manager.NodeDocument import NodeDocumentManager
+from Manager.Entity       import Entity
+from Manager.Manager      import Manager

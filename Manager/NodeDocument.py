@@ -23,7 +23,7 @@ from enum import Enum, auto
 from PySide import QtCore
 from Qasync import asyncSlot
 
-class ManagedDocument(QtCore.QObject, Utils.AsyncSlotObject):
+class NodeDocumentManager(QtCore.QObject, Utils.AsyncSlotObject):
     # Helps to manage documents on the OCP node, manages naming and peers
     
     class __Peer():
