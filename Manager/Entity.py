@@ -30,6 +30,8 @@ class Entity(SM.StateMachine):
         - etc.
     '''
     
+    # State Machine UML: //www.plantuml.com/plantuml/png/PLB1Ri8m3BtxAxph97wW0eGqTfWq3MtJJgY7pdL5HHfFQSiq8VvzQJ0X0GueUU_v-SNkgXygDuoTWUrZYRFP4hzipKrhkGPF3OolGfNHy-UkSeppEUsa9Luk5LwtFOcrJ4Ei-k1E3lwcruqrtXAF08XgvV_7_WZeVzVMUok_Ti9KzIOrlu_i_fAc2VrY3-tKKn5D681JxBGM6ZksGzxBe_VjdepqcTtcXsrczkoSE3m6x0G0SLh1DCogm8PagiivpLfWgw4Xg0EdqohGXKF2XFSKI69CzItEHu00HNAgsig-L3X9CUa7I7UJicIuSW2QAhDBc-cC0X-N0V6Klsoxk3okJ2LghOffDBTq6l8I77H3sbrtuoqQgeLmuUDOBczKOM5Hyt0HUJGtQOYc4vplIQMk3lI3lGzN9xVxuPxB2hnALcphiJF_
+    
     class States(SM.States):
         
         Undefined = SM.InitialState()                       # Initial state, events are used to setup fully
@@ -118,8 +120,9 @@ class Entity(SM.StateMachine):
         self,_onlinedoc = None
         await odoc.close()        
      
-    @SM.onExit(Entity.States.Online.Document.Open)
-    def onExitDocument(self):
+    @SM.onEnter(Entity.States.Online.Document.Close)
+    def onEnterCloseDocument(self):
+        # don't use exit Open, as w want to keep the fcdocument when leaving Online state and go to local
         self.fcdocument = None
      
     @SM.onEnter(Entity.States.Removed)
