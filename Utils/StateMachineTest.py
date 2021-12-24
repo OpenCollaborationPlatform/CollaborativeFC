@@ -11,6 +11,7 @@ class States(SM.States):
     SecondState = SM.State()
     ThirdState = SM.State()
     FourthState = SM.FinalState()
+    ProcessState = SM.ProcessState()
     
     class FirstGroup(SM.GroupedStates):
         
@@ -61,6 +62,8 @@ class Events(SM.Events):
                             (States.ParallelGroup.SecondGroup.FirstGroup.SecondState, States.ParallelGroup.SecondGroup.SecondGroup.FirstState),
                             (States.ParallelGroup.SecondGroup.SecondGroup.FirstState, States.ParallelGroup.SecondGroup.FirstState))
     fourth = SM.Transitions((States.ParallelGroup.SecondGroup.FirstState, States.FirstGroup.FirstGroup))
+    fith = SM.Transitions((States.FirstState, States.ProcessState),
+                          (States.ProcessState, States.FourthState))
 
 
 class MyTest(SM.StateMachine):  
@@ -71,27 +74,36 @@ class MyTest(SM.StateMachine):
     def __init__(self):
         super().__init__()
         
+        self.callbacks = []
         
         
     @SM.onEnter(States.SecondState)
-    def hmm(self):
-        print("Enter second state")
+    def c1(self):
+        self.callbacks.append("c1")
         
     @SM.onEnter(States.FirstGroup)
-    def enterGroup(self):
-        print("enter mygroup")
+    def c2(self):
+        self.callbacks.append("c2")
         
     @SM.onExit(States.FirstGroup)
-    def leaveGroup(self):
-        print("exit mygroup")
+    def c3(self):
+        self.callbacks.append("c3")
         
     @SM.onExit(States.FirstState)
-    def ohh(self):
-        print("leave first state")
+    def c4(self):
+        self.callbacks.append("c4")
         
     @SM.onTransition(States.FirstState, Events.first)
-    def ohh(self):
-        print("Transition first to second")
+    def c5(self):
+        self.callbacks.append("c5")
+        
+    @SM.onProcessingEnter
+    def c6(self):
+        self.callbacks.append("c6")
+        
+    @SM.onProcessingExit
+    def c7(self):
+        self.callbacks.append("c7")
         
 
 class TestStateMachine(unittest.TestCase):
@@ -118,7 +130,7 @@ class TestStateMachine(unittest.TestCase):
         o = Obj()
         
         trans = t.addTransition(States.FirstState, States.SecondState, o.sig)
-        trans.executed.connect(lambda: print("transition"))
+        trans.executed.connect(lambda: t.callbacks.append("transition"))
         
         self.assertEqual(len(t.activeStates), 1)
         self.assertIn(States.FirstState, t.activeStates)
@@ -128,7 +140,37 @@ class TestStateMachine(unittest.TestCase):
         o.sig.emit()
         self.assertEqual(len(t.activeStates), 1)
         self.assertIn(States.SecondState, t.activeStates)
+        
+        self.assertIn("transition", t.callbacks)
+        
 
+    def test_callbacks(self):
+        
+        t = MyTest()
+        t.processEvent(Events.first)
+        self.assertEqual(len(t.callbacks), 3)
+        self.assertIn("c1", t.callbacks)
+        self.assertIn("c4", t.callbacks)
+        self.assertIn("c5", t.callbacks)
+        
+    
+    def test_processing_states(self):
+        
+        t = MyTest()
+        callbacks = []
+        t.onProcessingEnter.connect(lambda: callbacks.append("enter"))
+        t.onProcessingExit.connect(lambda: callbacks.append("exit"))
+    
+        t.processEvent(Events.fith)
+        self.assertEqual(len(callbacks), 1)
+        self.assertIn("enter", callbacks)
+        self.assertIn("c6", t.callbacks)
+        
+        t.processEvent(Events.fith)
+        self.assertEqual(len(callbacks), 2)
+        self.assertIn("exit", callbacks)
+        self.assertIn("c7", t.callbacks)
+        
 
     def test_group_transitions(self):
 
@@ -232,3 +274,4 @@ class TestStateMachine(unittest.TestCase):
         self.assertIn(States.FirstGroup, t.activeStates)
         self.assertIn(States.FirstGroup.FirstGroup, t.activeStates)
         self.assertIn(States.FirstGroup.FirstGroup.FirstState, t.activeStates)
+        

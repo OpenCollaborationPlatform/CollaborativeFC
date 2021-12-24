@@ -40,7 +40,7 @@ class NodeDocumentManager(QtCore.QObject, Utils.AsyncSlotObject):
         self.__connection = connection
         self.__majority = False
         
-        connection.api.connectedChanged.connect(self.__connectChanged)    
+        connection.api.connectedChanged.connect(self.__connectChanged)
       
     async def setup(self):
         # Setups all document relevant things. Must be called after creation
