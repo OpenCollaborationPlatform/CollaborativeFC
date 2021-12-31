@@ -19,6 +19,7 @@
 
 import FreeCADGui, Utils
 from PySide2 import QtWidgets, QtCore, QtGui
+import Utils.StateMachine as SM
 
 class BusyIndicator(QtWidgets.QWidget):
     
@@ -95,7 +96,7 @@ class ErrorBox(QtWidgets.QWidget):
         self.deleteLater()
         self.__parent.setEnabled(True)
         
-        
+    
 
 class AsyncSlotWidget():
     # A base class to inherit from when AsyncSlotObjects are used and its
@@ -160,3 +161,48 @@ class AsyncSlotPromoter(QtCore.QObject, AsyncSlotWidget):
         QtCore.QObject.__init__(self)
         
         
+class StateMachineProcessWidget():
+    
+    def __init__(self, parent: QtCore.QObject):
+        
+        self.__sm = None
+        self.__parent = parent
+        self.__progress = None
+       
+    def setStateMachine(self, statemachine: SM.StateMachine):
+        
+        if not issubclass(type(statemachine), SM.StateMachine):
+            raise Exception("StateMachine process widget requires a StateMachine to work")
+        
+        if self.__sm:
+            raise Exception("StateMachien already set for widget")
+        
+        self.__sm = statemachine
+ 
+        self.__sm.onProcessingEnter.connect(self.__onProcessStart)
+        self.__sm.onProcessingExit.connect(self.__onProcessStop)
+        
+
+    @QtCore.Slot(int)
+    def __onProcessStart(self):
+        
+        # start the indicator
+            self.__parent.setEnabled(False)
+            self.__progress = BusyIndicator(self.__parent)
+            self.__progress.show()
+      
+      
+    @QtCore.Slot(int, str, str)
+    def __onProcessStop(self):
+        
+        self.__progress.stop()
+        self.__parent.setEnabled(True)
+
+ 
+class StateMachineProcessPromoter(QtCore.QObject, StateMachineProcessWidget):
+    # Promotes any QWidget to behave as StateMachineProcessWidget
+    
+    def __init__(self, widget, statemachine):
+        
+        StateMachineProcessWidget.__init__(self, widget)
+        QtCore.QObject.__init__(self)

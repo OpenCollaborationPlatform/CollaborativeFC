@@ -22,23 +22,41 @@ import FreeCAD, FreeCADGui, asyncio, os
 import Utils
 from Documents.Dataservice      import DataService
 from Documents.OnlineDocument   import OnlineDocument
-from Manager import ManagedDocument
-from Entity  import Entity
+from Manager.Entity  import Entity
 
 from Qasync import asyncSlot
 from PySide import QtCore
 import uuid
 from autobahn.wamp.types import CallResult
 from enum import Enum, auto
-     
 
-class Manager(QtCore.QObject, Utils.AsyncSlotObject):
+
+class _EventBlocker():
+    # helper class to block local events from the manager
+    
+    def __init__(self, manager):
+        self.__manager = manager
+          
+    def __enter__(self):
+        self.__manager._blockLocalEvents = True
+      
+    def __exit__(self, exc_type, exc_value, exc_traceback):
+        self.__manager._blockLocalEvents = False
+
+
+class Manager(QtCore.QObject):
     #Manager that handles all entities for collaboration:
     # - the local ones that are unshared
     # - the ones we have been invited too but not yet joined
     # - the ones open at the node but not yet in FC
     # - the one we share
-       
+    
+
+    documentAdded   = QtCore.Signal(str)
+    documentRemoved = QtCore.Signal(str)
+    documentChanged = QtCore.Signal(str)
+    
+    
     def __init__(self, collab_path, connection):  
         
         QtCore.QObject.__init__(self)
@@ -46,7 +64,7 @@ class Manager(QtCore.QObject, Utils.AsyncSlotObject):
         self.__entities = [] #empty list for all our document handling status, each doc is a map: {id, status, onlinedoc, doc}
         self.__connection = None
         self.__collab_path = collab_path
-        self.__blockLocalEvents = False
+        self._blockLocalEvents = False
         self.__uuid = uuid.uuid4()
         self.__dataservice = DataService(self.__uuid, connection)
         self.__connection = connection
@@ -89,44 +107,21 @@ class Manager(QtCore.QObject, Utils.AsyncSlotObject):
             doclist = await self.__connection.api.call(u"ocp.documents.list")
             for doc in doclist:
                 if not self.hasEntity("id", doc):
-                    entity = Entity(id = doc, status = Entity.Status.node, onlinedoc = None,
-                                    fcdoc = None, manager=ManagedDocument(doc, self.__connection))
-                    
-                    await entity.manager.setup()
+                    entity = Entity(self.__connection, self.__dataservice, self.__collab_path, _EventBlocker(self))
                     self.__entities.append(entity)
                     self.documentAdded.emit(entity.uuid)
+                    
+                    entity.start(id = doc)
                     
             # all invited documents
             doclist = await self.__connection.api.call(u"ocp.documents.invitations")
             for doc in doclist:
                 if not self.hasEntity("id", doc):
-                    entity = Entity(id = doc, status = Entity.Status.invited, onlinedoc = None,
-                                    fcdoc = None, manager=None)
-                    
+                    entity = Entity(self.__connection, self.__dataservice, self.__collab_path, _EventBlocker(self))                    
                     self.__entities.append(entity)
                     self.documentAdded.emit(entity.uuid)
-                
-        else:
-            for entity in self.__entities:
                     
-                if entity.status == Entity.Status.invited:
-                    self.__entities.remove(entity)
-                    self.documentRemoved.emit(entity.uuid)
-                    
-                if entity.status == Entity.Status.node:
-                    await entity.manager.close()
-                    entity.manager = None
-                    self.__entities.remove(entity)
-                    self.documentRemoved.emit(entity.uuid)
-                    
-                if entity.status == Entity.Status.shared:
-                    await entity.onlinedoc.close()
-                    await entity.manager.close()
-                    entity.onlinedoc = None
-                    entity.manager = None 
-                    entity.id = None
-                    entity.status = Entity.Status.local
-                    self.documentChanged.emit(entity.uuid)
+                    entity.start(id = doc)
 
 
     #FreeCAD event handling: Not blocking (used by document observers)
@@ -137,17 +132,16 @@ class Manager(QtCore.QObject, Utils.AsyncSlotObject):
         if not self.__connection:
             return 
         
-        if self.__blockLocalEvents:
+        if self._blockLocalEvents:
             return
         
         #If a document was opened in freecad this function makes it known to the Handler. 
-        entity = Entity(self.__connection, self.__dataservice)
+        entity = Entity(self.__connection, self.__dataservice, self.__collab_path, _EventBlocker(self))
         self.__entities.append(entity)       
         self.documentAdded.emit(entity.uuid)
         
         # process the state change
-        entity.fcdocument = doc
-        entity.processEvent(Entity.Events.fcopend)
+        entity.start(fcdoc = doc)
         
         
     def onFCDocumentClosed(self, doc):
@@ -155,11 +149,11 @@ class Manager(QtCore.QObject, Utils.AsyncSlotObject):
         if not self.__connection:
             return 
         
-        if self.__blockLocalEvents:
+        if self._blockLocalEvents:
             return
         
         entity = self.getEntity('fcdocument', doc)
-        entity.processEvent(Entity.Events.fcclosed)
+        entity.processEvent(Entity.Events.closed)
  
 
     #OCP event handling  (used as wamp event callbacks)
@@ -171,18 +165,14 @@ class Manager(QtCore.QObject, Utils.AsyncSlotObject):
         if self.hasEntity('id', id):
             return
                
-        entity = Entity(self.__connection, self.__dataservice)
-        await entity.manager.setup()
+        entity = Entity(self.__connection, self.__dataservice, self.__collab_path, _EventBlocker(self))
         self.__entities.append(entity)
         self.documentAdded.emit(entity.uuid)
         
-        entity.uuid = id
-        entity.processEvent(Entity.Events.collaborate)
-
+        entity.start(id = id)
         
     async def onOCPDocumentOpened(self, id): 
-        # opened means a new node document in our node that was created by someone else, we just joined.
-        # hence the processing is exactly the same as created
+        # same as created: setup the entity and let it figure out everything itself
         return await self.onOCPDocumentCreated(id)
             
         
@@ -193,163 +183,29 @@ class Manager(QtCore.QObject, Utils.AsyncSlotObject):
             return 
         
         entity = self.getEntity('id', id)
-        if entity.onlinedoc:
-            await entity.onlinedoc.close()
-            entity.onlinedoc = None
-        
-        if entity.manager:
-            await entity.manager.close()
-            entity.manager = None
-        
-        invitations = await self.__connection.api.call(u"ocp.documents.invitations")
-        
-        if entity.status == Entity.Status.node:
-            # check if we are invited
-            if id in invitations:
-                entity.status = Entity.Status.invited
-                self.documentChanged.emit(entity.uuid)
-            else:
-                self.__entities.remove(entity)
-                self.documentRemoved.emit(entity.uuid)
-               
-        elif entity.status == Entity.Status.shared:
-            #it was shared before, hence now with it being closed on the node it is only available locally          
-            entity.status = Entity.Status.local
-            entity.id = None
-            self.documentChanged.emit(entity.uuid)
-            
-            if id in invitations:
-                #we have now a local one + the invitation
-                await self.onOCPDocumentInvited(id, True)
-            
-        else:
-            # in case it is anything else than status==node || invited something went wrong, and removing it is fine
-            self.__entities.remove(entity)
-            self.documentRemoved.emit(entity.uuid)
+        entity.processEvent(Entity.Events.closed)
         
     
     async def onOCPDocumentInvited(self, doc, add):
        
         if add:
-            if self.hasEntity('id', doc):
-                return 
-            
-            entity = Entity(id = doc, status = Entity.Status.invited, onlinedoc = None,
-                                    fcdoc = None, manager=None)
-                    
-            self.__entities.append(entity)
-            self.documentAdded.emit(entity.uuid)
+            # same as created: setup the entity and let it figure out everything itself
+            return await self.onOCPDocumentCreated(id)
             
         else:
             if not self.hasEntity('id', doc):
                 return
             
-            if entity.status != Entity.Status.invited:
-                return 
-            
-            self.__entities.remove(entity)
-            self.documentRemoved.emit(entity.uuid)        
-        
-    
-    
-    #Document handling API: Async
-    #**********************************************************************
-    
-    def getOnlineDocument(self, fcdoc):
-        #return the corresponding OnlineDocument for a given FreeCAD local Document. Returns None is none is available
-        
-        #check if it is a GuiDocument and use the App one instead
-        if hasattr(fcdoc, "ActiveView"):
-            fcdoc = fcdoc.Document
-        
-        #get the online document for a certain freecad document, or None if not available
-        try:
-            entity = self.getEntity('fcdoc', fcdoc)
-            return entity.onlinedoc
-        except:
-            return None
+            entity = self.getEntity('id', id)
+            entity.processEvent(Entity.Events.closed)
 
     
-    def hasOnlineViewProvider(self, fcvp):        
-        #returns if the given FreeCAD viewprovider has a corresponding OnlineViewProvider
-        
-        for entity in self.__entities: 
-            if entity.onlinedoc and entity.onlinedoc.hasViewProvider(fcvp):
-                return True
-        
-        return False
- 
- 
+    # Entity access
+    # **********************************************************************
+    
     def getEntities(self):
         return self.__entities
-
-
-    async def collaborate(self, entity, documentname = "Unnamed"):
-        #for the entity collaboration is started. That means:
-        # - Created/opened in OCP when open local only
-        # - Opened in FC if open on node
-        # - Opened on node and created in FC when invited
-        # - Doing nothing if already shared
-        
-        if not entity:
-            raise "Entity is None type, cannot collaborate"
-        
-        if entity.status == Entity.Status.local:
-            dmlpath = os.path.join(self.__collab_path, "Dml")
-            res = await self.__connection.api.call(u"ocp.documents.create", dmlpath)
-            
-            #it could have been that we already received the "documentCreated" event, and hence have a new entity created.
-            #that would be wrong! 
-            if self.hasEntity("id", res):
-                self.__entities.remove(self.getEntity("id", res))
-                self.documentRemoved.emit(self.getEntity("id", res).uuid)
-            
-            entity.id = res
-            entity.onlinedoc = OnlineDocument(res, entity.fcdoc, self.__connection, self.__dataservice)
-            await entity.onlinedoc.setup()
-            entity.manager = ManagedDocument(res, self.__connection)
-            await entity.manager.setup()
-            await entity.onlinedoc.asyncSetup()
-                
-        elif entity.status == Entity.Status.node:
-            self.__blockLocalEvents = True
-            entity.fcdoc = FreeCAD.newDocument(documentname)
-            self.__blockLocalEvents = False
-            entity.onlinedoc = OnlineDocument(entity.id, entity.fcdoc, self.__connection, self.__dataservice)
-            await entity.onlinedoc.setup()
-            await entity.onlinedoc.asyncLoad() 
-                
-        elif entity.status == Entity.Status.invited:
-            await self.__connection.api.call(u"ocp.documents.open", entity.id)
-            self.__blockLocalEvents = True
-            entity.fcdoc = FreeCAD.newDocument(documentname)
-            self.__blockLocalEvents = False
-            entity.onlinedoc = OnlineDocument(entity.id, entity.fcdoc, self.__connection, self.__dataservice)
-            await entity.onlinedoc.setup()
-            entity.manager = ManagedDocument(entity.id, self.__connection)
-            await entity.manager.setup()
-            await entity.onlinedoc.asyncLoad() 
-
-        entity.status = Entity.Status.shared
-        self.documentChanged.emit(entity.uuid)
-        
    
-    async def stopCollaborate(self, entity):
-        # For the shared entity, this call stops the collaboration by closing it on the node, but keeping it local.
-        # For node entity it cloese it for good.
-        
-        if not self.__connection.api.connected:
-            return 
-        
-        # we do not do any entity work, as this is handled by the ocp event callbacks we trigger
-
-        if entity.status == Entity.Status.shared or entity.status == Entity.Status.node:
-            await self.__connection.api.call(u"ocp.documents.close", entity.id)
-            
-        else:
-            raise Exception(f"Cannot stop collaboration when status is {entity.status.name}")
-
-    
 
     def getEntity(self, key, val):
         #returns the entity for the given key/value pair, e.g. "fcdoc":doc. Careful: if status is used
@@ -368,36 +224,4 @@ class Manager(QtCore.QObject, Utils.AsyncSlotObject):
                 return True
         
         return False
-    
-    def entityStatus(self, name):
-        # returns the entity status enum value from name
-        # (helper class to not need to import Entity)
-        
-        return Entity.Status[name]
-    
-    
-    # QT implementation
-    # **************************************************************************************************
 
-    documentAdded   = QtCore.Signal(str)
-    documentRemoved = QtCore.Signal(str)
-    documentChanged = QtCore.Signal(str)
-    
-    @Utils.AsyncSlot(str)
-    async def toggleCollaborateSlot(self, uuid):
-        entity = self.getEntity("uuid", uuid)
-        if entity.status == Entity.Status.shared or entity.status == Entity.Status.node:
-            await self.stopCollaborate(entity)
-        else:
-            await self.collaborate(entity)
-        
-    @Utils.AsyncSlot(str)
-    async def toggleOpenSlot(self, uuid):
-        entity = self.getEntity("uuid", uuid)
-        if entity.fcdoc:
-            # we simply close it. the doc observer callbacks handle all the entity stuff
-            FreeCAD.closeDocument(entity.fcdoc.Name)
-        else:
-            # we can reuse collaborate, as it opens a document for a node status entity anyway
-            await self.collaborate(entity)
-        
