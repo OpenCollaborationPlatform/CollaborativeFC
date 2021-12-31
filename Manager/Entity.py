@@ -70,7 +70,6 @@ class Entity(SM.StateMachine):
         opened          = SM.Event()  # passive: document was opened outside, entity state should resemble that
         close           = SM.Event()  # active:  The entity shoul be closed
         closed          = SM.Event()  # passive: document was closed outside, entity state should represent that
-        edit            = SM.Event()  # active:  The entity should be edited
         
         # Connection events
         connected       = SM.Event()  # API connection esablished
@@ -117,7 +116,7 @@ class Entity(SM.StateMachine):
         # local state interals
         self.addTransition(Entity.States.Local.Detect, Entity.States.Local.Internal, condition = lambda sm: sm._id is None)
         self.addTransition(Entity.States.Local.Detect, Entity.States.Local.Disconnected, condition = lambda sm: sm._id is not None)
-        self.addTransition(Entity.States.Local.Internal, Entity.States.Local.CreateProcess, Entity.Events.edit)
+        self.addTransition(Entity.States.Local.Internal, Entity.States.Local.CreateProcess, Entity.Events.open)
         self.addTransition(Entity.States.Local.CreateProcess, Entity.States.Local.Internal, Entity.Events.abort)
         self.addTransition(Entity.States.Local.CreateProcess, Entity.States.Local.Internal, Entity.Events._failed)
         self.addTransition(Entity.States.Local.CreateProcess, Entity.States.Node.Status.Online, Entity.Events._done)
@@ -182,13 +181,18 @@ class Entity(SM.StateMachine):
     async def _createDoc(self):
         
         try:
+            print("create")
             dmlpath = os.path.join(self.__collab_path, "Dml")
             self._id = await self.__connection.api.call(u"ocp.documents.create", dmlpath)
+            print("created")
             self.processEvent(Entity.Events._done)
+            print("processed event")
 
         except asyncio.CancelledError:
+            print("abort")
             self.processEvent(Entity.Events.abort)
         except:
+            print("failed")
             self.processEvent(Entity.Events._failed)
 
     # Node substatus

@@ -262,6 +262,7 @@ class _State(QtCore.QObject):
         self._transitions  = {}         # transitions by event or signal
         self._asyncCallbacks = []       # Async functions to be called when entering the state (and aborted when exited)
         self.__tasks = []               # Collection of all running asyncio tasks
+        self.__attributes = []          # All attributes we need to set when entering/leaving
         
         if parent:
             parent._children.add(self)
@@ -344,25 +345,45 @@ class _State(QtCore.QObject):
 
 
     @property
-    def active(self):
+    def active(self) -> bool:
         return self._active
     
     def connectAsyncEntryCallback(self, asyncFcn):
         # Adds a async callback that gets called on state entry. When exiting the state before 
         # finishing the callback it will be abortet
         
-        self.asyncCallbacks.append(asyncFcn)
+        self._asyncCallbacks.append(asyncFcn)
         
+    def setAttributeValue(self, obj: object, prop: str, value, reset=False):
+        # Sets the property value when entering the state, and potentially sets it back to 
+        # to the original value when leaving
+        
+        data = {"obj": obj, "attr": prop, "value": value, "reset": reset, "initial": None}
+        self.__attributes.append(data)
+        
+
     def _onEntry(self):
         
         # start all async callbacks
         self.__tasks = []
         for clb in self._asyncCallbacks:
-            self.__tasks.append(asyncio.create_task(clb()))
+            self.__tasks.append(asyncio.ensure_future(clb()))
         
         # procecss the enter callbacks
         self.entered.emit()
         
+        # set the attributes (incl. QT properties)
+        for data in self.__attributes:
+            if data["reset"]:
+                data["initial"] = getattr(data["obj"], data["attr"])
+            
+            # check if qt proeprty
+            if hasattr(data["obj"], "setProperty") and data["obj"].property(data["attr"]):
+                data["obj"].setProperty(data["attr"], data["value"])
+            else:        
+                setattr(data["obj"], data["attr"], data["value"])
+
+
     def _onExit(self):
         
         # check if there are unfinished tasks and cancel them
@@ -374,7 +395,15 @@ class _State(QtCore.QObject):
         # processes all user callbacks on exit of state        
         self.exited.emit()
             
-
+        # reset the attributes (incl. QT properties)
+        for set in self.__attributes:
+            if data["reset"]:
+                if hasattr(data["obj"], "setProperty") and data["obj"].property(data["attr"]):
+                    data["obj"].setProperty(data["attr"], data["value"])
+                else:        
+                    setattr(data["obj"], data["attr"], data["value"])
+                    
+            
 
 class StateMachine(QtCore.QObject):
     # class representing a state machine
@@ -428,7 +457,7 @@ class StateMachine(QtCore.QObject):
                     self.__states[item.statemachine_data].exited.connect(item)
                 elif item.statemachine_usecase == "onAsyncEnter":
                     assert item.statemachine_data in self.__states, "onAsyncEnter callback state is invalid"
-                    self.__states[item.statemachine_data].addAsyncEntryCallback(item)
+                    self.__states[item.statemachine_data].connectAsyncEntryCallback(item)
                     
                 elif item.statemachine_usecase == "transition":
                     assert len(item.statemachine_data) == 3, "wrong argument count for transition callback"
@@ -679,6 +708,12 @@ class StateMachine(QtCore.QObject):
         # add transitions
         return self.__states[start]._addTransition(self.__states[end], *args, condition = condition)
 
+    def setAttributeValue(self, state, obj, attr, value, reset = False):
+        # Sets the attribute value when entering the state, and potentially sets it back
+        # to the original value when leaving
+        assert state in self.__states, "Not a valid state machine state"
+    
+        self.state(state).setAttributeValue(obj, attr, value, reset=reset)
     
     def state(self, state) -> _State:
         assert state in self.__states, "Invalid state identifier"
@@ -703,8 +738,7 @@ def onEnter(state):
     
     def wrapper(fnc):
         
-        if asyncio.iscoroutine(fnc):
-            
+        if asyncio.iscoroutinefunction(fnc):
             fnc.statemachine_usecase = "onAsyncEnter"
         else:
             fnc.statemachine_usecase = "onEnter"
