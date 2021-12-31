@@ -21,6 +21,22 @@ import inspect, asyncio
 from enum import Enum, auto
 from PySide2 import QtCore
 
+
+
+#   State Machine
+#
+#   Decorators: 
+#   * onEnter(statename):
+#       * Automatically connects the decorated function with the entered signal of the state
+#       * When using a async function it will be canceled when the state is left before it is finished (fnc receives CancelledError exception)
+#   * onExit(statename):
+#       * Automatically connects the decorated function with the exited signal of the state
+#       * When a async function is decoredet it will also run on exit, but never be canceled by the state maching
+#
+#
+#
+#
+
 class StateTypes(Enum):
         Normal = auto()
         Initial = auto()
@@ -38,7 +54,7 @@ class StateTypes(Enum):
 class _StateDefBase():
     # Base class for all state defining classes
     
-    type = StateTypes.Normal
+    type = [StateTypes.Normal]
     name = "unknown"
     
     def __repr__(self):
@@ -99,25 +115,31 @@ class _StateDefMeta(type):
         return iter(result)
 
 class State(_StateDefBase):
-    type = StateTypes.Normal
+    type = [StateTypes.Normal]
 
 class InitialState(_StateDefBase):
-    type = StateTypes.Initial
+    type = [StateTypes.Initial]
 
 class FinalState(_StateDefBase):
-    type = StateTypes.Final
+    type = [StateTypes.Final]
     
 class ProcessState(_StateDefBase):
-    type = StateTypes.Process
+    type = [StateTypes.Process]
+    
+class InitialProcessState(_StateDefBase):
+    type = [StateTypes.Initial, StateTypes.Process]
+    
+class FinalProcessState(_StateDefBase):
+    type = [StateTypes.Final, StateTypes.Process]
     
 class States(_StateDefBase, metaclass=_StateDefMeta):
-    type = StateTypes.Group
+    type = [StateTypes.Group]
     
 class GroupedStates(_StateDefBase, metaclass=_StateDefMeta):
-    type = StateTypes.Group
+    type = [StateTypes.Group]
 
 class ParallelStates(_StateDefBase, metaclass=_StateDefMeta):
-    type = StateTypes.Parallel
+    type = [StateTypes.Parallel]
 
 
 class _EventDefBase():
@@ -166,17 +188,24 @@ class _EventDefMeta(type):
         return iter(result)
 
 
+# Parent class for Event definition
 class Events(_EventDefBase, metaclass = _EventDefMeta):
     pass
 
 
-class Transitions(_EventDefBase):
+class TransitionEvent(_EventDefBase):
     
     def __init__(self, *args):
         self._transition_touples = args
+        super().__init__()
         
     def __iter__(self):
         return iter(self._transition_touples)
+
+class Event(TransitionEvent):
+    
+    def __init__(self):
+        super().__init__()
 
 
 # ***********************************************************************************************************************
@@ -196,16 +225,16 @@ class _Transition(QtCore.QObject):
     def _addConditionalTarget(self, target, condition):
         # add annother target based on condition. Fails is existing target is without condition,
         # as this is always used anyway.
-        if len(self._targets) == 1 and not self._targets[0][1]:
+        if len(self._targets) >= 1 and not self._targets[0][1]:
             raise Exception("Cannot add conditional transition as there is a non conditional already")
         
-        self._targets.append(target, condition)
+        self._targets.append((target, condition))
        
-    def _getTarget(self):
+    def _getTarget(self, statemachine):
         # we check which of the consitions are met
         for candidate in self._targets:
             if candidate[1]:
-                if candidate[1]():
+                if candidate[1](statemachine):
                     return candidate[0]
             else:
                 return candidate[0]
@@ -231,6 +260,8 @@ class _State(QtCore.QObject):
         self._initial = None            # _State that is used when transition to the group
         self._active = False            # True/False if active
         self._transitions  = {}         # transitions by event or signal
+        self._asyncCallbacks = []       # Async functions to be called when entering the state (and aborted when exited)
+        self.__tasks = []               # Collection of all running asyncio tasks
         
         if parent:
             parent._children.add(self)
@@ -282,7 +313,7 @@ class _State(QtCore.QObject):
             self._active = True
             self._onEntry()
         
-        if self.identifier.type == StateTypes.Group:
+        if StateTypes.Group in self.identifier.type:
             # we check if any child should be activated, if not, activate the initial one
             for child in self._children:
                 if child in required:
@@ -293,7 +324,7 @@ class _State(QtCore.QObject):
             assert self._initial, "Group has no initial state defined"
             self._initial._activate(required)
                 
-        if self.identifier.type == StateTypes.Parallel:
+        if StateTypes.Parallel in self.identifier.type:
             # activate all children
             for child in self._children:
                 child._activate(required)
@@ -315,12 +346,31 @@ class _State(QtCore.QObject):
     @property
     def active(self):
         return self._active
+    
+    def connectAsyncEntryCallback(self, asyncFcn):
+        # Adds a async callback that gets called on state entry. When exiting the state before 
+        # finishing the callback it will be abortet
+        
+        self.asyncCallbacks.append(asyncFcn)
         
     def _onEntry(self):
+        
+        # start all async callbacks
+        self.__tasks = []
+        for clb in self._asyncCallbacks:
+            self.__tasks.append(asyncio.create_task(clb()))
+        
         # procecss the enter callbacks
         self.entered.emit()
         
     def _onExit(self):
+        
+        # check if there are unfinished tasks and cancel them
+        if self.__tasks:
+            for task in self.__tasks:
+                if not task.done():
+                    task.cancel()
+        
         # processes all user callbacks on exit of state        
         self.exited.emit()
             
@@ -335,7 +385,7 @@ class StateMachine(QtCore.QObject):
     
     def __init__(self):
         
-        subclassDir = dir(self) # get dir before we add out base class types to self to avoid doubling states and events
+        subclassDir = dir(self) # get dir before we add our base class types to self to avoid doubling states and events
         super().__init__()
         
         self.__states = {}
@@ -376,21 +426,21 @@ class StateMachine(QtCore.QObject):
                 elif item.statemachine_usecase == "onExit":
                     assert item.statemachine_data in self.__states, "onExit callback state is invalid"
                     self.__states[item.statemachine_data].exited.connect(item)
+                elif item.statemachine_usecase == "onAsyncEnter":
+                    assert item.statemachine_data in self.__states, "onAsyncEnter callback state is invalid"
+                    self.__states[item.statemachine_data].addAsyncEntryCallback(item)
                     
-                elif item.statemachine_usecase == "onTransition":
-                    assert len(item.statemachine_data) >= 1, "wrong argument count for onTransition callback"
-                    assert item.statemachine_data[0] in self.__states, "onTransition callback start state is invalid"
+                elif item.statemachine_usecase == "transition":
+                    assert len(item.statemachine_data) == 3, "wrong argument count for transition callback"
+                    assert item.statemachine_data[0] in self.__states, "transition callback start state is invalid"
+                    assert item.statemachine_data[1] in self.__states, "transition callback end state is invalid"
 
-                    if len(item.statemachine_data) == 1:
-                        direct = self.__states[item.statemachine_data[0]]._getDirectTransition()
-                        if not direct:
-                            raise Exception("Direct transaction does not exist")
-                        direct.executed.connect(item)
+                    if item.statemachine_data[2]:
+                        trans = self.addTransition(item.statemachine_data[0], item.statemachine_data[1], item.statemachine_data[2][0])
                     else:
-                        trans = self.__states[item.statemachine_data[0]]._getTransition(item.statemachine_data[1])
-                        if not trans:
-                            raise Exception("Event transaction does not exist")
-                        trans.executed.connect(item)
+                        trans = self.addTransition(item.statemachine_data[0], item.statemachine_data[1])
+                    
+                    trans.executed.connect(item)
                         
                 elif item.statemachine_usecase == "onFinish":
                     self.finished.connect(item)
@@ -426,14 +476,14 @@ class StateMachine(QtCore.QObject):
             result.append(stateObj)
             
             #check if this is th einitial state and use it (or initial for the whole machine
-            if state.type == StateTypes.Initial:
+            if StateTypes.Initial in state.type:
                 if not parent:
                     stateObj._active = True
                 else:
                     assert not parent._initial, "Only a single initial sate is allowed per group"
                     parent._initial = stateObj
             
-            if state.type == StateTypes.Group or state.type == StateTypes.Parallel:
+            if StateTypes.Group in state.type or StateTypes.Parallel in state.type:
                 self.__buildGroupStates(state, stateObj)
                 
         return result
@@ -483,70 +533,78 @@ class StateMachine(QtCore.QObject):
             
         self.__processing = True
         self.processEvents = []
-       
-        # from the current active states, see to which we are going to transition
-        trans = self.__findTransition(self._rootStates, event)
-        if not trans:
-            return
         
-        start = trans[0]
-        startPath = self.__getUpwardsPath(start)
-        end = trans[1]._getTarget()
-        endPath = self.__getUpwardsPath(end)
-
-        # get the common parent, DS and AS states        
-        cp = None
-        for state in startPath:
-            if state in endPath:
-                cp = state
-                break
-            
-        if cp:
-            ds_ = startPath[startPath.index(cp)-1]
-            as_ = endPath[endPath.index(cp)-1]
-        else:
-            # no common parent means the relative toplevel group is the ds/as state
-            ds_ = startPath[-1]
-            as_ = endPath[-1]
-        
-        # finally deactivate  or activate the relevant states
-        ds_._deactivate()   
-        trans[1].executed.emit()
-        as_._activate(endPath)
-        
-        # check if we left or entered a processing state
-        if start.identifier.type == StateTypes.Process:
-            if not end.identifier.type == StateTypes.Process:
-                self.onProcessingExit.emit()
-        
-        elif end.identifier.type == StateTypes.Process:
-            self.onProcessingEnter.emit()
-            
-        # check if we reached a final state (a group or initial state cannot be final, hence it's
-        # enough to check end state
-        self.__processing = False
-        if end.identifier.type == StateTypes.Final:
-            self.__finished = True
-            self.finished.emit()
-        else:    
-            # process all events emmitd during this run. For that we need a local copie,
+        try:
+            # from the current active states, see to which we are going to transition
+            trans = self.__findTransition(self._rootStates, event)           
+            while trans:
+                
+                start = trans[0]
+                startPath = self.__getUpwardsPath(start)
+                end = trans[1]._getTarget(self)
+                endPath = self.__getUpwardsPath(end)
+                
+                # get the common parent, DS and AS states        
+                cp = None
+                for state in startPath:
+                    if state in endPath:
+                        cp = state
+                        break
+                    
+                if cp:
+                    ds_ = startPath[startPath.index(cp)-1]
+                    as_ = endPath[endPath.index(cp)-1]
+                else:
+                    # no common parent means the relative toplevel group is the ds/as state
+                    ds_ = startPath[-1]
+                    as_ = endPath[-1]
+                
+                # finally deactivate  or activate the relevant states
+                ds_._deactivate()   
+                trans[1].executed.emit()
+                as_._activate(endPath)
+                
+                # check if we left or entered a processing state
+                if StateTypes.Process in start.identifier.type:
+                    if not StateTypes.Process in end.identifier.type:
+                        self.onProcessingExit.emit()
+                
+                elif StateTypes.Process in end.identifier.type:
+                    self.onProcessingEnter.emit()
+                
+                # check if we reached a final state (a group or initial state cannot be final, hence it's
+                # enough to check end state
+                if StateTypes.Final in end.identifier.type:
+                    self.__finished = True
+                    self.finished.emit()
+                
+                # process all direct transitions
+                trans = self.__findTransition(self._rootStates)
+               
+            # finalize all events that have been captured during the processing
+            self.__processing = False
+            # process all events emmited during this run. For that we need a local copie,
             # as the other runs may also emit new events that need collection
             events = self.processEvents.copy()
             for event in events:
                 self.processEvent(event)
+                                            
+        finally: 
+            # just in case we errored out
+            self.__processing = False
        
     
-    def __findTransition(self, states, event):
+    def __findTransition(self, states, *args):
         # recursively searches the states for transitions with the given event
         # returns a tuple with (start, end) states
         
         for state in states:
             if state.active:
-                trans = state._getTransition(event)
-                if trans and trans._getTarget():
+                trans = state._getTransition(*args)
+                if trans and trans._getTarget(self):
                     return (state, trans)
                 else:
-                    states = self.__findTransition(state._children, event)
+                    states = self.__findTransition(state._children, *args)
                     if states:
                         return states
         
@@ -588,12 +646,17 @@ class StateMachine(QtCore.QObject):
         return result
 
     
-    def addTransition(self, start, end, *args) -> _Transition:
+    def addTransition(self, start, end, *args, condition=None) -> _Transition:
         # Adds a new transition between start and end states.
         # Additional arguments can be:
         # None:   Transition that is executed directly when state is entered
         # Event:  Transition that is executed when the event is processes
         # Signal: Transition that is executed when the signal is emitted
+        # 
+        # condition keyword: a function object returning a bool if the transition should be executed
+        #                    (useful only if multiple conditional transitions are added, either for 
+        #                     direct transitions or for a single event)
+        #                    does not work for signal argument
         
         assert start in self.__states, "Transition start is not a valid state machine state"
         assert end in self.__states, "Transition end is not a valid state machine state"
@@ -614,7 +677,7 @@ class StateMachine(QtCore.QObject):
                 sig.connect(lambda: self.__processEvent(sig))
           
         # add transitions
-        return self.__states[start]._addTransition(self.__states[end], *args)
+        return self.__states[start]._addTransition(self.__states[end], *args, condition = condition)
 
     
     def state(self, state) -> _State:
@@ -625,6 +688,7 @@ class StateMachine(QtCore.QObject):
     def transition(self, start, end, *args) -> _Transition:
         assert start in self.__states, "Invalid state identifier"
         assert end in self.__states, "Invalid state identifier"
+        assert start in self.__states, "State has no transition"            
 
         return self.__states[start]._getTransition(end, *args)
 
@@ -641,12 +705,10 @@ def onEnter(state):
         
         if asyncio.iscoroutine(fnc):
             
-            def asyncwrapper():
-                asyncio.ensure_future(fnc())
-                
-            fnc = asyncwrapper()
-        
-        fnc.statemachine_usecase = "onEnter"
+            fnc.statemachine_usecase = "onAsyncEnter"
+        else:
+            fnc.statemachine_usecase = "onEnter"
+            
         fnc.statemachine_data = state
         return fnc
 
@@ -669,7 +731,7 @@ def onExit(state):
 
     return wrapper
 
-def onTransition(start, *arg):
+def transition(start, end, *arg):
     
     def wrapper(fnc):
         
@@ -680,8 +742,8 @@ def onTransition(start, *arg):
                 
             fnc = asyncwrapper()
             
-        fnc.statemachine_usecase = "onTransition"
-        fnc.statemachine_data = (start, *arg)
+        fnc.statemachine_usecase = "transition"
+        fnc.statemachine_data = (start, end, arg)
         return fnc
 
     return wrapper

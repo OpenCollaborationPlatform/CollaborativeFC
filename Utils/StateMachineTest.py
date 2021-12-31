@@ -64,6 +64,7 @@ class Events(SM.Events):
     fourth = SM.Transitions((States.ParallelGroup.SecondGroup.FirstState, States.FirstGroup.FirstGroup))
     fith = SM.Transitions((States.FirstState, States.ProcessState),
                           (States.ProcessState, States.FourthState))
+    sixth = SM.Transitions()
 
 
 class MyTest(SM.StateMachine):  
@@ -171,6 +172,20 @@ class TestStateMachine(unittest.TestCase):
         self.assertIn("exit", callbacks)
         self.assertIn("c7", t.callbacks)
         
+        
+    def test_direct_transitions(self):
+        
+        t = MyTest()
+        self.assertEqual(len(t.activeStates), 1)
+        self.assertIn(States.FirstState, t.activeStates)
+        
+        t.addTransition(States.FirstState, States.SecondState, Events.sixth)
+        t.addTransition(States.SecondState, States.ThirdState)
+        
+        t.processEvent(Events.sixth)
+        self.assertEqual(len(t.activeStates), 1)
+        self.assertIn(States.ThirdState, t.activeStates)
+        
 
     def test_group_transitions(self):
 
@@ -274,4 +289,43 @@ class TestStateMachine(unittest.TestCase):
         self.assertIn(States.FirstGroup, t.activeStates)
         self.assertIn(States.FirstGroup.FirstGroup, t.activeStates)
         self.assertIn(States.FirstGroup.FirstGroup.FirstState, t.activeStates)
+        
+    def test_conditional_transitions(self):
+
+        t = MyTest()
+        self.assertEqual(len(t.activeStates), 1)
+        self.assertIn(States.FirstState, t.activeStates)
+        
+        t.myvar = 0
+        def condition1(sm):
+            return sm.myvar == 1
+         
+        def condition2(sm):
+            return sm.myvar == 2
+         
+        t.addTransition(States.FirstState, States.SecondState, Events.sixth, condition = condition1)
+        t.addTransition(States.FirstState, States.ThirdState, Events.sixth, condition = condition2)
+        t.addTransition(States.SecondState, States.FirstState, Events.sixth)
+        t.addTransition(States.ThirdState, States.ProcessState, condition = condition1)
+        t.addTransition(States.ThirdState, States.FourthState, condition = condition2)
+         
+        # with no condition meet, there should be no state change
+        t.processEvent(Events.sixth)
+        self.assertEqual(len(t.activeStates), 1)
+        self.assertIn(States.FirstState, t.activeStates)
+        
+        #with one condition meet we should transition
+        t.myvar = 1
+        t.processEvent(Events.sixth)
+        self.assertEqual(len(t.activeStates), 1)
+        self.assertIn(States.SecondState, t.activeStates)
+        
+        #with the other one meet we should transition (incl. the direct transition)
+        t.myvar = 2
+        t.processEvent(Events.sixth) # back to first
+        self.assertEqual(len(t.activeStates), 1)
+        self.assertIn(States.FirstState, t.activeStates)
+        t.processEvent(Events.sixth) # transition to third, direct transition to fourth
+        self.assertEqual(len(t.activeStates), 1)
+        self.assertIn(States.FourthState, t.activeStates)
         

@@ -39,6 +39,7 @@ class NodeDocumentManager(QtCore.QObject, Utils.AsyncSlotObject):
         self.__docId = id
         self.__connection = connection
         self.__majority = False
+        self.__setupDone = asyncio.Event()
         
         connection.api.connectedChanged.connect(self.__connectChanged)
       
@@ -55,7 +56,10 @@ class NodeDocumentManager(QtCore.QObject, Utils.AsyncSlotObject):
         
         # fetch the currently registered peers as well as the active ones
         await self.__processConnectionChange()
+        self.__setupDone.set()
         
+    async def waitTillSetup(self):
+        await self.__setupDone.wait()
 
     async def close(self):
         #unsubscribe the events
