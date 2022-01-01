@@ -31,7 +31,7 @@ class Entity(SM.StateMachine):
         - etc.
     '''
     
-    # State Machine UML: www.plantuml.com/plantuml/png/VLDVQnin37_tfz3wECWNE4eeT1qCnhfrZoMKcwri1iSEFbzXb7ptMJvDKRnRyf2pVh-VP5b_xgOovZ8VWgc7Wd2ViNuSMqzuIA_LOlDpicE0DmFrjo0ValqsO_uDjxVsL_8Mjzl6Fh_VmMQp5LwvV8e5Sno3Zk8dcs94IpSh_EPhJXQdwGR6YJDZX4INoC0cf0XVaaDpugoR1MywxlVwFq_y49tkKemZuwjfKBJboQ8IQ8258K1OZjdYYrAphIQllg0JjACVO_0HLRwgT5ZGbhxytRjOfIc66lk4n-1jZJR0yxkzTSdk_YTzSBvK5OkqQhLb8KswO_BJnD0iwPleJkPQ6nwF6Bl86XkQSH7pf0RW8UUKL_h_DCVeuy_kOdfqy-Zm-sLcVOfhxCUnZE5Cd6WW-HxPCluIjYpN02ylWGwQQcyW9j9RZEnSfMIRg7NUxIv9lLTLGFoomfk0-r85lDy3M6g1CuO7bFrvBEbglnml1JoOnATsqlG_B-9eeFpI4IEwCqEKRYBnHY6mcOywh_te0xfhYl57ogKNg0nSYcYCR03e9PMoABhoUdXPOZJ6DuYJf7bLn9ds6ftFMhQyaLn8Ck0Yh7JMy6nBxsMg1y2SoJ82WTe5yQkOcdZnF6Ecepb_3Z10Hfx6Symjhub4QwOnVyTQROjK72bLZKdJsKaAVbt41TSQBau_7dgFr48APiZc-3pqJhcOEunkFeG_
+    # State Machine UML: www.plantuml.com/plantuml/png/VLF1QXin4BthAoOvv53m3op11D8K2gLftMCmOIkDMu4i6QqsK8B_lP9sF3khRfr3lFFUqsWqC-zXI7rCuz6f_94G7YFc7qFH3e_XBKSKVWcwT_2k8FzDoCUWluyO_y3zlVuThCRjjh8l7_QmsMoP5qS--uJHzqvciOCEtgCkDmlyzbiC6eVX5lg1AYEaY9P8Ho443r-3GNMcgci4xpBlZ_n_7EWXijof6IV2LyiesQOdiugX3YQc0CnIpfgVbJDBFNcp2GsZ3VtidVKewXMjmuGwjUrltaKgIH5KsHsUdDKvMmSlDmTjWjx_J_faRCeg4WdL-iXS6EJ4-4yINOruRgmxgsjZU3wXRpCBhAl18kTPBC1JZ26kp7ytUc_zh-RYykXwei4VfvsrmQ-nd_hKkvaubuMaUzXbz5kmoLmTlBwwyY6f-eR2-F8MnPxB5BlfCXIukuCRQ_PBbJIOL2w5sulVnHvCbjyuF2J9wp8oenGjD5r3QrnAjTFdKa2BNFXGloJzJmSe6uXpuOGUpSmKIWwzy4eWi1bFigv3RnsQQuh-PuYf5OWAJF2e53i6fAcvBOBEl5nsaYY9qGryYCkyAg9AMusiPwrQSZ0riWGWqywJLUG5dZsxe0ECiKIA8H3UuNCP4mxXapEc6fhgfmGTHAIbdNDkoLQShOPANMmWtCKTnrAgn7ZeT8WRVbr43PSQQawx7j9kmi24aIieFosz4KVK0tep7jrV
     
     class States(SM.States):
         
@@ -115,8 +115,9 @@ class Entity(SM.StateMachine):
         self.addTransition(Entity.States.Created, Entity.States.Node, Entity.Events._node)
         
         # local state interals
-        self.addTransition(Entity.States.Local.Detect, Entity.States.Local.Internal, condition = lambda sm: sm._id is None)
-        self.addTransition(Entity.States.Local.Detect, Entity.States.Local.Disconnected, condition = lambda sm: sm._id is not None)
+        self.addTransition(Entity.States.Local.Detect, Entity.States.Local.Internal, condition = lambda sm: self.fcdocument and not sm._id)
+        self.addTransition(Entity.States.Local.Detect, Entity.States.Local.Disconnected, condition = lambda sm: self.fcdocument and sm._id)
+        self.addTransition(Entity.States.Local.Detect, Entity.States.Removed, condition = lambda sm: not self.fcdocument)
         self.addTransition(Entity.States.Local.Internal, Entity.States.Local.CreateProcess, Entity.Events.open)
         self.addTransition(Entity.States.Local.CreateProcess, Entity.States.Local.Internal, Entity.Events.abort)
         self.addTransition(Entity.States.Local.CreateProcess, Entity.States.Local.Internal, Entity.Events._failed)
@@ -125,6 +126,7 @@ class Entity(SM.StateMachine):
         self.addTransition(Entity.States.Local, Entity.States.Removed, Entity.Events.closed)
         
         # node state internals
+        self.addTransition(Entity.States.Node, Entity.States.Local, self.__connection.api.disconnected)
         self.addTransition(Entity.States.Node.Status.Detect, Entity.States.Node.Status.Online, Entity.Events._online)
         self.addTransition(Entity.States.Node.Status.Detect, Entity.States.Node.Status.Invited, Entity.Events._invited)
         self.addTransition(Entity.States.Node.Status.Detect, Entity.States.Local, Entity.Events._local)
@@ -202,6 +204,7 @@ class Entity(SM.StateMachine):
         with self._blocker:
             if self.fcdocument:
                 FreeCAD.closeDocument(self.fcdocument.Name)
+                self.fcdocument=None
             
 
     # Node substatus
