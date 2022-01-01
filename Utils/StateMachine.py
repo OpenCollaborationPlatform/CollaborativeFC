@@ -58,10 +58,10 @@ class _StateDefBase():
     name = "unknown"
     
     def __repr__(self):
-        return f"<State {self.name}: {self.type.name}>"
+        return f"<State {self.name}: {[t.name for t in self.type]}>"
     
     def __str__(self):
-        return f"<State {self.name}: {self.type.name}>"
+        return self.name
     
     @classmethod
     def _add_state_name_prefix(cls, prefix):
@@ -99,10 +99,10 @@ class _StateDefMeta(type):
     
     def __repr__(self):
         # returns the repr string for classes
-        return f"<State {self.name}: {self.type.name}>"
+        return f"<State {self.name}: {[t.name for t in self.type]}>"
     
     def __str__(self):
-        return f"<State {self.name}: {self.type.name}>"
+        return self.name
 
     def __iter__(self):
         result = []
@@ -374,11 +374,17 @@ class _State(QtCore.QObject):
         
         # set the attributes (incl. QT properties)
         for data in self.__attributes:
-            if data["reset"]:
-                data["initial"] = getattr(data["obj"], data["attr"])
             
-            # check if qt proeprty
-            if hasattr(data["obj"], "setProperty") and data["obj"].property(data["attr"]):
+            isqt = hasattr(data["obj"], "setProperty") and data["obj"].property(data["attr"]) != None
+            
+            if data["reset"]:
+                if isqt:
+                    data["initial"] = data["obj"].property(data["attr"])
+                else:
+                    data["initial"] = getattr(data["obj"], data["attr"])
+            
+            # check if qt proeprty           
+            if isqt:
                 data["obj"].setProperty(data["attr"], data["value"])
             else:        
                 setattr(data["obj"], data["attr"], data["value"])
@@ -396,12 +402,15 @@ class _State(QtCore.QObject):
         self.exited.emit()
             
         # reset the attributes (incl. QT properties)
-        for set in self.__attributes:
+        for data in self.__attributes:
             if data["reset"]:
-                if hasattr(data["obj"], "setProperty") and data["obj"].property(data["attr"]):
-                    data["obj"].setProperty(data["attr"], data["value"])
+                
+                isqt = hasattr(data["obj"], "setProperty") and data["obj"].property(data["attr"]) != None
+                
+                if isqt:
+                    data["obj"].setProperty(data["attr"], data["initial"])
                 else:        
-                    setattr(data["obj"], data["attr"], data["value"])
+                    setattr(data["obj"], data["attr"], data["initial"])
                     
             
 
@@ -565,7 +574,7 @@ class StateMachine(QtCore.QObject):
         
         try:
             # from the current active states, see to which we are going to transition
-            trans = self.__findTransition(self._rootStates, event)           
+            trans = self.__findTransition(self._rootStates, event)    
             while trans:
                 
                 start = trans[0]
@@ -617,7 +626,10 @@ class StateMachine(QtCore.QObject):
             events = self.processEvents.copy()
             for event in events:
                 self.processEvent(event)
-                                            
+
+        except Exception as e:
+            print("Statemachine event processing error: ", e)
+        
         finally: 
             # just in case we errored out
             self.__processing = False
@@ -752,16 +764,17 @@ def onExit(state):
     
     def wrapper(fnc):
         
-        if asyncio.iscoroutine(fnc):
+        result = fnc
+        if asyncio.iscoroutinefunction(fnc):
             
-            def asyncwrapper():
-                asyncio.ensure_future(fnc())
+            def asyncwrapper(self):
+                asyncio.ensure_future(fnc(self))
                 
-            fnc = asyncwrapper()
+            result = asyncwrapper
             
-        fnc.statemachine_usecase = "onExit"
-        fnc.statemachine_data = state
-        return fnc
+        result.statemachine_usecase = "onExit"
+        result.statemachine_data = state
+        return result
 
     return wrapper
 
@@ -769,51 +782,55 @@ def transition(start, end, *arg):
     
     def wrapper(fnc):
         
-        if asyncio.iscoroutine(fnc):
+        result = fnc
+        if asyncio.iscoroutinefunction(fnc):
             
-            def asyncwrapper():
-                asyncio.ensure_future(fnc())
+            def asyncwrapper(self):
+                asyncio.ensure_future(fnc(self))
                 
-            fnc = asyncwrapper()
+            result = asyncwrapper
             
-        fnc.statemachine_usecase = "transition"
-        fnc.statemachine_data = (start, end, arg)
-        return fnc
+        result.statemachine_usecase = "transition"
+        result.statemachine_data = (start, end, arg)
+        return result
 
     return wrapper
 
 def onFinish(fnc):
     
-    if asyncio.iscoroutine(fnc):
+    result = fnc
+    if asyncio.iscoroutinefunction(fnc):
         
-        def asyncwrapper():
-            asyncio.ensure_future(fnc())
+        def asyncwrapper(self):
+            asyncio.ensure_future(fnc(self))
             
-        fnc = asyncwrapper()
+        result = asyncwrapper
     
-    fnc.statemachine_usecase = "onFinish"
-    return fnc
+    result.statemachine_usecase = "onFinish"
+    return result
 
 def onProcessingEnter(fnc):
     
-    if asyncio.iscoroutine(fnc):
+    result = fnc
+    if asyncio.iscoroutinefunction(fnc):
         
-        def asyncwrapper():
-            asyncio.ensure_future(fnc())
+        def asyncwrapper(self):
+            asyncio.ensure_future(fnc(self))
             
-        fnc = asyncwrapper()
+        result = asyncwrapper
     
-    fnc.statemachine_usecase = "onProcessingEnter"
-    return fnc
+    result.statemachine_usecase = "onProcessingEnter"
+    return result
 
 def onProcessingExit(fnc):
     
-    if asyncio.iscoroutine(fnc):
+    result = fnc
+    if asyncio.iscoroutinefunction(fnc):
         
-        def asyncwrapper():
-            asyncio.ensure_future(fnc())
+        def asyncwrapper(self):
+            asyncio.ensure_future(fnc(self))
             
-        fnc = asyncwrapper()
+        result = asyncwrapper
     
-    fnc.statemachine_usecase = "onProcessingExit"
-    return fnc
+    result.statemachine_usecase = "onProcessingExit"
+    return result
