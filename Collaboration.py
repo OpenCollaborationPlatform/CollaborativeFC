@@ -73,6 +73,9 @@ if not importfail:
 
     #initialize the global FreeCAD document observer
     Observer.initialize(manager)
+    
+    # run the OCP framework!
+    connection.start()
 
     if os.getenv('OCP_TEST_RUN', "0") == "1":
         #connect to test server

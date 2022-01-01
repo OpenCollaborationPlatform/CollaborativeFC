@@ -40,7 +40,12 @@ class OCPConnection(QtCore.QObject):
         self.__node     = Node(self.__logger.getChild("Node"))
         self.__api      = API(self.__node, self.__logger.getChild("API"))
         self.__network  = Network(self.__api, self.__logger.getChild("Network"))
-       
+    
+    def start(self):
+        self.__node.start()
+        
+    def stop(self):
+        self.__node.stop()
         
     # Qt Property/Signal API used from the UI
     # ********************************************************************************************

@@ -203,6 +203,7 @@ class Node(QtCore.QObject, Utils.AsyncSlotObject):
         self.__logFile   = ""
         self.__logReader = None
         self.__logger    = logger
+        self.__task      = None
         
         # Qt property storage
         self.__running   = False
@@ -211,12 +212,23 @@ class Node(QtCore.QObject, Utils.AsyncSlotObject):
         self.__apiPort   = 0
         self.__apiUri    = "unknown"
         
-        asyncio.ensure_future(self.__asyncInit())
-        asyncio.ensure_future(self.__startLogging())
-     
+    def start(self):
+        # start the node processing (not the node itself if it is not running, for this use "run"
+        async def __start(self):
+            await self.__update()
+            await self.__startLogging()
+            
+        self.__task = asyncio.ensure_future(__start(self))
     
-    async def __asyncInit(self):
-            await self.__update()           
+    
+    def stop(self):
+        # stops the node processing
+        
+        if self.__task and not self.__task.done():
+            self.__task.cancel()
+            
+        self.__task = None
+                      
         
     async def __startLogging(self):
         # open logfile if available
@@ -229,11 +241,18 @@ class Node(QtCore.QObject, Utils.AsyncSlotObject):
 
     async def run(self):
         # handles the full setup process till a OCP node is running       
+        
+        if not self.__task: 
+            raise Exception("Node processing not started yet")
+        
         await self.__initializeNode()
         await self.__start()
         
    
     async def shutdown(self):
+        
+        if not self.__task: 
+            raise Exception("Node processing not started yet")
         
         if self.__test:
             #in test mode we do not start our own node!

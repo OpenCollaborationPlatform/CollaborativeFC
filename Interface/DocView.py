@@ -41,8 +41,6 @@ class DocView(QtWidgets.QWidget):
         
         self.__manager.documentAdded.connect(self.__onDocumentAdded)
         self.__manager.documentRemoved.connect(self.__onDocumentRemoved)
-        self.__manager.documentChanged.connect(self.__onDocumentChanged)
-
 
     @QtCore.Slot(str)
     def __onEdit(self, uuid):
@@ -68,14 +66,6 @@ class DocView(QtWidgets.QWidget):
         self.layout().removeWidget(widget)
         widget.deleteLater()
      
-    @QtCore.Slot(str)
-    def __onDocumentChanged(self, uuid):
-        
-        if not uuid in self.__widgets:
-            return 
-        
-        self.__widgets[uuid].update()
-
 
 class DocWidget(QtWidgets.QWidget, StateMachineProcessWidget):
     
@@ -104,59 +94,37 @@ class DocWidget(QtWidgets.QWidget, StateMachineProcessWidget):
         largeSize = QtGui.QFontMetrics(largeFont).ascent()
         self.ui.statusIndicator.setMaximumSize(largeSize, largeSize)
                 
-        self.ui.shareButton.clicked.connect(lambda: self.__entity.processEvent(Entity.Events.open))
-        #self.ui.docButton.clicked.connect(lambda: self.__manager.toggleOpenSlot(self.__uuid))
+        self.ui.openButton.clicked.connect(lambda: self.__entity.processEvent(Entity.Events.open))
+        self.ui.closeButton.clicked.connect(lambda: self.__entity.processEvent(Entity.Events.close))
         #self.ui.editButton.clicked.connect(lambda: self.edit.emit(self.__uuid))
-        
-        
-        self.ui.onlinestatus.hide()
-        self.__entity.state(Entity.States.Local).setAttributeValue(self.ui.statusLabel, "text", "Local document", reset = True)
-        self.__entity.state(Entity.States.Node).setAttributeValue(self.ui.statusLabel, "text", "Collaboration document", reset = True)
-        self.__entity.state(Entity.States.Node.Status.Online).setAttributeValue(self.ui.onlinestatus, "visible", True, reset = True)
-        self.__entity.state(Entity.States.Node.Status.Online).setAttributeValue(self.ui.statusLabel, "visible", False, reset = True)        
-        self.__entity.state(Entity.States.Node.Status.Invited).setAttributeValue(self.ui.statusLabel, "text", "Invited to join", reset = True)
-        
+               
         
         # setup the ui
         # ############
         
+        self.ui.onlinestatus.hide()
+        self.__entity.state(Entity.States.Local).setAttributeValue(self.ui.statusLabel, "text", "Local document", reset = True)
+        self.__entity.state(Entity.States.Node).setAttributeValue(self.ui.statusLabel, "text", "Loading...", reset = True)
+        self.__entity.state(Entity.States.Node.Status.Invited).setAttributeValue(self.ui.statusLabel, "text", "Invited to join", reset = True)
+        self.__entity.state(Entity.States.Node.Status.Invited).setAttributeValue(self.ui.closeButton, "enabled", False, reset=True)
+        self.__entity.state(Entity.States.Node.Status.Online).setAttributeValue(self.ui.onlinestatus, "visible", True, reset = True)
+        self.__entity.state(Entity.States.Node.Status.Online).setAttributeValue(self.ui.statusLabel, "visible", False, reset = True)
+        self.__entity.state(Entity.States.Node.Status.Online).setAttributeValue(self.ui.statusIndicator, "pixmap", QtGui.QPixmap(":/Collaboration/Icons/indicator_on.svg"), reset=True)
+        self.__entity.state(Entity.States.Node.Status.Online.Edit).setAttributeValue(self.ui.openButton, "enabled", False, reset=True)     
+                
+        
         # manager data
         def _manager_setup():
+            self.ui.memberLabel.setText(f"{entity.node_document_manager.memberCount}")
+            self.ui.joinedLabel.setText(f"{entity.node_document_manager.joinedCount}")
+            self.ui.majorityLabel.setText(f"{entity.node_document_manager.majority}")
             entity.node_document_manager.memberCountChanged.connect(lambda: self.ui.memberLabel.setText(f"{entity.node_document_manager.memberCount}"))
             entity.node_document_manager.joinedCountChanged.connect(lambda: self.ui.joinedLabel.setText(f"{entity.node_document_manager.joinedCount}"))
             entity.node_document_manager.majorityChanged.connect(lambda: self.ui.majorityLabel.setText(f"{entity.node_document_manager.majority}"))
         
         entity.state(Entity.States.Node.Status.Online).entered.connect(_manager_setup)
-     
-        # shared state setup
-        def _shared_setup():
-            self.ui.shareButton.setText("Stop")
-            self.ui.docButton.setText("Close")
-            self.ui.editButton.setEnabled(True)
-            self.ui.docButton.setEnabled(True)
-            self.ui.statusIndicator.setPixmap(QtGui.QPixmap(":/Collaboration/Icons/indicator_on.svg"))
-            
-        entity.state(Entity.States.Node.Status.Online.Edit).entered.connect(_shared_setup)
-        
-        # local state setup
-        def _local_setup():
-            self.ui.shareButton.setText("Share")
-            self.ui.docButton.setText("Close")
-            self.ui.editButton.setEnabled(False)
-            self.ui.docButton.setEnabled(True)
-            self.ui.statusIndicator.setPixmap(QtGui.QPixmap(":/Collaboration/Icons/indicator_off.svg"))
-            
-        entity.state(Entity.States.Local).entered.connect(_local_setup)
-        
-        # invited  setup
-        def _invited_setup():
-            self.ui.shareButton.setText("Join")
-            self.ui.docButton.setText("Open")
-            self.ui.editButton.setEnabled(False)
-            self.ui.docButton.setEnabled(False)
-            self.ui.statusIndicator.setPixmap(QtGui.QPixmap(":/Collaboration/Icons/indicator_off.svg"))
-            
-        entity.state(Entity.States.Node.Status.Invited).entered.connect(_invited_setup)
+
+
 
 
     def paintEvent(self, event):

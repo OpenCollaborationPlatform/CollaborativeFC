@@ -20,6 +20,7 @@
 import FreeCAD, FreeCADGui, asyncio, os
 
 import Utils
+from OCP import OCPConnection
 from Documents.Dataservice      import DataService
 from Documents.OnlineDocument   import OnlineDocument
 from Manager.Entity  import Entity
@@ -54,10 +55,9 @@ class Manager(QtCore.QObject):
 
     documentAdded   = QtCore.Signal(str)
     documentRemoved = QtCore.Signal(str)
-    documentChanged = QtCore.Signal(str)
+
     
-    
-    def __init__(self, collab_path, connection):  
+    def __init__(self, collab_path, connection: OCPConnection):  
         
         QtCore.QObject.__init__(self)
         
@@ -108,6 +108,7 @@ class Manager(QtCore.QObject):
             for doc in doclist:
                 if not self.hasEntity("id", doc):
                     entity = Entity(self.__connection, self.__dataservice, self.__collab_path, _EventBlocker(self))
+                    entity.finished.connect(lambda: self._removeEntity(entity))
                     self.__entities.append(entity)
                     self.documentAdded.emit(entity.uuid)
                     
@@ -117,11 +118,16 @@ class Manager(QtCore.QObject):
             doclist = await self.__connection.api.call(u"ocp.documents.invitations")
             for doc in doclist:
                 if not self.hasEntity("id", doc):
-                    entity = Entity(self.__connection, self.__dataservice, self.__collab_path, _EventBlocker(self))                    
+                    entity = Entity(self.__connection, self.__dataservice, self.__collab_path, _EventBlocker(self))     
+                    entity.finished.connect(lambda: self._removeEntity(entity))
                     self.__entities.append(entity)
                     self.documentAdded.emit(entity.uuid)
                     
                     entity.start(id = doc)
+
+    def _removeEntity(self, e):
+        self.documentRemoved.emit(e.uuid)
+        self.__entities.remove(e)
 
 
     #FreeCAD event handling: Not blocking (used by document observers)
@@ -137,6 +143,7 @@ class Manager(QtCore.QObject):
         
         #If a document was opened in freecad this function makes it known to the Handler. 
         entity = Entity(self.__connection, self.__dataservice, self.__collab_path, _EventBlocker(self))
+        entity.finished.connect(lambda: self._removeEntity(entity))
         self.__entities.append(entity)       
         self.documentAdded.emit(entity.uuid)
         
@@ -153,7 +160,8 @@ class Manager(QtCore.QObject):
             return
         
         entity = self.getEntity('fcdocument', doc)
-        entity.processEvent(Entity.Events.closed)
+        if entity:
+            entity.processEvent(Entity.Events.closed)
  
 
     #OCP event handling  (used as wamp event callbacks)
@@ -166,6 +174,7 @@ class Manager(QtCore.QObject):
             return
                
         entity = Entity(self.__connection, self.__dataservice, self.__collab_path, _EventBlocker(self))
+        entity.finished.connect(lambda: self._removeEntity(entity))
         self.__entities.append(entity)
         self.documentAdded.emit(entity.uuid)
         

@@ -187,16 +187,25 @@ class StateMachineProcessWidget():
     def __onProcessStart(self):
         
         # start the indicator
-            self.__parent.setEnabled(False)
-            self.__progress = BusyIndicator(self.__parent)
-            self.__progress.show()
+        self.__parent.setEnabled(False)
+        self.__progress = BusyIndicator(self.__parent)
+        self.__progress.show()
       
       
     @QtCore.Slot(int, str, str)
     def __onProcessStop(self):
         
-        self.__progress.stop()
-        self.__parent.setEnabled(True)
+        if self.__progress:
+            self.__progress.stop()
+            self.__progress = None
+            
+        if self.__parent:
+            self.__parent.setEnabled(True)
+            
+        if hasattr(self.__sm, "error") and self.__sm.error:
+            err = ErrorBox("failed", str(self.__sm.error), self.__parent)
+            err.show()
+            self.__sm.error = None
 
  
 class StateMachineProcessPromoter(QtCore.QObject, StateMachineProcessWidget):

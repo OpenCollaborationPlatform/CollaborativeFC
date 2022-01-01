@@ -17,7 +17,8 @@
 # *   Suite 330, Boston, MA  02111-1307, USA                             *
 # ************************************************************************
 
-import uuid
+import asyncio, uuid, os
+import FreeCAD
 import Utils.StateMachine as SM
 from Manager.NodeDocument import NodeDocumentManager
 from Documents.OnlineDocument import OnlineDocument
@@ -96,7 +97,7 @@ class Entity(SM.StateMachine):
     def __init__(self, connection, dataservice, collab_path, eventblocker):
         
         super().__init__()
-        
+               
         self.__connection = connection
         self._dataservice  = dataservice
         self._id = None
@@ -111,7 +112,7 @@ class Entity(SM.StateMachine):
         
         # startup transitions
         self.addTransition(Entity.States.Created, Entity.States.Local, Entity.Events._local)
-        self.addTransition(Entity.States.Created, Entity.States.Node, Entity.Events._online)
+        self.addTransition(Entity.States.Created, Entity.States.Node, Entity.Events._node)
         
         # local state interals
         self.addTransition(Entity.States.Local.Detect, Entity.States.Local.Internal, condition = lambda sm: sm._id is None)
@@ -121,6 +122,7 @@ class Entity(SM.StateMachine):
         self.addTransition(Entity.States.Local.CreateProcess, Entity.States.Local.Internal, Entity.Events._failed)
         self.addTransition(Entity.States.Local.CreateProcess, Entity.States.Node.Status.Online, Entity.Events._done)
         self.addTransition(Entity.States.Local.Disconnected, Entity.States.Node, Entity.Events.connected)
+        self.addTransition(Entity.States.Local, Entity.States.Removed, Entity.Events.closed)
         
         # node state internals
         self.addTransition(Entity.States.Node.Status.Detect, Entity.States.Node.Status.Online, Entity.Events._online)
@@ -165,10 +167,12 @@ class Entity(SM.StateMachine):
                 return
         if id:
             self._id = id
-            if self.__connection.connected:
+            if self.__connection.api.connected:
                 self.processEvent(Entity.Events._node)
+                print(self.activeStates)
             else:
                 self.processEvent(Entity.Events._local)
+                print(self.activeStates)
             return
         
         raise Exception("Either fcdoc or id must be provided to set initial state")
@@ -181,19 +185,24 @@ class Entity(SM.StateMachine):
     async def _createDoc(self):
         
         try:
-            print("create")
             dmlpath = os.path.join(self.__collab_path, "Dml")
             self._id = await self.__connection.api.call(u"ocp.documents.create", dmlpath)
-            print("created")
             self.processEvent(Entity.Events._done)
-            print("processed event")
 
         except asyncio.CancelledError:
-            print("abort")
             self.processEvent(Entity.Events.abort)
-        except:
-            print("failed")
+
+        except Exception as e:
+            self.error = e
             self.processEvent(Entity.Events._failed)
+
+
+    @SM.transition(States.Local, States.Removed, Events.close)
+    def _closeLocalDoc(self):
+        with self._blocker:
+            if self.fcdocument:
+                FreeCAD.closeDocument(self.fcdocument.Name)
+            
 
     # Node substatus
     # ##############
@@ -201,12 +210,17 @@ class Entity(SM.StateMachine):
     @SM.onEnter(States.Node.Status.Detect)
     async def _detectNodeStatus(self):
 
-        status = await self.__connection.api.call(u"ocp.documents.status", entity.id)
-        if status == "open":
-            self.processEvent(Entity.Events._online)
-        elif status == "invited":
-            self.processEvent(Entity.Events._invited)
-        else:
+        try:
+            status = await self.__connection.api.call(u"ocp.documents.status", self._id)
+            if status == "open":
+                self.processEvent(Entity.Events._online)
+            elif status == "invited":
+                self.processEvent(Entity.Events._invited)
+            else:
+                self.processEvent(Entity.Events._local)
+        
+        except Exception as e:
+            print("detect error: ", e)
             self.processEvent(Entity.Events._local)
 
 
@@ -214,12 +228,13 @@ class Entity(SM.StateMachine):
     async def _openInvited(self):
                
         try:
-            await self.__connection.api.call(u"ocp.documents.open", entity.id)
+            await self.__connection.api.call(u"ocp.documents.open", self._id)
             self.processEvent(Entity.Events._done)
        
         except asyncio.CancelledError:
             self.processEvent(Entity.Events.abort)
-        except:
+        except Exception as e:
+            self.error = e
             self.processEvent(Entity.Events._failed)
 
 
@@ -227,8 +242,14 @@ class Entity(SM.StateMachine):
     # #####################
 
     @SM.onEnter(States.Node.Status.Online)
-    async def _enterOnline(self):
-        self._manager = NodeDocumentManager(self.id, self.__connection)
+    def _enterOnline1(self):
+        # we need to setup the manager imediately, not with asyncio delay, as other callbacks for the state
+        # may acces it
+        self._manager = NodeDocumentManager(self._id, self.__connection)
+
+    @SM.onEnter(States.Node.Status.Online)
+    async def _enterOnline2(self):
+        # setup the manager delayed after creation
         await self._manager.setup()
         
     @SM.onExit(States.Node.Status.Online)
@@ -238,17 +259,29 @@ class Entity(SM.StateMachine):
         await manager.close()
     
     @SM.onEnter(States.Node.Status.Online.Edit)
-    async def _enterShared(self):
-        self._onlinedoc = OnlineDocument(self.id, self.__connection, self._dataservice)
-        await self._onlinedoc.setup()
-        await self._onlinedoc.asyncLoad()
+    def _enterShared1(self):
+        # we need to setup the onlinedoc imediately, not with asyncio delay, as other callbacks for the state
+        # may acces it
+        self._onlinedoc = OnlineDocument(self._id, self.fcdocument, self.__connection, self._dataservice)
+    
+    @SM.onEnter(States.Node.Status.Online.Edit)
+    async def _enterShared2(self):
+        # setup the onlinedoc delayed after creation
+        try:
+            await self._onlinedoc.setup()
+            await self._onlinedoc.asyncLoad()
+        except Exception as e:
+            print("Failed setup online doc: ", e)
         
     @SM.onExit(States.Node.Status.Online.Edit)
     async def _exitShared(self):
-        odoc = self._onlinedoc
-        self._onlinedoc = None
-        await odoc.close()
-        
+        try:
+            odoc = self._onlinedoc
+            self._onlinedoc = None
+            await odoc.close()
+        except Exception as e:
+            print("Failed close online doc: ", e)
+            
     @SM.transition(States.Node.Status.Online.Replicate, States.Node.Status.Online.Edit, Events.open)
     def _openDoc(self):
         with self._blocker:
@@ -258,17 +291,20 @@ class Entity(SM.StateMachine):
     def _closeDoc(self):
         with self._blocker:
             FreeCAD.closeDocument(self.fcdocument.Name)
+            self.fcdocument = None
+ 
             
     @SM.onEnter(States.Node.Status.Online.CloseProcess)
-    async def _closeDoc(self):
+    async def _closeNode(self):
                
         try:
-            await self.__connection.api.call(u"ocp.documents.close", entity.id)
+            await self.__connection.api.call(u"ocp.documents.close", self._id)
             self.processEvent(Entity.Events._done)
        
         except asyncio.CancelledError:
             self.processEvent(Entity.Events.abort)
-        except:
+        except Exception as e:
+            self.error = e
             self.processEvent(Entity.Events._failed)
  
  
@@ -291,6 +327,14 @@ class Entity(SM.StateMachine):
             return None
 
         return self._manager
+    
+    @property
+    def id(self):
+        # if called in StateMachine __init__ we may not yet have it defined
+        if not hasattr(self, "_id"):
+            return None
+
+        return self._id
     
     @property
     def status(self) -> str:
