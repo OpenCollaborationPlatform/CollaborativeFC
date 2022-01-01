@@ -200,6 +200,7 @@ class API(QtCore.QObject, Utils.AsyncSlotObject):
         self.__readyEvent.clear()
         self.__session = None
         
+        self.disconnected.emit()
         self.connectedChanged.emit()            
         
         
@@ -208,6 +209,7 @@ class API(QtCore.QObject, Utils.AsyncSlotObject):
         
         
     async def __onReady(self, *args):
+        self.reconnected.emit()
         self.connectedChanged.emit()
         self.__readyEvent.set()
         self.__logger.info("API ready")
@@ -218,6 +220,8 @@ class API(QtCore.QObject, Utils.AsyncSlotObject):
     
     #signals for property change (needed to have QML update on property change)
     connectedChanged         = QtCore.Signal()
+    reconnected              = QtCore.Signal()
+    disconnected             = QtCore.Signal()
     __reconnectChanged       = QtCore.Signal()
 
 

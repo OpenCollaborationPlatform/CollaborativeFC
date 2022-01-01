@@ -168,7 +168,7 @@ class Manager(QtCore.QObject):
     #**********************************************************************
     
     async def onOCPDocumentCreated(self, id):
-
+   
         #could be that we already have this id (e.g. if we created it ourself)
         if self.hasEntity('id', id):
             return
