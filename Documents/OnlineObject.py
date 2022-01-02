@@ -30,12 +30,14 @@ import Documents.Object   as Object
 from Documents.AsyncRunner import BatchedOrderedRunner, DocumentRunner
 from Documents.Writer import OCPObjectWriter
 from Documents.Reader import OCPObjectReader
-from Utils.Errorhandling import isOCPError
+from Utils.Errorhandling import isOCPError, ErrorHandler
 
 
-class FreeCADOnlineObject():
+class FreeCADOnlineObject(ErrorHandler):
     
     def __init__(self, name, onlinedoc, objGroup, parentOnlineObj = None):
+        
+        super().__init__()
         
         self.logger = logging.getLogger(objGroup[:-1] + " " + name)
                 
@@ -50,9 +52,28 @@ class FreeCADOnlineObject():
             else:
                 self._runner     = parentOnlineObj._runner
 
+        self._registerSubErrorhandler(self._runner)
+
         self.Writer = OCPObjectWriter(name, objGroup, onlinedoc, self.logger)
         self.Reader = OCPObjectReader(name, objGroup, onlinedoc, self.logger)
-        
+
+    # Error Handling
+    # ##############
+
+    # All async functions are processed in the objects async runner. All occuring errors are 
+    # upstreamed to us and handled in the following functions.
+    
+    def _handleError(self, source, error, *data):
+        self._runner.run(self.download)
+        super()._handleError(source, error, *data)
+    
+    def _handleException(self, exception):
+        self._runner.run(self.download)
+        super()._handleException(exception)
+
+
+    # Common FreeCAD object functionality
+    # ###################################
 
     async def _docPrints(self):
         uri = u"ocp.documents.{0}.prints".format(self._docId)
@@ -135,7 +156,7 @@ class FreeCADOnlineObject():
             
         except Exception as e:
             self.logger.error(f"Downloading object failed: {e}")
-            traceback.print_exc()
+            raise
       
 
     async def upload(self, obj):
@@ -184,6 +205,7 @@ class OnlineObject(FreeCADOnlineObject):
     def __init__(self, obj, onlinedoc):
         
         super().__init__(obj.Name, onlinedoc, "Objects")
+    
         self.recomputeCache = {}
         self.obj            = obj
         
@@ -197,10 +219,7 @@ class OnlineObject(FreeCADOnlineObject):
 
         cbs = [b.copy() for b in batchers]            
         self._runner.registerBatcher(Batcher.MultiBatcher(cbs))
-        
-        # error handling
-        self._runner.registerErrorHandler(isOCPError, self.download, obj)
-        
+
         
     def setup(self, syncer=None):
         # setup the FC object on the OCP node including all properties
@@ -298,9 +317,6 @@ class OnlineViewProvider(FreeCADOnlineObject):
             
         cbs = [b.copy() for b in batchers]            
         self._runner.registerBatcher(Batcher.MultiBatcher(cbs))
-        
-        # error handling
-        self._runner.registerErrorHandler(isOCPError, self.download, obj)
         
           
     def setup(self, sync=None):

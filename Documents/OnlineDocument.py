@@ -24,16 +24,20 @@ import Documents.Observer   as Observer
 from Documents.OnlineObserver   import OnlineObserver
 from Documents.OnlineObject     import OnlineObject, OnlineViewProvider
 from Documents.AsyncRunner      import DocumentRunner
+from Utils.Errorhandling        import ErrorHandler
 
 from autobahn.wamp.exception    import ApplicationError
 
-class OnlineDocument():
+class OnlineDocument(ErrorHandler):
     ''' Describing a FreeCAD document in the OCP framework. Properties can be changed or objects added/removed 
         like with a normal FreeCAD document, with the difference, that all changes are mirrored to all collabrators.
         Changes to the online doc do not change anything on the local one. The intenion is to mirror all user changes 
         done to the local document'''
 
     def __init__(self, id, doc, connection, dataservice):
+        
+        super().__init__()
+        
         self.id = id
         self.document = doc
         self.connection = connection 
@@ -58,20 +62,25 @@ class OnlineDocument():
  
     async def close(self):
         # we close the online doc. That means closing the observer and all objects/viewproviders
-        tasks = []
-        tasks.append(self.onlineObs.close())
         
-        for obj in self.objects.values():
-            tasks.append(obj.close())
-        
-        for vp in self.viewproviders.values():
-            tasks.append(vp.close())
- 
-        if tasks:
-            await asyncio.gather(*tasks)
+        try:
+            tasks = []
+            tasks.append(self.onlineObs.close())
             
-        self.objects = []
-        self.viewproviders = []
+            for obj in self.objects.values():
+                tasks.append(obj.close())
+            
+            for vp in self.viewproviders.values():
+                tasks.append(vp.close())
+    
+            if tasks:
+                await asyncio.gather(*tasks)
+                
+            self.objects = []
+            self.viewproviders = []
+        
+        except Exception as e:
+            self._handleException(self, e)
   
     def shouldExcludeTypeId(self, typeid):
         #we do not add App origins, lines and planes, as they are only Autocreated from parts and bodies
@@ -88,6 +97,7 @@ class OnlineDocument():
         #create the async runner for that object
         oobj = OnlineObject(obj, self)
         self.objects[obj.Name] = oobj
+        self._registerSubErrorhandler(oobj)
         
         if not self.synced:
             #create the syncer that blocks all runners till this object is created. This is required to ensure no property access the object
@@ -132,6 +142,7 @@ class OnlineDocument():
         del(self.objects[obj.Name])
         oobj.synchronize(Syncer.WaitAcknowledgeSyncer(ackno))
         oobj.remove()
+        self._unregisterSubErrorhandler(oobj)
         
         #as well as the online observer one
         asyncio.ensure_future(self.onlineObs.closeRunner(obj.Name))
@@ -356,6 +367,7 @@ class OnlineDocument():
 
         except Exception as e:
             self.logger.error(f"Closing transaction failed: {e}")
+            self._handleException(self, e)
             
         finally:
             if sync:
@@ -364,10 +376,15 @@ class OnlineDocument():
 
 
     async def _docPrints(self):
-        uri = f"ocp.documents.{self.id}.prints"
-        vals = await self.connection.api.call(uri)
-        for val in vals:
-            self.logger.debug(val)
+        
+        try:
+            uri = f"ocp.documents.{self.id}.prints"
+            vals = await self.connection.api.call(uri)
+            for val in vals:
+                self.logger.debug(val)
+        
+        except Exception as e:
+            self._handleException(self, e)        
 
 
     async def asyncSetup(self):
@@ -397,7 +414,7 @@ class OnlineDocument():
             
         except Exception as e:
             self.logger.error(f"Unable to setup document: {e}")
-            traceback.print_exc()
+            self._handleException(self, e)
 
             
                    
@@ -444,7 +461,7 @@ class OnlineDocument():
         
         except Exception as e:
             self.logger.error(f"Unable to load document: {e}")
-            traceback.print_exc()
+            self._handleException(self, e) 
             
         finally:
             await self.connection.api.call(f"ocp.documents.{self.id}.view", False)
@@ -459,21 +476,26 @@ class OnlineDocument():
         
         except Exception as e:
             self.logger.error(f"Getting peers error: {e}")
+            self._handleException(self, e) 
             return []
         
         
     async def waitTillCloseout(self, timeout = 10):
         #wait till all current async tasks are finished. Note that it also wait for task added during the wait period.
         #throws an error on timeout.
-          
-        coros = []
-        for obj in list(self.objects.values()):
-            coros.append(obj.waitTillCloseout(timeout))
-            
-        for obj in list(self.viewproviders.values()):
-            coros.append(obj.waitTillCloseout(timeout))
+        
+        try:
+            coros = []
+            for obj in list(self.objects.values()):
+                coros.append(obj.waitTillCloseout(timeout))
+                
+            for obj in list(self.viewproviders.values()):
+                coros.append(obj.waitTillCloseout(timeout))
 
-        coros.append(self.onlineObs.waitTillCloseout(timeout))
+            coros.append(self.onlineObs.waitTillCloseout(timeout))
 
-        if len(coros)>0:
-            await asyncio.gather(*coros)
+            if len(coros)>0:
+                await asyncio.gather(*coros)
+        
+        except Exception as e:
+            self._handleException(self, e) 

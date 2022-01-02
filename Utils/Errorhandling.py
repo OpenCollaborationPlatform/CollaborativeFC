@@ -104,20 +104,56 @@ def isOCPError(error: Exception, errclass: ErrorClass=ErrorClass.none, source: s
 
     return False
 
-       
-
+   
 class ErrorHandler():
-    ''' Base class that allows unified error handling in a ownership hirarchy, e.g. allows catching errors in a ErrorHandler a object keeps 
-        a reference of.    
-    ''' 
+    
+    class Exceptions(Enum):
+        Default    = auto()       # any unknown exception
+        Canceled   = auto()       # asyncio Canceled error
+        Processing = auto()       # internal error in error processing
     
     def __init__(self):
-        pass
+        self._parents     = []
+        self.__subhandler = []
     
-    def __handleError(self, error: Exception):
-        pass
+    def _registerSubErrorhandler(self, handler):
+        self.__subhandler.append(handler)
+        if not self in handler._parents:
+            handler._parents.append(self)
     
-    def getErrorHandler(self):
-        return self.__handleError
+    def _unregisterSubErrorhandler(self, handler):
+        
+        if handler in self.__subhandler:
+            self.__subhandler.remove(handler)
+            if self in handler._parents:
+                handler._parents.remove(self)
     
-    pass
+    def __upstream(self, upstream, *args):
+        
+        if not self._parents:
+            return
+        
+        if isinstance(upstream, Exception):
+            for parent in self._parents:
+                parent._handleException(self, self, upstream)
+            
+        elif isinstance(upstream, Enum):
+            for parent in self._parents:
+                parent._handleError(self, self, upstream)
+        
+        else:
+            for parent in self._parents:
+                parent._handleError(self, self, ErrorHandler.Exceptions.Processing, "Wrong type upstreamed")
+    
+    
+    def _handleException(self, source, exception: Exception):
+        # Receives all exceptions, either from the derived class or any 
+        # unhandled exception from a registered subandler.
+        # To be overriden
+        self.__upstream(exception)
+    
+    def _handleError(self, source, error: Enum, *data):
+        # Receives all errors created in any subhandler.
+        # To be overriden
+        self.__upstream(error, *data)
+

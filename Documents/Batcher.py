@@ -1,4 +1,6 @@
 
+from Utils.Errorhandling import ErrorHandler
+
 #Batcher are used together with Batched Asyncrunner. They scan over the existing tasks of the runner and 
 #batch them together when possible. For example a single "changeProperty" task can be batched with others into
 #a "multiChangeProperty" call, hence reducing the amount of OCP node calls required.
@@ -29,12 +31,15 @@ async def executeBatchersOnTasks(batchers, tasks):
     return maxBatched
 
 
-class EquallityBatcher():
+class EquallityBatcher(ErrorHandler):
     #Batches multiple tasks with the same name (as provided in constructor). When used the batcher executes all batched 
     #tasks and afterwards the handler. The principal is that the batched themself do not execute an expensive operation
     #but fill some kind of cache, and the handler afterwards uses this cache to start optimized execution on it
     
     def __init__(self, taskName, handler):
+        
+        super().__init__()
+        
         self.__func = taskName
         self.__handler = handler
         self.__tasks = []
@@ -62,10 +67,15 @@ class EquallityBatcher():
         
         #first execute all batched functions
         for task in self.__tasks:
+            self._registerSubErrorhandler(task)
             await task.execute()
+            self._unregisterSubErrorhandler(task)
         
         #not execute the batchhandler
-        await self.__handler()
+        try:
+            await self.__handler()
+        except Exception as e:
+            self._handleException(e)
         
     
     def numBatched(self):
@@ -75,13 +85,15 @@ class EquallityBatcher():
         return EquallityBatcher(self.__func, self.__handler)
     
 
-class MultiBatcher():
+class MultiBatcher(ErrorHandler):
     #Batches together task of multiple batchers nondependent of order. As long as the tasks are 
     #handable by any of the batchers this batcher swallows it. During execute all  batchers are
     #executed in provided order
     
     def __init__(self, batchers):
         
+        super().__init__()
+
         self.__batchers = batchers
         self.Name = f"MultiBatcher"
     
@@ -107,7 +119,9 @@ class MultiBatcher():
     async def execute(self):
         
         for batcher in self.__batchers:
+            self._registerSubErrorhandler(batcher)
             await batcher.execute()        
+            self._unregisterSubErrorhandler(batcher)
     
     
     def numBatched(self):

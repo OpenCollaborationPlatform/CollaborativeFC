@@ -333,6 +333,15 @@ class Entity(SM.StateMachine):
         return self._manager
     
     @property
+    def online_document(self):
+        
+        # if called in StateMachine __init__ we may not yet have it defined
+        if not hasattr(self, "_onlinedoc"):
+            return None
+
+        return self._onlinedoc
+    
+    @property
     def id(self):
         # if called in StateMachine __init__ we may not yet have it defined
         if not hasattr(self, "_id"):
