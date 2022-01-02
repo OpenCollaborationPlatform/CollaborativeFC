@@ -184,13 +184,24 @@ class __ObserverBase():
         #for freecad 0.18 it returns the properties a certain extension adds to a object
         return self.__fc018_extensions[extension]
 
+    
+    def _getOnlineDocument(self, fcdoc):
+        
+        result = None
+        entity = self.handler.getEntity("fcdocument", fcdoc)
+        if entity:
+            result = entity.online_document
+            
+        return result
+    
 
 class __DocumentObserver(__ObserverBase):
     
     def __init__(self, handler):
         super().__init__(handler)
         self.removing = []
-        
+    
+     
     def slotCreatedDocument(self, doc):
         
         if self.isDeactivatedFor(doc):
@@ -224,7 +235,7 @@ class __DocumentObserver(__ObserverBase):
             return
         
         #print("Observer add document object ", obj.Name)  
-        odoc = self.handler.getOnlineDocument(doc)
+        odoc = self._getOnlineDocument(doc)
         if odoc:
             odoc.newObject(obj)
 
@@ -245,7 +256,7 @@ class __DocumentObserver(__ObserverBase):
                 self._removing.remove(obj)
         
         #print("Observer remove document object ", obj.Name)        
-        odoc = self.handler.getOnlineDocument(doc)
+        odoc = self._getOnlineDocument(doc)
         if odoc:
             odoc.removeObject(obj)
 
@@ -257,7 +268,7 @@ class __DocumentObserver(__ObserverBase):
             return                
         
         #print("Observer changed document object ( ", obj.Name, ", ", prop, " ) into state ", obj.State)
-        odoc = self.handler.getOnlineDocument(doc)
+        odoc = self._getOnlineDocument(doc)
         if not odoc:
             return
             
@@ -278,7 +289,7 @@ class __DocumentObserver(__ObserverBase):
         if self.isDeactivatedFor(doc):
             return
                 
-        odoc = self.handler.getOnlineDocument(doc)
+        odoc = self._getOnlineDocument(doc)
         if not odoc:
             return
         if obj.isDerivedFrom("App::DocumentObject"):
@@ -295,7 +306,7 @@ class __DocumentObserver(__ObserverBase):
         
         #print("Observer remove dyn property ( ", obj.Name, ", ", prop, " )")
             
-        odoc = self.handler.getOnlineDocument(doc)
+        odoc = self._getOnlineDocument(doc)
         if not odoc:
             return
         
@@ -312,7 +323,7 @@ class __DocumentObserver(__ObserverBase):
         if self.isDeactivatedFor(doc):
             return          
         
-        odoc = self.handler.getOnlineDocument(doc)
+        odoc = self._getOnlineDocument(doc)
         if not odoc:
             return
         
@@ -328,7 +339,7 @@ class __DocumentObserver(__ObserverBase):
         if self.isDeactivatedFor(doc) or self.isRemoving(obj):
             return
         
-        odoc = self.handler.getOnlineDocument(doc)
+        odoc = self._getOnlineDocument(doc)
         if odoc:
             odoc.recomputObject(obj)
     
@@ -347,7 +358,7 @@ class __DocumentObserver(__ObserverBase):
         if self.isDeactivatedFor(doc):
             return
                
-        odoc = self.handler.getOnlineDocument(doc)
+        odoc = self._getOnlineDocument(doc)
         if not odoc:
             return
 
@@ -367,7 +378,7 @@ class __DocumentObserver(__ObserverBase):
         if self.isDeactivatedFor(doc):
             return
         
-        odoc = self.handler.getOnlineDocument(doc)
+        odoc = self._getOnlineDocument(doc)
         if odoc:
             odoc.recomputeDocument()
     
@@ -408,6 +419,13 @@ class __GUIDocumentObserver(__ObserverBase):
     def __init__(self, handler):
         super().__init__(handler)
  
+    def _hasOnlineViewProvider(self, vp):
+        
+        for entity in self.handler.getEntities(): 
+            if entity.online_document and entity.online_document.hasViewProvider(vp):
+                return True
+        
+        return False
        
     def slotCreatedDocument(self, doc):
         pass
@@ -433,7 +451,7 @@ class __GUIDocumentObserver(__ObserverBase):
             self._createdWhileDeactivated[doc].append(vp)
             return
         
-        odoc = self.handler.getOnlineDocument(doc)
+        odoc = self._getOnlineDocument(doc)
         if odoc:
             odoc.newViewProvider(vp)
             
@@ -446,14 +464,14 @@ class __GUIDocumentObserver(__ObserverBase):
                
         #we need to check if any document has this vp, as accessing it before 
         #creation crashes freecad
-        if not self.handler.hasOnlineViewProvider(vp):
+        if not self._hasOnlineViewProvider(vp):
             return
         
         doc = vp.Document
         if self.isDeactivatedFor(doc) or self.isRemoving(vp.Object):
             return
 
-        odoc = self.handler.getOnlineDocument(doc)
+        odoc = self._getOnlineDocument(doc)
         if not odoc:
             return
         
