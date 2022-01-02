@@ -47,7 +47,7 @@ class NodeDocumentManager(QtCore.QObject, Utils.AsyncSlotObject):
         # Setups all document relevant things. Must be called after creation
         
         # subscribe to peer update, registration and active
-        self.__subkey = f"ManagedDocument_{self.__docId}"
+        self.__subkey = f"NodeDocumentManager_{self.__docId}"
         await self.__connection.api.subscribe(self.__subkey, self.__peerAuthChanged,  f"ocp.documents.{self.__docId}.peerAuthChanged")
         await self.__connection.api.subscribe(self.__subkey, self.__peerActivityChanged,  f"ocp.documents.{self.__docId}.peerActivityChanged")
         await self.__connection.api.subscribe(self.__subkey, self.__peerAdded,  f"ocp.documents.{self.__docId}.peerAdded")
@@ -63,6 +63,7 @@ class NodeDocumentManager(QtCore.QObject, Utils.AsyncSlotObject):
 
     async def close(self):
         #unsubscribe the events
+        self.__connection.api.connectedChanged.disconnect(self.__connectChanged)
         await self.__connection.api.closeKey(self.__subkey)
     
     
@@ -101,11 +102,11 @@ class NodeDocumentManager(QtCore.QObject, Utils.AsyncSlotObject):
             joinedPeers = await self.__connection.api.call(f"ocp.documents.{self.__docId}.listPeers", joined=True)
             
             for peer in readPeers:
-                self.peers.append(ManagedDocument.__Peer(peer, "Read", peer in joinedPeers))
+                self.peers.append(NodeDocumentManager.__Peer(peer, "Read", peer in joinedPeers))
                 self.peerAdded.emit(peer)
             
             for peer in writePeers:
-                self.peers.append(ManagedDocument.__Peer(peer, "Write", peer in joinedPeers))
+                self.peers.append(NodeDocumentManager.__Peer(peer, "Write", peer in joinedPeers))
                 self.peerAdded.emit(peer)
             
             self.memberCountChanged.emit()
@@ -139,7 +140,7 @@ class NodeDocumentManager(QtCore.QObject, Utils.AsyncSlotObject):
             self.joinedCountChanged.emit()
     
     async def __peerAdded(self, id, auth):
-        self.peers.append(ManagedDocument.__Peer(id, auth, False))
+        self.peers.append(NodeDocumentManager.__Peer(id, auth, False))
             
         self.peerAdded.emit(id)
         self.memberCountChanged.emit()

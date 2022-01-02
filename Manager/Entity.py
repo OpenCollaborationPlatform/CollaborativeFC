@@ -122,7 +122,7 @@ class Entity(SM.StateMachine):
         self.addTransition(Entity.States.Local.CreateProcess, Entity.States.Local.Internal, Entity.Events.abort)
         self.addTransition(Entity.States.Local.CreateProcess, Entity.States.Local.Internal, Entity.Events._failed)
         self.addTransition(Entity.States.Local.CreateProcess, Entity.States.Node.Status.Online, Entity.Events._done)
-        self.addTransition(Entity.States.Local.Disconnected, Entity.States.Node, Entity.Events.connected)
+        self.addTransition(Entity.States.Local.Disconnected, Entity.States.Node, self.__connection.api.reconnected)
         self.addTransition(Entity.States.Local, Entity.States.Removed, Entity.Events.closed)
         
         # node state internals
@@ -171,10 +171,8 @@ class Entity(SM.StateMachine):
             self._id = id
             if self.__connection.api.connected:
                 self.processEvent(Entity.Events._node)
-                print(self.activeStates)
             else:
                 self.processEvent(Entity.Events._local)
-                print(self.activeStates)
             return
         
         raise Exception("Either fcdoc or id must be provided to set initial state")
@@ -199,13 +197,16 @@ class Entity(SM.StateMachine):
             self.processEvent(Entity.Events._failed)
 
 
-    @SM.transition(States.Local, States.Removed, Events.close)
+    @SM.transition(States.Local.Internal, States.Removed, Events.close)
     def _closeLocalDoc(self):
         with self._blocker:
             if self.fcdocument:
                 FreeCAD.closeDocument(self.fcdocument.Name)
                 self.fcdocument=None
-            
+    
+    @SM.transition(States.Local.Disconnected, States.Local.Internal, Events.close)
+    def _closeDisconnectedDoc(self):
+        self._id = None
 
     # Node substatus
     # ##############
@@ -258,7 +259,7 @@ class Entity(SM.StateMachine):
     @SM.onExit(States.Node.Status.Online)
     async def _exitOnline(self):
         manager = self._manager
-        self.manager = None
+        self._manager = None
         await manager.close()
     
     @SM.onEnter(States.Node.Status.Online.Edit)

@@ -40,7 +40,6 @@ class DocView(QtWidgets.QWidget):
         self.setLayout(layout)
         
         self.__manager.documentAdded.connect(self.__onDocumentAdded)
-        self.__manager.documentRemoved.connect(self.__onDocumentRemoved)
 
     @QtCore.Slot(str)
     def __onEdit(self, uuid):
@@ -48,13 +47,16 @@ class DocView(QtWidgets.QWidget):
 
     @QtCore.Slot(str)
     def __onDocumentAdded(self, uuid):
-        widget = DocWidget(self.__manager.getEntity("uuid", uuid), self)
+        entity = self.__manager.getEntity("uuid", uuid)
+        widget = DocWidget(entity, self)
         self.__widgets[uuid] = widget
         self.layout().insertWidget(0, widget)
         widget.edit.connect(self.__onEdit)
+        
+        entity.finished.connect(lambda: self._onDocumentRemoved(uuid))
      
     @QtCore.Slot(str)
-    def __onDocumentRemoved(self, uuid):
+    def _onDocumentRemoved(self, uuid):
         
         if not uuid in self.__widgets:
             return 
@@ -96,35 +98,67 @@ class DocWidget(QtWidgets.QWidget, StateMachineProcessWidget):
                 
         self.ui.openButton.clicked.connect(lambda: self.__entity.processEvent(Entity.Events.open))
         self.ui.closeButton.clicked.connect(lambda: self.__entity.processEvent(Entity.Events.close))
-        #self.ui.editButton.clicked.connect(lambda: self.edit.emit(self.__uuid))
+        self.ui.editButton.clicked.connect(lambda: self.edit.emit(self.__entity.uuid))
                
         
         # setup the ui
         # ############
         
         self.ui.onlinestatus.hide()
-        self.__entity.state(Entity.States.Local).setAttributeValue(self.ui.statusLabel, "text", "Local document", reset = True)
-        self.__entity.state(Entity.States.Node).setAttributeValue(self.ui.statusLabel, "text", "Loading...", reset = True)
-        self.__entity.state(Entity.States.Node.Status.Invited).setAttributeValue(self.ui.statusLabel, "text", "Invited to join", reset = True)
-        self.__entity.state(Entity.States.Node.Status.Invited).setAttributeValue(self.ui.closeButton, "enabled", False, reset=True)
-        self.__entity.state(Entity.States.Node.Status.Online).setAttributeValue(self.ui.onlinestatus, "visible", True, reset = True)
-        self.__entity.state(Entity.States.Node.Status.Online).setAttributeValue(self.ui.statusLabel, "visible", False, reset = True)
-        self.__entity.state(Entity.States.Node.Status.Online).setAttributeValue(self.ui.statusIndicator, "pixmap", QtGui.QPixmap(":/Collaboration/Icons/indicator_on.svg"), reset=True)
-        self.__entity.state(Entity.States.Node.Status.Online.Edit).setAttributeValue(self.ui.openButton, "enabled", False, reset=True)     
+        self.ui.openButton.hide()
+        self.ui.closeButton.hide()
+        self.ui.editButton.hide()
+        
+        self.__entity.state(Entity.States.Local).setAttributeValue(self.ui.statusLabel, "text", "Local document")
+        
+        self.__entity.state(Entity.States.Local.Internal).setAttributeValue(self.ui.openButton, "text", "Share")
+        self.__entity.state(Entity.States.Local.Internal).setAttributeValue(self.ui.openButton, "visible", True)
+        
+        self.__entity.state(Entity.States.Local.Disconnected).setAttributeValue(self.ui.statusLabel, "text", "Disconnected document")
+        self.__entity.state(Entity.States.Local.Disconnected).setAttributeValue(self.ui.statusIndicator, "pixmap", QtGui.QPixmap(":/Collaboration/Icons/indicator_err.svg"))
+        self.__entity.state(Entity.States.Local.Disconnected).setAttributeValue(self.ui.closeButton, "text", "Leave")
+        self.__entity.state(Entity.States.Local.Disconnected).setAttributeValue(self.ui.closeButton, "visible", True)
+        
+        self.__entity.state(Entity.States.Node).setAttributeValue(self.ui.statusLabel, "text", "Loading...")
+        
+        self.__entity.state(Entity.States.Node.Status.Invited).setAttributeValue(self.ui.statusLabel, "text", "Invited to join")
+        self.__entity.state(Entity.States.Node.Status.Invited).setAttributeValue(self.ui.openButton, "text", "Join")
+        self.__entity.state(Entity.States.Node.Status.Invited).setAttributeValue(self.ui.openButton, "visible", True)
+        
+        self.__entity.state(Entity.States.Node.Status.Online).setAttributeValue(self.ui.onlinestatus, "visible", True)
+        self.__entity.state(Entity.States.Node.Status.Online).setAttributeValue(self.ui.statusLabel, "visible", False)
+        self.__entity.state(Entity.States.Node.Status.Online).setAttributeValue(self.ui.editButton, "visible", True)
+        
+        self.__entity.state(Entity.States.Node.Status.Online.Replicate).setAttributeValue(self.ui.openButton, "visible", True)
+        self.__entity.state(Entity.States.Node.Status.Online.Replicate).setAttributeValue(self.ui.closeButton, "visible", True)
+        self.__entity.state(Entity.States.Node.Status.Online.Replicate).setAttributeValue(self.ui.closeButton, "text", "Leave")
+        self.__entity.state(Entity.States.Node.Status.Online.Replicate).setAttributeValue(self.ui.statusIndicator, "pixmap", QtGui.QPixmap(":/Collaboration/Icons/indicator_intermediate.svg"))
+        
+        self.__entity.state(Entity.States.Node.Status.Online.Edit).setAttributeValue(self.ui.statusIndicator, "pixmap", QtGui.QPixmap(":/Collaboration/Icons/indicator_on.svg"))
+        self.__entity.state(Entity.States.Node.Status.Online.Edit).setAttributeValue(self.ui.closeButton, "visible", True)
+        self.__entity.state(Entity.States.Node.Status.Online.Edit).setAttributeValue(self.ui.closeButton, "text", "Close")
                 
         
         # manager data
         def _manager_setup():
-            self.ui.memberLabel.setText(f"{entity.node_document_manager.memberCount}")
-            self.ui.joinedLabel.setText(f"{entity.node_document_manager.joinedCount}")
-            self.ui.majorityLabel.setText(f"{entity.node_document_manager.majority}")
-            entity.node_document_manager.memberCountChanged.connect(lambda: self.ui.memberLabel.setText(f"{entity.node_document_manager.memberCount}"))
-            entity.node_document_manager.joinedCountChanged.connect(lambda: self.ui.joinedLabel.setText(f"{entity.node_document_manager.joinedCount}"))
-            entity.node_document_manager.majorityChanged.connect(lambda: self.ui.majorityLabel.setText(f"{entity.node_document_manager.majority}"))
+            self._onlineStatusUpdate()
+            entity.node_document_manager.memberCountChanged.connect(self._onlineStatusUpdate)
+            entity.node_document_manager.joinedCountChanged.connect(self._onlineStatusUpdate)
+            entity.node_document_manager.majorityChanged.connect(self._onlineStatusUpdate)
+        
+        def _manager_clear():
+            entity.node_document_manager.memberCountChanged.disconnect(self._onlineStatusUpdate)
+            entity.node_document_manager.joinedCountChanged.disconnect(self._onlineStatusUpdate)
+            entity.node_document_manager.majorityChanged.disconnect(self._onlineStatusUpdate)
         
         entity.state(Entity.States.Node.Status.Online).entered.connect(_manager_setup)
+        entity.state(Entity.States.Node.Status.Online).exited.connect(_manager_clear)
 
 
+    def _onlineStatusUpdate(self):
+        self.ui.memberLabel.setText(f"{self.__entity.node_document_manager.memberCount}")
+        self.ui.joinedLabel.setText(f"{self.__entity.node_document_manager.joinedCount}")
+        self.ui.majorityLabel.setText(f"{self.__entity.node_document_manager.majority}")
 
 
     def paintEvent(self, event):

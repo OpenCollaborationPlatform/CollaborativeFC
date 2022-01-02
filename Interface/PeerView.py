@@ -105,10 +105,10 @@ class PeerWidget(QtWidgets.QWidget):
         self.setLayout(layout)
         
         # Set the correct sizes dependent on system setting
-        fontSize = 1.2*self.ui.idLabel.font().pointSize()
-        largeFont = self.ui.idLabel.font()
-        largeFont.setPointSize(fontSize)
-        self.ui.idLabel.setFont(largeFont)
+        #fontSize = 1.2*self.ui.idLabel.font().pointSize()
+        #largeFont = self.ui.idLabel.font()
+        #largeFont.setPointSize(fontSize)
+        #self.ui.idLabel.setFont(largeFont)
         
         self.ui.removeButton.clicked.connect(lambda: self.__docmanager.removePeerSlot(self.__peerId))
         self.ui.rightsButton.clicked.connect(lambda: self.__docmanager.togglePeerRightsSlot(self.__peerId))
