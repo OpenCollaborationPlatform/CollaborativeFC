@@ -54,7 +54,6 @@ class Manager(QtCore.QObject):
     
 
     documentAdded   = QtCore.Signal(str)
-    documentRemoved = QtCore.Signal(str)
 
     
     def __init__(self, collab_path, connection: OCPConnection):  
@@ -89,6 +88,10 @@ class Manager(QtCore.QObject):
         except Exception as e:
             print("Document Handler connection init error: {0}".format(e))
 
+    def _removeEntity(self, entity):
+        
+        if entity in self.__entities:
+            self.__entities.remove(entity)
     
     @asyncSlot()
     async def __connectionChanged(self):
@@ -108,7 +111,7 @@ class Manager(QtCore.QObject):
             for doc in doclist:
                 if not self.hasEntity("id", doc):
                     entity = Entity(self.__connection, self.__dataservice, self.__collab_path, _EventBlocker(self))
-                    entity.finished.connect(lambda: self._removeEntity(entity))
+                    entity.finished.connect(lambda e=entity: self._removeEntity(e))
                     self.__entities.append(entity)
                     self.documentAdded.emit(entity.uuid)
                     
@@ -119,15 +122,11 @@ class Manager(QtCore.QObject):
             for doc in doclist:
                 if not self.hasEntity("id", doc):
                     entity = Entity(self.__connection, self.__dataservice, self.__collab_path, _EventBlocker(self))     
-                    entity.finished.connect(lambda: self._removeEntity(entity))
+                    entity.finished.connect(lambda e=entity: self._removeEntity(e))
                     self.__entities.append(entity)
                     self.documentAdded.emit(entity.uuid)
                     
                     entity.start(id = doc)
-
-    def _removeEntity(self, e):
-        self.documentRemoved.emit(e.uuid)
-        self.__entities.remove(e)
 
 
     #FreeCAD event handling: Not blocking (used by document observers)
@@ -143,7 +142,7 @@ class Manager(QtCore.QObject):
         
         #If a document was opened in freecad this function makes it known to the Handler. 
         entity = Entity(self.__connection, self.__dataservice, self.__collab_path, _EventBlocker(self))
-        entity.finished.connect(lambda: self._removeEntity(entity))
+        entity.finished.connect(lambda e=entity: self._removeEntity(e))
         self.__entities.append(entity)       
         self.documentAdded.emit(entity.uuid)
         
@@ -174,7 +173,7 @@ class Manager(QtCore.QObject):
             return
                
         entity = Entity(self.__connection, self.__dataservice, self.__collab_path, _EventBlocker(self))
-        entity.finished.connect(lambda: self._removeEntity(entity))
+        entity.finished.connect(lambda e=entity: self._removeEntity(e))
         self.__entities.append(entity)
         self.documentAdded.emit(entity.uuid)
         

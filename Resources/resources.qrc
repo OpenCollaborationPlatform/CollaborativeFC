@@ -4,7 +4,9 @@
 		<file>Icons/indicator_on.svg</file>
 		<file>Icons/icon_white.svg</file>
 		<file>Icons/indicator_off.svg</file>
+		<file>Icons/indicator_intermediate.svg</file>
 		<file>Icons/icon.svg</file>
+		<file>Icons/settings.svg</file>
 		<file>Icons/busy.svg</file>
 		<file>Icons/logo.svg</file>
 		<file>Ui/Error.ui</file>

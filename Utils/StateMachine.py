@@ -354,7 +354,7 @@ class _State(QtCore.QObject):
         
         self._asyncCallbacks.append(asyncFcn)
         
-    def setAttributeValue(self, obj: object, prop: str, value, reset=False):
+    def setAttributeValue(self, obj: object, prop: str, value, reset=True):
         # Sets the property value when entering the state, and potentially sets it back to 
         # to the original value when leaving
         
@@ -720,7 +720,7 @@ class StateMachine(QtCore.QObject):
         # add transitions
         return self.__states[start]._addTransition(self.__states[end], *args, condition = condition)
 
-    def setAttributeValue(self, state, obj, attr, value, reset = False):
+    def setAttributeValue(self, state, obj, attr, value, reset = True):
         # Sets the attribute value when entering the state, and potentially sets it back
         # to the original value when leaving
         assert state in self.__states, "Not a valid state machine state"
