@@ -20,6 +20,7 @@
 import FreeCAD, FreeCADGui, asyncio, os
 
 import Utils
+from Utils.Errorhandling import OCPErrorHandler, attachErrorData
 from OCP import OCPConnection
 from Documents.Dataservice      import DataService
 from Documents.OnlineDocument   import OnlineDocument
@@ -45,7 +46,7 @@ class _EventBlocker():
         self.__manager._blockLocalEvents = False
 
 
-class Manager(QtCore.QObject):
+class Manager(QtCore.QObject, OCPErrorHandler):
     #Manager that handles all entities for collaboration:
     # - the local ones that are unshared
     # - the ones we have been invited too but not yet joined
@@ -59,6 +60,7 @@ class Manager(QtCore.QObject):
     def __init__(self, collab_path, connection: OCPConnection):  
         
         QtCore.QObject.__init__(self)
+        OCPErrorHandler.__init__(self)
         
         self.__entities = [] #empty list for all our document handling status, each doc is a map: {id, status, onlinedoc, doc}
         self.__connection = None
@@ -71,6 +73,17 @@ class Manager(QtCore.QObject):
         self.__connection.api.connectedChanged.connect(self.__connectionChanged)
         asyncio.ensure_future(self.__asyncInit())   
     
+    
+    def _handleError(self, source, error, data):
+        
+        if "ocp_message" in data:
+            err = data["ocp_message"]
+            printdata = data.copy()
+            del printdata["ocp_message"]
+            del printdata["exception"]
+            print(f"{err}: {printdata}")
+            
+        OCPErrorHandler._handleError(self, source, error, data)
     
     async def __asyncInit(self):
         
@@ -86,7 +99,8 @@ class Manager(QtCore.QObject):
             await self.__handleConnectionChanged()
             
         except Exception as e:
-            print("Document Handler connection init error: {0}".format(e))
+            attachErrorData(e, "ocp_message",  "Initalizing document manager failed")
+            self._processException(e)
 
     def _removeEntity(self, entity):
         
@@ -104,29 +118,34 @@ class Manager(QtCore.QObject):
         # Required as async function as __asyncInit cannot call asyncSlot, as it would spawn a task
         # from within a task
         
-        if self.__connection.api.connected:
+        try:
+            if self.__connection.api.connected:
+                
+                # all open documents
+                doclist = await self.__connection.api.call(u"ocp.documents.list")
+                for doc in doclist:
+                    if not self.hasEntity("id", doc):
+                        entity = Entity(self.__connection, self.__dataservice, self.__collab_path, _EventBlocker(self))
+                        entity.finished.connect(lambda e=entity: self._removeEntity(e))
+                        self.__entities.append(entity)
+                        self.documentAdded.emit(entity.uuid)
+                        
+                        entity.start(id = doc)
+                        
+                # all invited documents
+                doclist = await self.__connection.api.call(u"ocp.documents.invitations")
+                for doc in doclist:
+                    if not self.hasEntity("id", doc):
+                        entity = Entity(self.__connection, self.__dataservice, self.__collab_path, _EventBlocker(self))     
+                        entity.finished.connect(lambda e=entity: self._removeEntity(e))
+                        self.__entities.append(entity)
+                        self.documentAdded.emit(entity.uuid)
+                        
+                        entity.start(id = doc)
             
-            # all open documents
-            doclist = await self.__connection.api.call(u"ocp.documents.list")
-            for doc in doclist:
-                if not self.hasEntity("id", doc):
-                    entity = Entity(self.__connection, self.__dataservice, self.__collab_path, _EventBlocker(self))
-                    entity.finished.connect(lambda e=entity: self._removeEntity(e))
-                    self.__entities.append(entity)
-                    self.documentAdded.emit(entity.uuid)
-                    
-                    entity.start(id = doc)
-                    
-            # all invited documents
-            doclist = await self.__connection.api.call(u"ocp.documents.invitations")
-            for doc in doclist:
-                if not self.hasEntity("id", doc):
-                    entity = Entity(self.__connection, self.__dataservice, self.__collab_path, _EventBlocker(self))     
-                    entity.finished.connect(lambda e=entity: self._removeEntity(e))
-                    self.__entities.append(entity)
-                    self.documentAdded.emit(entity.uuid)
-                    
-                    entity.start(id = doc)
+        except Exception as e:
+            attachErrorData(e, "ocp_message", "Processing connection change failed")
+            self._processException(e)
 
 
     #FreeCAD event handling: Not blocking (used by document observers)
@@ -166,7 +185,7 @@ class Manager(QtCore.QObject):
     #OCP event handling  (used as wamp event callbacks)
     #**********************************************************************
     
-    async def onOCPDocumentCreated(self, id):
+    def onOCPDocumentCreated(self, id):
    
         #could be that we already have this id (e.g. if we created it ourself)
         if self.hasEntity('id', id):
@@ -179,12 +198,12 @@ class Manager(QtCore.QObject):
         
         entity.start(id = id)
         
-    async def onOCPDocumentOpened(self, id): 
+    def onOCPDocumentOpened(self, id): 
         # same as created: setup the entity and let it figure out everything itself
-        return await self.onOCPDocumentCreated(id)
+        return self.onOCPDocumentCreated(id)
             
         
-    async def onOCPDocumentClosed(self, id):
+    def onOCPDocumentClosed(self, id):
         
         
         if not self.hasEntity('id', id):
@@ -194,11 +213,11 @@ class Manager(QtCore.QObject):
         entity.processEvent(Entity.Events.closed)
         
     
-    async def onOCPDocumentInvited(self, doc, add):
+    def onOCPDocumentInvited(self, doc, add):
        
         if add:
             # same as created: setup the entity and let it figure out everything itself
-            return await self.onOCPDocumentCreated(id)
+            return self.onOCPDocumentCreated(id)
             
         else:
             if not self.hasEntity('id', doc):

@@ -19,6 +19,7 @@
 
 import asyncio, FreeCAD
 import Documents.Property as Property
+from Utils.Errorhandling import attachErrorData
 
 class OCPObjectWriter():
     ''' Writes object data to the OCP node document
@@ -66,7 +67,8 @@ class OCPObjectWriter():
             uri = f"ocp.documents.{self.docId}.content.Document.{self.objGroup}.Has"
             return await self.connection.api.call(uri, self.name)
         except Exception as e:
-            self.logger.error(f"Queriying availablitiy failed: {e}")
+            attachErrorData(e, "ocp_message", "Queriying availablitiy failed")
+            raise e
             
 
     async def setup(self, typeid, properties, infos):
@@ -84,23 +86,29 @@ class OCPObjectWriter():
             self.setupStage = False
         
         except Exception as e:
-            self.logger.error("Setup error: {0}".format(e))
+            attachErrorData(e, "ocp_message", "Setup failed")
+            raise e
            
     
     async def __createProperty(self, dynamic, prop, info):
         #adds a new property with its property information
         #could be added as normal or as dynamic property, dependent on dyn boolean
         
-        # Note: no try/catch, as method is private and the error is always caught from caller
-        if dynamic:
-            self.logger.debug(f"Create dynamic property {prop}")
-            fnc = "CreateDynamicProperty"
-        else:
-            self.logger.debug(f"Setup default property {prop}")
-            fnc = "SetupProperty"
-            
-        uri = f"ocp.documents.{self.docId}.content.Document.{self.objGroup}.{self.name}.Properties.{fnc}"
-        await self.connection.api.call(uri, prop, info["typeid"], info["group"], info["docu"], info["status"])
+        try:
+            # Note: no try/catch, as method is private and the error is always caught from caller
+            if dynamic:
+                self.logger.debug(f"Create dynamic property {prop}")
+                fnc = "CreateDynamicProperty"
+            else:
+                self.logger.debug(f"Setup default property {prop}")
+                fnc = "SetupProperty"
+                
+            uri = f"ocp.documents.{self.docId}.content.Document.{self.objGroup}.{self.name}.Properties.{fnc}"
+            await self.connection.api.call(uri, prop, info["typeid"], info["group"], info["docu"], info["status"])
+        
+        except Exception as e:
+            attachErrorData(e, "ocp_message", "Creating a property failed")
+            raise e
 
     
     
@@ -108,16 +116,21 @@ class OCPObjectWriter():
         #adds a list of properties and a list with their property infos
         #could be added as normal or as dynamic property, dependent on "dynamic" boolean
         
-        # Note: no try/catch, as method is private and the error is always caught from caller
-        if dynamic:
-            self.logger.debug(f"Create dynamic properties {props}")
-            fnc = "CreateDynamicProperties"
-        else:
-            self.logger.debug(f"Setup default properties {props}")
-            fnc = "SetupProperties"
+        try:
+            # Note: no try/catch, as method is private and the error is always caught from caller
+            if dynamic:
+                self.logger.debug(f"Create dynamic properties {props}")
+                fnc = "CreateDynamicProperties"
+            else:
+                self.logger.debug(f"Setup default properties {props}")
+                fnc = "SetupProperties"
+                
+            uri = f"ocp.documents.{self.docId}.content.Document.{self.objGroup}.{self.name}.Properties.{fnc}"
+            await self.connection.api.call(uri, props, infos)
             
-        uri = f"ocp.documents.{self.docId}.content.Document.{self.objGroup}.{self.name}.Properties.{fnc}"
-        await self.connection.api.call(uri, props, infos)
+        except Exception as e:
+            attachErrorData(e, "ocp_message", "Creating properties failed")
+            raise e
 
     
     async def removeProperty(self, prop):
@@ -127,7 +140,8 @@ class OCPObjectWriter():
             await self.connection.api.call(uri, prop)
         
         except Exception as e:
-            self.logger.error("Remove property {0} failed: {1}".format(prop, e))
+            attachErrorData(e, "ocp_message", f"Removing property \"{prop}\" failed")
+            raise e
         
     
     def addDynamicProperty(self, prop, info):
@@ -154,7 +168,8 @@ class OCPObjectWriter():
                 await self.__createProperties(True, keys, values)
 
         except Exception as e:
-            self.logger.error(f"Create dynamic property from cache failed: {e}")
+            attachErrorData(e, "ocp_message", "Creation of dynamic properties from cache failed")
+            raise e
             
             
     def changePropertyStatus(self, prop, status):
@@ -204,7 +219,8 @@ class OCPObjectWriter():
                         raise Exception(f"Properties {failed} failed")
                 
         except Exception as e:
-            self.logger.error("Change property status from cache failed: {0}".format(e))
+            attachErrorData(e, "ocp_message", "Change property status from cache failed")
+            raise e
             
     
     def changeProperty(self, prop, value, outlist):        
@@ -267,7 +283,7 @@ class OCPObjectWriter():
 
             #execute all parallel tasks
             if tasks:
-                await asyncio.wait(tasks)
+                await asyncio.gather(*tasks)
             
             #now batchwrite all properties in correct order
             if len(props) == 1:
@@ -289,7 +305,8 @@ class OCPObjectWriter():
                 await self.connection.api.call(uri, out)
                 
         except Exception as e:
-            self.logger.error(f"Batch writing properties {list(props.keys())} failed: {e}")
+            attachErrorData(e, "ocp_message", f"Batch writing properties {list(props.keys())} failed")
+            raise e
         
         
     async def addExtension(self, extension, props=None, infos=None):
@@ -306,7 +323,8 @@ class OCPObjectWriter():
                 await self.__createProperties(False, props, infos)
                 
         except Exception as e:
-            self.logger.error("Adding extension failed: {0}".format(e))
+            sattachErrorData(e, "ocp_message", "Adding extension failed")
+            raise e
      
      
     async def remove(self):
@@ -316,7 +334,8 @@ class OCPObjectWriter():
             await self.connection.api.call(uri + u".content.Document.{0}.RemoveObject".format(self.objGroup), self.name)
         
         except Exception as e:
-            self.logger.error("Removing error: {0}".format(e))
+            attachErrorData(e, "ocp_message", "Removing of object failed")
+            raise e
 
 
             
@@ -328,4 +347,5 @@ class OCPObjectWriter():
             await self.connection.api.call(uri)
         
         except Exception as e:
-            self.logger.error("Recompute exception: {0}".format(e))
+            attachErrorData(e, "ocp_message", "Recompute failed")
+            raise e

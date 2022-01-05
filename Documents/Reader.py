@@ -52,7 +52,8 @@ class OCPObjectReader():
             uri = f"ocp.documents.{self.docId}.content.Document.{self.objGroup}.Has"
             return await self.connection.api.call(uri, self.name)
         except Exception as e:
-            self.logger.error(f"Queriying availablitiy failed: {e}")
+            attachErrorData(e, "ocp_message", "Queriying availablitiy failed")
+            raise e
     
     
     async def propertyList(self):
@@ -63,7 +64,8 @@ class OCPObjectReader():
             return await self.connection.api.call(uri)
         
         except Exception as e:
-            self.logger.error(f"Fetching property list failed: {e}")
+            attachErrorData(e, "ocp_message", "Fetching property list failed")
+            raise e
     
     
     async def property(self,  prop):
@@ -75,7 +77,8 @@ class OCPObjectReader():
             return await self.__getBinaryValues(value)
         
         except Exception as e:
-            self.logger.error(f"Reading property {prop} failed: {e}")
+            attachErrorData(e, "ocp_message", f"Reading property {prop} failed")
+            raise e
     
     
     async def properties(self,  props):
@@ -97,7 +100,8 @@ class OCPObjectReader():
             return await self.__getBinaryValues(values)
         
         except Exception as e:
-            self.logger.error(f"Reading properties {props} failed: {e}")
+            attachErrorData(e, "ocp_message", f"Reading properties {props} failed")
+            raise e
     
     
     async def propertyInfo(self, prop):
@@ -108,7 +112,8 @@ class OCPObjectReader():
             return await self.connection.api.call(uri)
         
         except Exception as e:
-            self.logger.error(f"Reading property info for {prop} failed: {e}")
+            attachErrorData(e, "ocp_message", f"Reading property info for {prop} failed")
+            raise e
             
     
     async def propertiesInfos(self, props):
@@ -130,7 +135,8 @@ class OCPObjectReader():
             return infos
         
         except Exception as e:
-            self.logger.error(f"Reading properties infos for {props} failed: {e}")
+            attachErrorData(e, "ocp_message", f"Reading properties infos for {props} failed")
+            raise e
         
 
     async def extensions(self):
@@ -140,7 +146,8 @@ class OCPObjectReader():
             return await self.connection.api.call(uri)
         
         except Exception as e:
-            self.logger.error(f"Fetching object extensions failed: {e}")
+            attachErrorData(e, "ocp_message", "Fetching object extensions failed")
+            raise e
         
         
     # internal functions

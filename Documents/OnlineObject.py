@@ -30,10 +30,10 @@ import Documents.Object   as Object
 from Documents.AsyncRunner import BatchedOrderedRunner, DocumentRunner
 from Documents.Writer import OCPObjectWriter
 from Documents.Reader import OCPObjectReader
-from Utils.Errorhandling import isOCPError, ErrorHandler
+from Utils.Errorhandling import isOCPError, OCPErrorHandler, attachErrorData
 
 
-class FreeCADOnlineObject(ErrorHandler):
+class FreeCADOnlineObject(OCPErrorHandler):
     
     def __init__(self, name, onlinedoc, objGroup, parentOnlineObj = None):
         
@@ -61,25 +61,36 @@ class FreeCADOnlineObject(ErrorHandler):
     # ##############
 
     # All async functions are processed in the objects async runner. All occuring errors are 
-    # upstreamed to us and handled in the following functions.
+    # upstreamed to us and handled in the following function.
     
-    def _handleError(self, source, error, *data):
+    def _handleError(self, source, error, data):
+        
+        # after any error we need to ensure FreeCAD and Node status match
         self._runner.run(self.download)
-        super()._handleError(source, error, *data)
+        
+        if "ocp_message" in data:
+                        
+            err = data["ocp_message"]
+            printdata = data.copy()
+            del printdata["ocp_message"]
+            del printdata["exception"]
+            self.logger.Error(f"{err}: {printdata}")
+        
+        super()._handleError(source, error, data)
     
-    def _handleException(self, exception):
-        self._runner.run(self.download)
-        super()._handleException(exception)
-
 
     # Common FreeCAD object functionality
     # ###################################
 
     async def _docPrints(self):
-        uri = u"ocp.documents.{0}.prints".format(self._docId)
-        vals = await self.connection.api.call(uri)
-        for val in vals:
-            self.logger.debug(val)
+        try:
+            uri = u"ocp.documents.{0}.prints".format(self._docId)
+            vals = await self.connection.api.call(uri)
+            for val in vals:
+                self.logger.debug(val)
+        except Exception as e:
+            attachErrorData(e, "ocp_message", "Retreiving JavaScript prints failed")
+            self._processException(e)
 
 
     async def waitTillCloseout(self, timeout = 10):
@@ -155,8 +166,8 @@ class FreeCADOnlineObject(ErrorHandler):
             self.logger.debug(f"Object download finished")
             
         except Exception as e:
-            self.logger.error(f"Downloading object failed: {e}")
-            raise
+            attachErrorData(e, "ocp_message", "Downloading object failed")
+            raise e
       
 
     async def upload(self, obj):
@@ -196,8 +207,8 @@ class FreeCADOnlineObject(ErrorHandler):
                 await asyncio.gather(*tasks)
       
         except Exception as e:
-            self.logger.error(f"Uploading object failed: {e}")
-            traceback.print_exc()
+            attachErrorData(e, "ocp_message", "Uploading object failed")
+            raise e
         
 
 class OnlineObject(FreeCADOnlineObject):

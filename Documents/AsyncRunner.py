@@ -19,9 +19,9 @@
 
 import asyncio
 import Documents.Batcher as Batcher
-from Utils.Errorhandling import ErrorHandler
+from Utils.Errorhandling import OCPErrorHandler
 
-class Task(ErrorHandler):
+class Task(OCPErrorHandler):
     # Wraps a function to be called as Task
     # Works for async and normal functions, with arbitrary arguments
     
@@ -40,7 +40,7 @@ class Task(ErrorHandler):
             else:
                 self.Func(*self.Args)
         except Exception as e:
-            self._handleException(e)
+            self._processException(e)
                 
     def name(self):
         return self.Func.__self__.__class__.__name__ + "." + self.Func.__name__
@@ -68,7 +68,7 @@ class DocumentRunner():
         return DocumentBatchedOrderedRunner(DocumentRunner.__receiver[docId])
             
     
-class OrderedRunner(ErrorHandler):
+class OrderedRunner(OCPErrorHandler):
     #AsyncRunner which runs task in order
    
     #runs all tasks synchronous
@@ -106,11 +106,11 @@ class OrderedRunner(ErrorHandler):
         
         self.__finishEvent.set()       
 
-    def _handleException(self, source: ErrorHandler, exception: Exception):
+    def _processException(self, exception: Exception):
         # any error in task processing leads to deletion of all current tasks
         
         self.__tasks = []
-        super()._handleException(self, source, exception)
+        super()._processException(exception)
 
 
     async def __run(self):
@@ -139,7 +139,7 @@ class OrderedRunner(ErrorHandler):
                 
             except Exception as e:
                 self.__logger.error(f"{e}")
-                self._handleException(e)
+                self._processException(e)
                 
         if not self.__shutdown:
             self.__logger.error(f"Main loop of sync runner closed unexpectedly: {e}")
@@ -160,7 +160,7 @@ class OrderedRunner(ErrorHandler):
         self.run(syncer.execute)
 
 
-class BatchedOrderedRunner(ErrorHandler):
+class BatchedOrderedRunner(OCPErrorHandler):
     #batched ordered execution of tasks
     #Normally run received a function object of an async function and its arguments.
     #The functions are than processed in order one by one (each one awaited). If functions can be batched
@@ -210,11 +210,11 @@ class BatchedOrderedRunner(ErrorHandler):
         
         self.__finishEvent.set()
 
-    def _handleException(self, source: ErrorHandler, exception: Exception):
+    def _processException(self, exception: Exception):
         # any error in task processing leads to deletion of all current tasks
         
         self.__tasks = []
-        super()._handleException(self, source, exception)        
+        super()._processException(exception)
 
     async def __run(self):
                   
@@ -245,7 +245,7 @@ class BatchedOrderedRunner(ErrorHandler):
                             self._unregisterSubErrorhandler(task)
 
                     except Exception as e:
-                        self._handleException(e)
+                        self._processException(e)
                 
                 self.__finishEvent.set()
                 self.__syncEvent.clear()
@@ -253,7 +253,7 @@ class BatchedOrderedRunner(ErrorHandler):
 
             except Exception as e:
                 self.logger.error(f"Unexpected exception in BatchedOrderedRunner: {e}")
-                self._handleException(e)
+                self._processException(e)
                 
         if not self.__shutdown:            
             self.logger.error(f"Unexpected shutdown in BatchedOrderedRunner: {e}")
@@ -272,7 +272,7 @@ class BatchedOrderedRunner(ErrorHandler):
         self.run(syncer.execute)
         
 
-class DocumentBatchedOrderedRunner(ErrorHandler):
+class DocumentBatchedOrderedRunner(OCPErrorHandler):
     #A Async runner that synchronizes over the whole document, and has the same API as the BatchedOrderedRunner to be 
     #compatible replacement
     
