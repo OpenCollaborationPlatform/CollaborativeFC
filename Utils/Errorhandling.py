@@ -19,9 +19,11 @@
 
 from enum import Enum, auto
 from autobahn import wamp
+from asyncio import CancelledError
+from typing import Any
 
 # error classes:
-class ErrorClass(Enum):
+class OCPErrorClass(Enum):
     internal = auto()
     connection = auto()
     application = auto()
@@ -33,17 +35,17 @@ class ErrorClass(Enum):
 Key_Not_Available = "key_not_available"
 
 
-class OCPError(RuntimeError):
+class OCPError():
     
     def __init__(self, exptn: wamp.ApplicationError):
        
         components = exptn.error.split(".")
         if not exptn.error.startswith("ocp.error"):
-            self.errclass = ErrorClass.wamp
+            self.errclass = OCPErrorClass.wamp
             self.source = "router"
             self.reason = components[-1]
         else:
-            self.errclass = ErrorClass(components[2])
+            self.errclass = OCPErrorClass[components[2]]
             self.source = components[3]
             self.reason = components[4]       
         
@@ -58,8 +60,6 @@ class OCPError(RuntimeError):
             self.arguments = exptn.args[2]
             self.stack = exptn.args[3]
         
-        super().__init__(exptn.error)
-        
     def __str__(self):
          msg = self.error + ": " + self.message
          if self.arguments:
@@ -72,26 +72,15 @@ class OCPError(RuntimeError):
          return msg
         
 
-def isOCPError(error: Exception, errclass: ErrorClass=ErrorClass.none, source: str=None, reason: str=None) -> bool:
+def isOCPError(error: Exception, errclass: OCPErrorClass=OCPErrorClass.none, source: str=None, reason: str=None) -> bool:
         
-    if isinstance(error, OCPError):
-        
-        if errclass != ErrorClass.none and error.errclass != errclass:
-            return False
-        if source and source != error.source:
-            return False
-        if reason and reason != error.reason:
-            return False     
-        
-        return True
-        
-    elif isinstance(error, wamp.ApplicationError):
+    if isinstance(error, wamp.ApplicationError):
         uri = error.error
         if not uri.startswith("ocp.error"):
             return False
         
         comps = uri.split(".")
-        if errclass != ErrorClass.none and [2] != errclass.name:
+        if errclass != OCPErrorClass.none and [2] != errclass.name:
             return False
             
         if source and comps[3] != source:
@@ -104,13 +93,22 @@ def isOCPError(error: Exception, errclass: ErrorClass=ErrorClass.none, source: s
 
     return False
 
+
+def attachErrorData(exception: Exception, key: str, value: Any):
+    
+    if not hasattr(exception, "_ocp_error_data"):
+        exception._ocp_error_data = {}
+        
+    exception._ocp_error_data[key] = value
+    
+    return exception
+
    
 class ErrorHandler():
     
     class Exceptions(Enum):
         Default    = auto()       # any unknown exception
         Canceled   = auto()       # asyncio Canceled error
-        Processing = auto()       # internal error in error processing
     
     def __init__(self):
         self._parents     = []
@@ -128,32 +126,93 @@ class ErrorHandler():
             if self in handler._parents:
                 handler._parents.remove(self)
     
-    def __upstream(self, upstream, *args):
+    def __upstream(self, error: Enum, data: Any):
         
         if not self._parents:
             return
         
-        if isinstance(upstream, Exception):
-            for parent in self._parents:
-                parent._handleException(self, self, upstream)
-            
-        elif isinstance(upstream, Enum):
-            for parent in self._parents:
-                parent._handleError(self, self, upstream)
+        for parent in self._parents:
+            parent._handleError(self, error, data)
         
+    def _extractErrorData(self, exception: Exception) -> dict[str, Any]:
+        # Extracts all attached error data into a dictionary
+        
+        data = {}
+        if  hasattr(exception, "_ocp_error_data"):
+            data = exception._ocp_error_data
+        
+        data["exception"] = exception
+        return data
+        
+    
+    def _processException(self, exception: Exception):
+        # Processes exceptions into errors. To override by subclasses
+
+        if isinstance(exception, CancelledError):
+            self._handleError(self, ErrorHandler.Exceptions.Canceled, self._extractErrorData(exception))
         else:
-            for parent in self._parents:
-                parent._handleError(self, self, ErrorHandler.Exceptions.Processing, "Wrong type upstreamed")
+            self._handleError(self, ErrorHandler.Exceptions.Default, self._extractErrorData(exception))
     
     
-    def _handleException(self, source, exception: Exception):
-        # Receives all exceptions, either from the derived class or any 
-        # unhandled exception from a registered subandler.
-        # To be overriden
-        self.__upstream(exception)
-    
-    def _handleError(self, source, error: Enum, *data):
+    def _handleError(self, source, error: Enum, data: dict[str, Any]):
         # Receives all errors created in any subhandler.
         # To be overriden
-        self.__upstream(error, *data)
+        self.__upstream(error, data)
 
+
+class WampErrorHandler(ErrorHandler):
+
+    class WampError(Enum):
+        General = auto
+        Timeout = auto()
+        Application = auto()
+        
+
+    def _processException(self, exception: Exception):
+        # Processes exceptions into errors.
+        
+        if not isinstance(exception, wamp.Error):
+            super()._processException(exception)
+        
+        data = self._extractErrorData(exception)
+        data["arguments"] = exception.args
+        
+        if isinstance(exception, wamp.ApplicationError):
+            if exception.error == wamp.ApplicationError.CANCELED:
+                self._handleError(self, WampErrorHandler.WampError.Timeout, data)
+            
+            else:
+                self._handleError(self, WampErrorHandler.WampError.Application, data)
+        
+        else:
+            self._handleError(self, WampErrorHandler.WampError.General, data)
+            
+
+class OCPErrorHandler(WampErrorHandler):
+    
+    class OCPError(Enum):
+        Application = auto()        
+        Connection = auto()
+        Internal = auto()
+            
+    def _processException(self, exception: Exception):
+        # Processes exceptions into errors.
+        
+        
+        if not isOCPError(exception):
+            super()._processException(exception)
+            return 
+        
+        data = self._extractErrorData(exception)
+        data["OCPError"] = OCPError(exception)
+        
+        if isOCPError(exception, errclass=OCPErrorClass.application):
+            self._handleError(self, OCPErrorHandler.OCPError.Application, data)
+            
+        elif isOCPError(exception, errclass=OCPErrorClass.connection):
+            self._handleError(self, OCPErrorHandler.OCPError.Connection, data)
+        
+        else:
+            self._handleError(self, OCPErrorHandler.OCPError.Internal, data)
+            
+            

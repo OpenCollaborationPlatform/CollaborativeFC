@@ -24,11 +24,11 @@ import Documents.Observer   as Observer
 from Documents.OnlineObserver   import OnlineObserver
 from Documents.OnlineObject     import OnlineObject, OnlineViewProvider
 from Documents.AsyncRunner      import DocumentRunner
-from Utils.Errorhandling        import ErrorHandler
+from Utils.Errorhandling        import OCPErrorHandler, attachErrorData
 
 from autobahn.wamp.exception    import ApplicationError
 
-class OnlineDocument(ErrorHandler):
+class OnlineDocument(OCPErrorHandler):
     ''' Describing a FreeCAD document in the OCP framework. Properties can be changed or objects added/removed 
         like with a normal FreeCAD document, with the difference, that all changes are mirrored to all collabrators.
         Changes to the online doc do not change anything on the local one. The intenion is to mirror all user changes 
@@ -80,7 +80,25 @@ class OnlineDocument(ErrorHandler):
             self.viewproviders = []
         
         except Exception as e:
-            self._handleException(self, e)
+            attachErrorData(e, "ocp_message", "Closing document failed")
+            self._processException(e)
+  
+    
+    def _handleError(self, source, error, data):
+        
+        # after any error we need to ensure FreeCAD and Node status match
+        self._runner.run(self.download)
+        
+        if sorce is self and "ocp_message" in data:
+                        
+            err = data["ocp_message"]
+            printdata = data.copy()
+            del printdata["ocp_message"]
+            del printdata["exception"]
+            self.logger.Error(f"{err}: {printdata}")
+        
+        super()._handleError(source, error, data)
+  
   
     def shouldExcludeTypeId(self, typeid):
         #we do not add App origins, lines and planes, as they are only Autocreated from parts and bodies
@@ -353,12 +371,12 @@ class OnlineDocument(ErrorHandler):
         
     async def __recomputeDocument(self, sync):
         
-        #wait till all objects have done their work
-        if sync:
-            await sync.wait()
-        
-        #close the transaction
         try:     
+            #wait till all objects have done their work
+            if sync:
+                await sync.wait()
+        
+            #close the transaction
             self.logger.debug("Close transaction")
             uri = f"ocp.documents.{self.id}.content.Transaction.IsOpen"
             if await self.connection.api.call(uri):
@@ -366,8 +384,8 @@ class OnlineDocument(ErrorHandler):
                 await self.connection.api.call(uri)
 
         except Exception as e:
-            self.logger.error(f"Closing transaction failed: {e}")
-            self._handleException(self, e)
+            attachErrorData(e, "ocp_message", "Closing transaction failed")
+            self._processException(e)
             
         finally:
             if sync:
@@ -384,7 +402,8 @@ class OnlineDocument(ErrorHandler):
                 self.logger.debug(val)
         
         except Exception as e:
-            self._handleException(self, e)        
+            attachErrorData(e, "ocp_message", "Accessing JavaScript prints failed")
+            self._processException(e)        
 
 
     async def asyncSetup(self):
@@ -413,8 +432,8 @@ class OnlineDocument(ErrorHandler):
                     await asyncio.gather(*tasks)
             
         except Exception as e:
-            self.logger.error(f"Unable to setup document: {e}")
-            self._handleException(self, e)
+            attachErrorData(e, "ocp_message", "Unable to setup document")
+            self._processException(e)
 
             
                    
@@ -460,8 +479,8 @@ class OnlineDocument(ErrorHandler):
                 await asyncio.gather(*tasks)
         
         except Exception as e:
-            self.logger.error(f"Unable to load document: {e}")
-            self._handleException(self, e) 
+            attachErrorData(e, "ocp_message", "Unable to load document")
+            self._processException(e) 
             
         finally:
             await self.connection.api.call(f"ocp.documents.{self.id}.view", False)
@@ -475,8 +494,8 @@ class OnlineDocument(ErrorHandler):
             return await self.connection.api.call(u"ocp.documents.{0}.listPeers".format(self.id))
         
         except Exception as e:
-            self.logger.error(f"Getting peers error: {e}")
-            self._handleException(self, e) 
+            attachErrorData(e, "ocp_message", "Retreiving peers failed")
+            self._processException(e) 
             return []
         
         
@@ -498,4 +517,4 @@ class OnlineDocument(ErrorHandler):
                 await asyncio.gather(*coros)
         
         except Exception as e:
-            self._handleException(self, e) 
+            self._processException(e) 

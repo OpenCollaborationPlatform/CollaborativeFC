@@ -1,5 +1,5 @@
 
-from Utils.Errorhandling import ErrorHandler
+from Utils.Errorhandling import OCPErrorHandler
 
 #Batcher are used together with Batched Asyncrunner. They scan over the existing tasks of the runner and 
 #batch them together when possible. For example a single "changeProperty" task can be batched with others into
@@ -31,7 +31,7 @@ async def executeBatchersOnTasks(batchers, tasks):
     return maxBatched
 
 
-class EquallityBatcher(ErrorHandler):
+class EquallityBatcher(OCPErrorHandler):
     #Batches multiple tasks with the same name (as provided in constructor). When used the batcher executes all batched 
     #tasks and afterwards the handler. The principal is that the batched themself do not execute an expensive operation
     #but fill some kind of cache, and the handler afterwards uses this cache to start optimized execution on it
@@ -75,7 +75,7 @@ class EquallityBatcher(ErrorHandler):
         try:
             await self.__handler()
         except Exception as e:
-            self._handleException(e)
+            self._processException(e)
         
     
     def numBatched(self):
@@ -85,7 +85,7 @@ class EquallityBatcher(ErrorHandler):
         return EquallityBatcher(self.__func, self.__handler)
     
 
-class MultiBatcher(ErrorHandler):
+class MultiBatcher(OCPErrorHandler):
     #Batches together task of multiple batchers nondependent of order. As long as the tasks are 
     #handable by any of the batchers this batcher swallows it. During execute all  batchers are
     #executed in provided order

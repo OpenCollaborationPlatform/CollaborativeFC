@@ -139,9 +139,9 @@ class API(QtCore.QObject, Utils.AsyncSlotObject):
         if "options" in kwargs:
             opts = kwargs["options"]
             if not opts.timeout:
-                opts.timeout = 5000
+                opts.timeout = 10000
         else:
-            kwargs["options"] = wamp.CallOptions(timeout=5000)
+            kwargs["options"] = wamp.CallOptions(timeout=10000)
             
         # call
         return await self.__session.call(*args, **kwargs)
