@@ -31,7 +31,7 @@ class Entity(SM.StateMachine):
         - etc.
     '''
     
-    # State Machine UML: www.plantuml.com/plantuml/png/VLF1QXin4BthAoOvv53m3op11D8K2gLftMCmOIkDMu4i6QqsK8B_lP9sF3khRfr3lFFUqsWqC-zXI7rCuz6f_94G7YFc7qFH3e_XBKSKVWcwT_2k8FzDoCUWluyO_y3zlVuThCRjjh8l7_QmsMoP5qS--uJHzqvciOCEtgCkDmlyzbiC6eVX5lg1AYEaY9P8Ho443r-3GNMcgci4xpBlZ_n_7EWXijof6IV2LyiesQOdiugX3YQc0CnIpfgVbJDBFNcp2GsZ3VtidVKewXMjmuGwjUrltaKgIH5KsHsUdDKvMmSlDmTjWjx_J_faRCeg4WdL-iXS6EJ4-4yINOruRgmxgsjZU3wXRpCBhAl18kTPBC1JZ26kp7ytUc_zh-RYykXwei4VfvsrmQ-nd_hKkvaubuMaUzXbz5kmoLmTlBwwyY6f-eR2-F8MnPxB5BlfCXIukuCRQ_PBbJIOL2w5sulVnHvCbjyuF2J9wp8oenGjD5r3QrnAjTFdKa2BNFXGloJzJmSe6uXpuOGUpSmKIWwzy4eWi1bFigv3RnsQQuh-PuYf5OWAJF2e53i6fAcvBOBEl5nsaYY9qGryYCkyAg9AMusiPwrQSZ0riWGWqywJLUG5dZsxe0ECiKIA8H3UuNCP4mxXapEc6fhgfmGTHAIbdNDkoLQShOPANMmWtCKTnrAgn7ZeT8WRVbr43PSQQawx7j9kmi24aIieFosz4KVK0tep7jrV
+    # State Machine UML: www.plantuml.com/plantuml/png/XLHHJzmy47pthrXuuE6JxWz4w8J4rqgLgjB28q8ejPTYATWdnw52YF_UsDdRc-JIAmzSTcQy6QyzkUfpc_Bmqfdn8JDT9nv_d5It_19VnqhAhz6s7RqR6lycvFzeVmoStkZoqZv7RtcxhUpzVm-qsMoLXoLVGkOKsWwx-Dx64DYMDmD-_Zr5otr_JcqlpWIfeXdII4anqBVes7o8wrhHE_Qz6_yFlMm4xKx3s0c-QgDqcxQiAeKQcfW2A2izQtzLLXPdykepEqKNz4teV63m2wFZp3R3-5SqdvpF1l7LyNQnn-dg7n9DhNJ6_snwznRiIa_4crhGRv-ViUVyO6IRI0bKsLlUTTwscHkwFtkoBjg7lqZdRxvVQ3_CgPE_sN5OR0QnfXOwcgaV749ACQrSkTiX11z-cUCZgoiM-FKK4n_36lkvpMrt83vA1kGz6cpvhLZDSqEFZrrvGAhkeJ2X7ed6VAGqmFlvqSK5dNdtC5TXfb4v5sxtdnWukUgADXq_PUHjkNdEcE8CpTJa5Aj-UfmB93k5Z_K9wEC9I3U2TN77WPqojIKSUkKD8BGPTkZhgVKTkrEAzcTCUIa01ou6DaRlEE5tHCS2zCXZPaLY1CCtw2ArUL8aJfSQzBFYLiuHWgT31OnMxQmBrCgS7mKbDcAXF1xjG2-HaTYfFGrSGvnIgOn2137LTIC6OTIL1ymiQ34Z3HfABFauzDnAWhLRBOtP9mw2hAFaObKnl5-oI8TvMYHdYneT3epLOAxXIo6On4-wIxeSB35N7Dpmqlq1
     
     class States(SM.States):
         
@@ -56,6 +56,7 @@ class Entity(SM.StateMachine):
                     Detect       = SM.InitialState()    # Check if online document is in replication or edit mode
                     Replicate    = SM.State()           # Document is replicated on the node, but not edited in the application
                     Edit         = SM.State()           # Edit state: document is ready for concurrent edit
+                    SyncProcess  = SM.ProcessState()    # Syncing FreeCAD document to Node status
                     CloseProcess = SM.ProcessState()    # Closes the document on the node
             
             class Error(SM.GroupedStates):              # Error handling 
@@ -121,7 +122,7 @@ class Entity(SM.StateMachine):
         self.addTransition(Entity.States.Local.Internal, Entity.States.Local.CreateProcess, Entity.Events.open)
         self.addTransition(Entity.States.Local.CreateProcess, Entity.States.Local.Internal, Entity.Events.abort)
         self.addTransition(Entity.States.Local.CreateProcess, Entity.States.Local.Internal, Entity.Events._failed)
-        self.addTransition(Entity.States.Local.CreateProcess, Entity.States.Node.Status.Online, Entity.Events._done)
+        self.addTransition(Entity.States.Local.CreateProcess, Entity.States.Node.Status.Online.Edit, Entity.Events._done)
         self.addTransition(Entity.States.Local.Disconnected, Entity.States.Node, self.__connection.api.reconnected)
         self.addTransition(Entity.States.Local, Entity.States.Removed, Entity.Events.closed)
         
@@ -139,9 +140,12 @@ class Entity(SM.StateMachine):
 
         # node.online state status internals
         self.addTransition(Entity.States.Node.Status.Online.Detect, Entity.States.Node.Status.Online.Replicate, condition = lambda sm: sm.fcdocument is None)
-        self.addTransition(Entity.States.Node.Status.Online.Detect, Entity.States.Node.Status.Online.Edit, condition = lambda sm: sm.fcdocument is not None)
+        self.addTransition(Entity.States.Node.Status.Online.Detect, Entity.States.Node.Status.Online.SyncProcess, condition = lambda sm: sm.fcdocument is not None)
+        self.addTransition(Entity.States.Node.Status.Online.SyncProcess, Entity.States.Node.Status.Online.Replicate, Entity.Events._failed)
+        self.addTransition(Entity.States.Node.Status.Online.SyncProcess, Entity.States.Node.Status.Online.Replicate, Entity.Events.abort)
+        self.addTransition(Entity.States.Node.Status.Online.SyncProcess, Entity.States.Node.Status.Online.Edit, Entity.Events._done)
         self.addTransition(Entity.States.Node.Status.Online.Replicate, Entity.States.Node.Status.Detect, Entity.Events.closed)
-        self.addTransition(Entity.States.Node.Status.Online.Replicate, Entity.States.Node.Status.Online.Edit, Entity.Events.opened)
+        self.addTransition(Entity.States.Node.Status.Online.Replicate, Entity.States.Node.Status.Online.SyncProcess, Entity.Events.opened)
         self.addTransition(Entity.States.Node.Status.Online.Edit, Entity.States.Node.Status.Online.Replicate, Entity.Events.closed)
         self.addTransition(Entity.States.Node.Status.Online.Replicate, Entity.States.Node.Status.Online.CloseProcess, Entity.Events.close)
         self.addTransition(Entity.States.Node.Status.Online.CloseProcess, Entity.States.Node.Status.Detect, Entity.Events.abort)
@@ -183,18 +187,38 @@ class Entity(SM.StateMachine):
     
     @SM.onEnter(States.Local.CreateProcess)
     async def _createDoc(self):
+        # create document on node, load all available local data into it and finish. 
+        # _done event leads directly to "Edit" state
         
         try:
             dmlpath = os.path.join(self.__collab_path, "Dml")
             self._id = await self.__connection.api.call(u"ocp.documents.create", dmlpath)
+            
+            if not self._onlinedoc:
+                self._onlinedoc = OnlineDocument(self._id, self.fcdocument, self.__connection, self._dataservice)
+                await self._onlinedoc.setup()
+            
+            # Load data into node
+            await self._onlinedoc.asyncSetup()
+                
             self.processEvent(Entity.Events._done)
 
         except asyncio.CancelledError:
-            self.processEvent(Entity.Events.abort)
-
+            try:
+                if self._onlinedoc:
+                    await asyncio.wait_for(self._onlinedoc.close(), timeout=1)
+            finally:
+                self._onlinedoc = None
+                self.processEvent(Entity.Events.abort)
+            
         except Exception as e:
-            self.error = e
-            self.processEvent(Entity.Events._failed)
+            try:
+                if self._onlinedoc:
+                    await asyncio.wait_for(self._onlinedoc.close(), timeout=1)
+            finally:
+                self._onlinedoc = None          
+                self.error = e
+                self.processEvent(Entity.Events._failed)
 
 
     @SM.transition(States.Local.Internal, States.Removed, Events.close)
@@ -262,31 +286,45 @@ class Entity(SM.StateMachine):
         self._manager = None
         await manager.close()
     
-    @SM.onEnter(States.Node.Status.Online.Edit)
-    def _enterShared1(self):
-        # we need to setup the onlinedoc imediately, not with asyncio delay, as other callbacks for the state
-        # may acces it
-        self._onlinedoc = OnlineDocument(self._id, self.fcdocument, self.__connection, self._dataservice)
-    
-    @SM.onEnter(States.Node.Status.Online.Edit)
-    async def _enterShared2(self):
-        # setup the onlinedoc delayed after creation
-        try:
-            await self._onlinedoc.setup()
-            await self._onlinedoc.asyncLoad()
-        except Exception as e:
-            print("Failed setup online doc: ", e)
+    @SM.onEnter(States.Node.Status.Online.SyncProcess)
+    async def _syncDoc(self):
         
+        try:
+            if not self._onlinedoc:
+                self._onlinedoc = OnlineDocument(self._id, self.fcdocument, self.__connection, self._dataservice)
+                await self._onlinedoc.setup()
+            
+            await self._onlinedoc.asyncLoad()
+            self.processEvent(Entity.Events._done)
+                
+        except asyncio.CancelledError:
+            try:
+                if self._onlinedoc:
+                    await asyncio.wait_for(self._onlinedoc.close(), timeout=1)
+            finally:
+                self._onlinedoc = None
+                self.processEvent(Entity.Events.abort)
+            
+        except Exception as e:
+            try:
+                if self._onlinedoc:
+                    await asyncio.wait_for(self._onlinedoc.close(), timeout=1)
+            finally:
+                self._onlinedoc = None          
+                self.error = e
+                self.processEvent(Entity.Events._failed)
+
+
     @SM.onExit(States.Node.Status.Online.Edit)
     async def _exitShared(self):
         try:
             odoc = self._onlinedoc
             self._onlinedoc = None
-            await odoc.close()
+            await asyncio.wait_for(odoc.close(), timeout=5)
         except Exception as e:
             print("Failed close online doc: ", e)
             
-    @SM.transition(States.Node.Status.Online.Replicate, States.Node.Status.Online.Edit, Events.open)
+    @SM.transition(States.Node.Status.Online.Replicate, States.Node.Status.Online.SyncProcess, Events.open)
     def _openDoc(self):
         with self._blocker:
             self.fcdocument = FreeCAD.newDocument("Unnamed")

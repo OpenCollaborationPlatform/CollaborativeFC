@@ -85,17 +85,14 @@ class OnlineDocument(OCPErrorHandler):
   
     
     def _handleError(self, source, error, data):
-        
-        # after any error we need to ensure FreeCAD and Node status match
-        self._runner.run(self.download)
-        
-        if sorce is self and "ocp_message" in data:
+                
+        if source is self and "ocp_message" in data:
                         
             err = data["ocp_message"]
             printdata = data.copy()
             del printdata["ocp_message"]
             del printdata["exception"]
-            self.logger.Error(f"{err}: {printdata}")
+            self.logger.error(f"{err}: {printdata}")
         
         super()._handleError(source, error, data)
   

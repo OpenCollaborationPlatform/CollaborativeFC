@@ -19,6 +19,7 @@
 
 import asyncio, FreeCAD
 import Documents.Property as Property
+from Utils.Errorhandling import attachErrorData
 from autobahn.wamp.types  import CallOptions
 
 class OCPObjectReader():
