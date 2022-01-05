@@ -59,13 +59,16 @@ class OCPError():
             self.origin = exptn.args[1]
             self.arguments = exptn.args[2]
             self.stack = exptn.args[3]
-        
+    
+    def __repr__(self): 
+        return self.__str__()
+    
     def __str__(self):
-         msg = self.error + ": " + self.message
+         msg = self.errclass.name + ": " + self.message
          if self.arguments:
              msg += " ("
-             for i in range(len(self.arguments)/2):
-                 msg += str(self.args[i*2]) + ": " + str(self.args[i*2+1]) + ", "
+             for i in range(int(len(self.arguments)/2)):
+                 msg += str(self.arguments[i*2]) + ": " + str(self.arguments[i*2+1]) + ", "
              
              msg += ")"
              
