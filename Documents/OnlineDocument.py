@@ -366,9 +366,7 @@ class OnlineDocument(OCPErrorHandler):
         
         else:
             runner = DocumentRunner.getSenderRunner(self.id, self.logger)
-            runner.run(self.__recomputeDocument(self.sync))
-            
-        
+            runner.run(self.__recomputeDocument(self.sync))       
         
     async def __recomputeDocument(self, sync):
         

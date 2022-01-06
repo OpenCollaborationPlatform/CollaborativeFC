@@ -288,9 +288,10 @@ class OCPObjectWriter():
             #now batchwrite all properties in correct order
             if len(props) == 1:
                 prop = list(props.keys())[0]
-                self.logger.debug(f"Write property {prop}")
+                self.logger.debug(f"Write property {props}")
                 uri = f"ocp.documents.{self.docId}.content.Document.{self.objGroup}.{self.name}.Properties.{prop}.SetValue"
                 await self.connection.api.call(uri, list(props.values())[0])
+                self.logger.debug(f"Done writing property {prop}")
             else:
                 self.logger.debug(f"Write properties {list(props.keys())}")
                 uri = u"ocp.documents.{0}.content.Document.{1}.{2}.Properties.SetValues".format(self.docId, self.objGroup, self.name)
@@ -300,10 +301,9 @@ class OCPObjectWriter():
 
             #finally process the outlist
             if self.objGroup == "Objects" and out != outlist:
-                self.logger.debug(f"Set Outlist")
                 uri = f"ocp.documents.{self.docId}.content.Document.{self.objGroup}.{self.name}.dependencies"
                 await self.connection.api.call(uri, out)
-                
+
         except Exception as e:
             attachErrorData(e, "ocp_message", f"Batch writing properties {list(props.keys())} failed")
             raise e
