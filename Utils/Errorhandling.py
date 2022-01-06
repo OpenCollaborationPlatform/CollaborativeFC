@@ -64,7 +64,7 @@ class OCPError():
         return self.__str__()
     
     def __str__(self):
-         msg = self.errclass.name + ": " + self.message
+         msg = str(self.errclass) + ": " + self.message
          if self.arguments:
              msg += " ("
              for i in range(int(len(self.arguments)/2)):
@@ -72,6 +72,17 @@ class OCPError():
              
              msg += ")"
              
+         return msg
+     
+    def fullMessage(self):
+         
+         msg = self.__str__()
+         msg += "\nOrigin: " + self.origin
+         msg += "\nStack: \n"
+         
+         for s in self.stack:
+             msg += s + "\n"
+         
          return msg
         
 
