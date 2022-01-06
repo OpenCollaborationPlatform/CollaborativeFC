@@ -87,12 +87,16 @@ class OnlineDocument(OCPErrorHandler):
     def _handleError(self, source, error, data):
                 
         if source is self and "ocp_message" in data:
-                        
+            
             err = data["ocp_message"]
-            printdata = data.copy()
-            del printdata["ocp_message"]
-            del printdata["exception"]
-            self.logger.error(f"{err}: {printdata}")
+            if error in OCPErrorHandler.OCPError:
+                ocperr = data["OCPError"]
+                self.logger.error(f"{err}: {ocperr.fullMessage()}")
+            else:
+                printdata = data.copy()
+                del printdata["ocp_message"]
+                del printdata["exception"]
+                self.logger.error(f"{err}: {printdata}")
         
         super()._handleError(source, error, data)
   
@@ -405,6 +409,7 @@ class OnlineDocument(OCPErrorHandler):
 
     async def asyncSetup(self):
         # Loads the existing FreeCAD doc into the ocp node
+        # called from entity, and not a runner, hence requires any exception to be raised
         try:                
             for fcobj in self.document.Objects:
                 
@@ -430,12 +435,13 @@ class OnlineDocument(OCPErrorHandler):
             
         except Exception as e:
             attachErrorData(e, "ocp_message", "Unable to setup document")
-            self._processException(e)
+            raise e
 
             
                    
     async def asyncLoad(self):
         # loads the online doc into the freecad doc
+        # called from entity, and not a runner, hence requires any exception to be raised
         
         try:
             #first we need to get into view mode for the document, to have a steady picture of the current state of things and
@@ -477,7 +483,7 @@ class OnlineDocument(OCPErrorHandler):
         
         except Exception as e:
             attachErrorData(e, "ocp_message", "Unable to load document")
-            self._processException(e) 
+            raise e
             
         finally:
             await self.connection.api.call(f"ocp.documents.{self.id}.view", False)

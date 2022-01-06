@@ -451,7 +451,7 @@ class __GUIDocumentObserver(__ObserverBase):
             self._createdWhileDeactivated[doc].append(vp)
             return
         
-        odoc = self._getOnlineDocument(doc)
+        odoc = self._getOnlineDocument(doc.Document)
         if odoc:
             odoc.newViewProvider(vp)
             
@@ -461,7 +461,7 @@ class __GUIDocumentObserver(__ObserverBase):
  
  
     def slotChangedObject(self, vp, prop):
-               
+                
         #we need to check if any document has this vp, as accessing it before 
         #creation crashes freecad
         if not self._hasOnlineViewProvider(vp):
@@ -471,7 +471,7 @@ class __GUIDocumentObserver(__ObserverBase):
         if self.isDeactivatedFor(doc) or self.isRemoving(vp.Object):
             return
 
-        odoc = self._getOnlineDocument(doc)
+        odoc = self._getOnlineDocument(doc.Document)
         if not odoc:
             return
         
