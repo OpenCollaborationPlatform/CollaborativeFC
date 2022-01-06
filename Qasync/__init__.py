@@ -14,7 +14,7 @@ __author__ = (
     "Mark Harviston <mark.harviston@gmail.com>, "
     "Arve Knudsen <arve.knudsen@gmail.com>",
 )
-__version__ = "0.18.0"
+__version__ = "0.22.0"
 __url__ = "https://github.com/CabbageDevelopment/qasync"
 __license__ = "BSD"
 __all__ = ["QEventLoop", "QThreadExecutor", "asyncSlot", "asyncClose"]
@@ -40,6 +40,7 @@ qtapi_env = os.getenv("QT_API", "").strip().lower()
 if qtapi_env:
     env_to_mod_map = {
         "pyqt5": "PyQt5",
+        "pyqt6": "PyQt6",
         "pyqt": "PyQt4",
         "pyqt4": "PyQt4",
         "pyside6": "PySide6",
@@ -60,14 +61,14 @@ if qtapi_env:
 
 # If a Qt lib is already imported, use that
 if not QtModule:
-    for QtModuleName in ("PyQt5", "PySide2", "PySide6"):
+    for QtModuleName in ("PyQt5", "PyQt6", "PySide2", "PySide6"):
         if QtModuleName in sys.modules:
             QtModule = sys.modules[QtModuleName]
             break
 
 # Try importing qt libs
 if not QtModule:
-    for QtModuleName in ("PyQt5", "PySide2", "PySide6"):
+    for QtModuleName in ("PyQt5", "PyQt6", "PySide2", "PySide6"):
         try:
             QtModule = importlib.import_module(QtModuleName)
         except ImportError:
@@ -86,6 +87,12 @@ QtGui = importlib.import_module(QtModuleName + ".QtGui", package=QtModuleName)
 if QtModuleName == "PyQt5":
     from PyQt5 import QtWidgets
     from PyQt5.QtCore import pyqtSlot as Slot
+
+    QApplication = QtWidgets.QApplication
+
+elif QtModuleName == "PyQt6":
+    from PyQt6 import QtWidgets
+    from PyQt6.QtCore import pyqtSlot as Slot
 
     QApplication = QtWidgets.QApplication
 
@@ -131,7 +138,10 @@ class _QThreadWorker(QtCore.QThread):
             future, callback, args, kwargs = command
             self._logger.debug(
                 "#%s got callback %s with args %s and kwargs %s from queue",
-                    self.__num, callback, args, kwargs
+                self.__num,
+                callback,
+                args,
+                kwargs,
             )
             if future.set_running_or_notify_cancel():
                 self._logger.debug("Invoking callback")
@@ -194,7 +204,9 @@ class QThreadExecutor:
         future = Future()
         self._logger.debug(
             "Submitting callback %s with args %s and kwargs %s to thread worker queue",
-            callback, args, kwargs
+            callback,
+            args,
+            kwargs,
         )
         self.__queue.put((future, callback, args, kwargs))
         return future
@@ -285,6 +297,16 @@ class _SimpleTimer(QtCore.QObject):
         if self.__debug_enabled:
             self._logger.debug(*args, **kwargs)
 
+
+def _fileno(fd):
+    if isinstance(fd, int):
+        return fd
+    try:
+        return int(fd.fileno())
+    except (AttributeError, TypeError, ValueError):
+        raise ValueError(f"Invalid file object: {fd!r}") from None
+
+
 @with_logger
 class _QEventLoop:
     """
@@ -351,7 +373,11 @@ class _QEventLoop:
 
         try:
             self.__log_debug("Starting Qt event loop")
-            rslt = self.__app.exec_()
+            rslt = -1
+            try:
+                rslt = self.__app.exec_()
+            except AttributeError:
+                rslt = self.__app.exec()
             self.__log_debug("Qt event loop ended with result %s", rslt)
             return rslt
         finally:
@@ -436,7 +462,9 @@ class _QEventLoop:
 
         self.__log_debug(
             "Registering callback %s to be invoked with arguments %s after %s second(s)",
-            callback, args, delay
+            callback,
+            args,
+            delay,
         )
 
         if sys.version_info >= (3, 7):
@@ -474,7 +502,7 @@ class _QEventLoop:
             existing.activated["int"].disconnect()
             # will get overwritten by the assignment below anyways
 
-        notifier = QtCore.QSocketNotifier(fd, QtCore.QSocketNotifier.Read)
+        notifier = QtCore.QSocketNotifier(_fileno(fd), QtCore.QSocketNotifier.Type.Read)
         notifier.setEnabled(True)
         self.__log_debug("Adding reader callback for file descriptor %s", fd)
         notifier.activated["int"].connect(
@@ -511,7 +539,10 @@ class _QEventLoop:
             existing.activated["int"].disconnect()
             # will get overwritten by the assignment below anyways
 
-        notifier = QtCore.QSocketNotifier(fd, QtCore.QSocketNotifier.Write)
+        notifier = QtCore.QSocketNotifier(
+            _fileno(fd),
+            QtCore.QSocketNotifier.Type.Write,
+        )
         notifier.setEnabled(True)
         self.__log_debug("Adding writer callback for file descriptor %s", fd)
         notifier.activated["int"].connect(
@@ -544,7 +575,7 @@ class _QEventLoop:
         try:
             callback(*args)
         finally:
-            # The notifier might have been overridden by the
+            # The notifier might have been overriden by the
             # callback. We must not re-enable it in that case.
             if notifiers.get(fd, None) is notifier:
                 notifier.setEnabled(True)
@@ -555,7 +586,9 @@ class _QEventLoop:
         if fd not in notifiers:
             self._logger.warning(
                 "Socket notifier for fd %s is ready, even though it should "
-                "be disabled, not calling %s and disabling", fd, callback
+                "be disabled, not calling %s and disabling",
+                fd,
+                callback,
             )
             notifier.setEnabled(False)
             return
@@ -581,9 +614,7 @@ class _QEventLoop:
         If no executor is provided, the default executor will be used, which defers execution to
         a background thread.
         """
-        self.__log_debug(
-            "Running callback %s with args %s in executor", callback, args
-        )
+        self.__log_debug("Running callback %s with args %s in executor", callback, args)
         if isinstance(callback, asyncio.Handle):
             assert not args
             assert not isinstance(callback, asyncio.TimerHandle)

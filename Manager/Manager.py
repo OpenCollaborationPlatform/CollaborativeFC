@@ -21,7 +21,6 @@ import FreeCAD, FreeCADGui, asyncio, os
 
 import Utils
 from Utils.Errorhandling import OCPErrorHandler, attachErrorData
-from OCP import OCPConnection
 from Documents.Dataservice      import DataService
 from Documents.OnlineDocument   import OnlineDocument
 from Manager.Entity  import Entity
@@ -57,7 +56,7 @@ class Manager(QtCore.QObject, OCPErrorHandler):
     documentAdded   = QtCore.Signal(str)
 
     
-    def __init__(self, collab_path, connection: OCPConnection):  
+    def __init__(self, collab_path, connection):  
         
         QtCore.QObject.__init__(self)
         OCPErrorHandler.__init__(self)

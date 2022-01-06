@@ -98,7 +98,7 @@ class OnlineObserver():
      
         
     async def __run(self, *args, details=None):
-    
+
         #the path are all topics after Document.Objects.
         path = details.topic.split(".")[5:]    
         #key is the one used in the callback map
