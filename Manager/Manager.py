@@ -90,10 +90,10 @@ class Manager(QtCore.QObject, OCPErrorHandler):
               
         try:
             #we register ourself for some key events
-            await self.__connection.api.subscribe("manager", self.onOCPDocumentCreated, u"ocp.documents.created")
-            await self.__connection.api.subscribe("manager", self.onOCPDocumentOpened, u"ocp.documents.opened")
-            await self.__connection.api.subscribe("manager", self.onOCPDocumentClosed, u"ocp.documents.closed")
-            await self.__connection.api.subscribe("manager", self.onOCPDocumentInvited, u"ocp.documents.invited")
+            await self.__connection.api.subscribe("manager", self._onOCPDocumentCreated, u"ocp.documents.created")
+            await self.__connection.api.subscribe("manager", self._onOCPDocumentOpened, u"ocp.documents.opened")
+            await self.__connection.api.subscribe("manager", self._onOCPDocumentClosed, u"ocp.documents.closed")
+            await self.__connection.api.subscribe("manager", self._onOCPDocumentInvited, u"ocp.documents.invited")
 
             await self.__handleConnectionChanged()
             
@@ -105,6 +105,16 @@ class Manager(QtCore.QObject, OCPErrorHandler):
         
         if entity in self.__entities:
             self.__entities.remove(entity)
+            
+    def _spawnOnlineEntity(self, docid):
+        #spawns a new entity with the given id
+        
+        entity = Entity(self.__connection, self.__dataservice, self.__collab_path, _EventBlocker(self))
+        entity.finished.connect(lambda e=entity: self._removeEntity(e))
+        entity._onSpwanInvitedEntity.connect(self._spawnOnlineEntity)
+        self.__entities.append(entity)
+        self.documentAdded.emit(entity.uuid)
+        entity.start(id = docid)
     
     @asyncSlot()
     async def __connectionChanged(self):
@@ -126,6 +136,7 @@ class Manager(QtCore.QObject, OCPErrorHandler):
                     if not self.hasEntity("id", doc):
                         entity = Entity(self.__connection, self.__dataservice, self.__collab_path, _EventBlocker(self))
                         entity.finished.connect(lambda e=entity: self._removeEntity(e))
+                        entity._onSpwanInvitedEntity.connect(self._spawnOnlineEntity)
                         self.__entities.append(entity)
                         self.documentAdded.emit(entity.uuid)
                         
@@ -137,6 +148,7 @@ class Manager(QtCore.QObject, OCPErrorHandler):
                     if not self.hasEntity("id", doc):
                         entity = Entity(self.__connection, self.__dataservice, self.__collab_path, _EventBlocker(self))     
                         entity.finished.connect(lambda e=entity: self._removeEntity(e))
+                        entity._onSpwanInvitedEntity.connect(self._spawnOnlineEntity)
                         self.__entities.append(entity)
                         self.documentAdded.emit(entity.uuid)
                         
@@ -161,6 +173,7 @@ class Manager(QtCore.QObject, OCPErrorHandler):
         #If a document was opened in freecad this function makes it known to the Handler. 
         entity = Entity(self.__connection, self.__dataservice, self.__collab_path, _EventBlocker(self))
         entity.finished.connect(lambda e=entity: self._removeEntity(e))
+        entity._onSpwanInvitedEntity.connect(self._spawnOnlineEntity)
         self.__entities.append(entity)       
         self.documentAdded.emit(entity.uuid)
         
@@ -184,7 +197,7 @@ class Manager(QtCore.QObject, OCPErrorHandler):
     #OCP event handling  (used as wamp event callbacks)
     #**********************************************************************
     
-    def onOCPDocumentCreated(self, id):
+    def _onOCPDocumentCreated(self, id):
    
         #could be that we already have this id (e.g. if we created it ourself)
         if self.hasEntity('id', id):
@@ -192,17 +205,18 @@ class Manager(QtCore.QObject, OCPErrorHandler):
                
         entity = Entity(self.__connection, self.__dataservice, self.__collab_path, _EventBlocker(self))
         entity.finished.connect(lambda e=entity: self._removeEntity(e))
+        entity._onSpwanInvitedEntity.connect(self._spawnOnlineEntity)
         self.__entities.append(entity)
         self.documentAdded.emit(entity.uuid)
         
         entity.start(id = id)
         
-    def onOCPDocumentOpened(self, id): 
+    def _onOCPDocumentOpened(self, id): 
         # same as created: setup the entity and let it figure out everything itself
-        return self.onOCPDocumentCreated(id)
+        return self._onOCPDocumentCreated(id)
             
         
-    def onOCPDocumentClosed(self, id):
+    def _onOCPDocumentClosed(self, id):
         
         
         if not self.hasEntity('id', id):
@@ -212,11 +226,11 @@ class Manager(QtCore.QObject, OCPErrorHandler):
         entity.processEvent(Entity.Events.closed)
         
     
-    def onOCPDocumentInvited(self, doc, add):
+    def _onOCPDocumentInvited(self, doc, add):
        
         if add:
             # same as created: setup the entity and let it figure out everything itself
-            return self.onOCPDocumentCreated(id)
+            return self._onOCPDocumentCreated(id)
             
         else:
             if not self.hasEntity('id', doc):

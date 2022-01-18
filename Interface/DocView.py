@@ -116,7 +116,6 @@ class DocWidget(QtWidgets.QWidget, StateMachineProcessWidget):
         
         self.__entity.state(Entity.States.Local.Disconnected).setAttributeValue(self.ui.statusLabel, "text", "Disconnected document")
         self.__entity.state(Entity.States.Local.Disconnected).setAttributeValue(self.ui.statusIndicator, "pixmap", QtGui.QPixmap(":/Collaboration/Icons/indicator_err.svg"))
-        self.__entity.state(Entity.States.Local.Disconnected).setAttributeValue(self.ui.closeButton, "text", "Leave")
         self.__entity.state(Entity.States.Local.Disconnected).setAttributeValue(self.ui.closeButton, "visible", True)
         
         self.__entity.state(Entity.States.Node).setAttributeValue(self.ui.statusLabel, "text", "Loading...")
@@ -128,15 +127,13 @@ class DocWidget(QtWidgets.QWidget, StateMachineProcessWidget):
         self.__entity.state(Entity.States.Node.Status.Online).setAttributeValue(self.ui.onlinestatus, "visible", True)
         self.__entity.state(Entity.States.Node.Status.Online).setAttributeValue(self.ui.statusLabel, "visible", False)
         self.__entity.state(Entity.States.Node.Status.Online).setAttributeValue(self.ui.editButton, "visible", True)
+        self.__entity.state(Entity.States.Node.Status.Online).setAttributeValue(self.ui.closeButton, "visible", True)
         
         self.__entity.state(Entity.States.Node.Status.Online.Replicate).setAttributeValue(self.ui.openButton, "visible", True)
-        self.__entity.state(Entity.States.Node.Status.Online.Replicate).setAttributeValue(self.ui.closeButton, "visible", True)
-        self.__entity.state(Entity.States.Node.Status.Online.Replicate).setAttributeValue(self.ui.closeButton, "text", "Leave")
         self.__entity.state(Entity.States.Node.Status.Online.Replicate).setAttributeValue(self.ui.statusIndicator, "pixmap", QtGui.QPixmap(":/Collaboration/Icons/indicator_intermediate.svg"))
         
         self.__entity.state(Entity.States.Node.Status.Online.Edit).setAttributeValue(self.ui.statusIndicator, "pixmap", QtGui.QPixmap(":/Collaboration/Icons/indicator_on.svg"))
-        self.__entity.state(Entity.States.Node.Status.Online.Edit).setAttributeValue(self.ui.closeButton, "visible", True)
-        self.__entity.state(Entity.States.Node.Status.Online.Edit).setAttributeValue(self.ui.closeButton, "text", "Close")
+
                 
         
         # manager data

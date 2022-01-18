@@ -20,9 +20,11 @@
 import asyncio
 import Documents.Batcher as Batcher
 from Utils.Errorhandling import OCPErrorHandler
+from enum import Enum, auto
+from typing import Any
 
-class Task(OCPErrorHandler):
-    # Wraps a function to be called as Task
+class _Task():
+    # Wraps a function to be called as _Task
     # Works for async and normal functions, with arbitrary arguments
     
     def __init__(self, fnc, args):
@@ -46,6 +48,37 @@ class Task(OCPErrorHandler):
         return self.Func.__self__.__class__.__name__ + "." + self.Func.__name__
 
 
+class _TaskErrorHandler(OCPErrorHandler):
+    
+    class TaskError(Enum):
+        Recover = auto()    # Revocer action failed
+    
+    def __init__(self):
+        self.__recoverTask = {}
+        
+    def setRecoverTask(self, error: Enum, fnc, *args):
+        
+        if not error in self.__recoverTask:
+            self.__recoverTask[error] = []
+            
+        self.__recoverTask[error].append(_Task(fnc, args))
+        
+    def _handleError(self, source, error: Enum, data: dict[str, Any]):
+        
+        # ustream the error!
+        super()._handleError(source, error, data)
+        
+        # we try to execute the recovery action. If it also fails we have a a new error
+        if error in self.__tasks:
+            try:
+                asyncio.gather(*(self.__tasks[error]))
+            except Exception as e:
+                recdata = self._extractErrorData(e)
+                recdata["recover_from"] = data
+                super()._handleError(self, _TaskErrorHandler.TaskError.Recover, recdata)
+                return
+        
+
 class DocumentRunner():
     #Generates sender and receiver DocumentBatchedOrderedRunner for a whole document where all actions on all 
     #individual runners are executed in order
@@ -66,9 +99,9 @@ class DocumentRunner():
             DocumentRunner.__receiver[docId] = OrderedRunner(logger)
         
         return DocumentBatchedOrderedRunner(DocumentRunner.__receiver[docId])
-            
+
     
-class OrderedRunner(OCPErrorHandler):
+class OrderedRunner(_TaskErrorHandler):
     #AsyncRunner which runs task in order
    
     #runs all tasks synchronous
@@ -106,11 +139,10 @@ class OrderedRunner(OCPErrorHandler):
         
         self.__finishEvent.set()       
 
-    def _processException(self, exception: Exception):
+    def _handleError(self, source, error: Enum, data: dict[str, Any]):
         # any error in task processing leads to deletion of all current tasks
-        
         self.__tasks = []
-        super()._processException(exception)
+        super()._handleError(source, error, data)
 
 
     async def __run(self):
@@ -124,10 +156,11 @@ class OrderedRunner(OCPErrorHandler):
                 #work the tasks synchronous
                 task = self.__tasks.pop(0)
                 while task:
-                    self._registerSubErrorhandler(task)
-                    self.__current = task.name()
-                    await task.execute()
-                    self._unregisterSubErrorhandler(task)
+                    try:
+                        self.__current = task.name()
+                        await task.execute()
+                    except Exception as e:
+                        self._processException(e)
                     
                     if self.__tasks:
                         task = self.__tasks.pop(0)
@@ -147,7 +180,7 @@ class OrderedRunner(OCPErrorHandler):
            
     def run(self, fnc, *args):
         
-        self.__tasks.append(Task(fnc, args))
+        self.__tasks.append(_Task(fnc, args))
         self.__syncEvent.set()
         
         
@@ -160,7 +193,7 @@ class OrderedRunner(OCPErrorHandler):
         self.run(syncer.execute)
 
 
-class BatchedOrderedRunner(OCPErrorHandler):
+class BatchedOrderedRunner(_TaskErrorHandler):
     #batched ordered execution of tasks
     #Normally run received a function object of an async function and its arguments.
     #The functions are than processed in order one by one (each one awaited). If functions can be batched
@@ -186,7 +219,7 @@ class BatchedOrderedRunner(OCPErrorHandler):
     def registerBatcher(self, batcher):        
         self.__batcher.append(batcher)
         self._registerSubErrorhandler(batcher)
-
+        
 
     async def waitTillCloseout(self, timeout = 10):     
         try:
@@ -210,11 +243,10 @@ class BatchedOrderedRunner(OCPErrorHandler):
         
         self.__finishEvent.set()
 
-    def _processException(self, exception: Exception):
+    def _handleError(self, source, error: Enum, data: dict[str, Any]):
         # any error in task processing leads to deletion of all current tasks
-        
         self.__tasks = []
-        super()._processException(exception)
+        super()._handleError(source, error, data)
 
     async def __run(self):
                   
@@ -240,9 +272,7 @@ class BatchedOrderedRunner(OCPErrorHandler):
                         else:                       
                             #not batchable, execute normal operation
                             task = self.__tasks.pop(0)
-                            self._registerSubErrorhandler(task)
                             await task.execute()
-                            self._unregisterSubErrorhandler(task)
 
                     except Exception as e:
                         self._processException(e)
@@ -272,7 +302,7 @@ class BatchedOrderedRunner(OCPErrorHandler):
         self.run(syncer.execute)
         
 
-class DocumentBatchedOrderedRunner(OCPErrorHandler):
+class DocumentBatchedOrderedRunner(_TaskErrorHandler):
     #A Async runner that synchronizes over the whole document, and has the same API as the BatchedOrderedRunner to be 
     #compatible replacement
     

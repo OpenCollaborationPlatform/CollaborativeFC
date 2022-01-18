@@ -58,7 +58,7 @@ class OCPObjectWriter():
         self.dynPropCache       = {}
         self.statusPropCache    = {}
         self.propChangeCache    = {}
-        self.propChangeOutlist  = []
+        self.propChangeInlist  = []
         self.setupStage         = True
 
     
@@ -223,12 +223,12 @@ class OCPObjectWriter():
             raise e
             
     
-    def changeProperty(self, prop, value, outlist):        
+    def changeProperty(self, prop, value, intlist):        
         # change a property to new value and outlist. Note: Value must be already in serializabe format
         # Not async as it will be batched by runner
         
         self.propChangeCache[prop] = value
-        self.propChangeOutlist = outlist #we are only interested in the last set outlist, not intermediate steps
+        self.propChangeInlist = intlist #we are only interested in the last set outlist, not intermediate steps
     
     
     async def __getCidForData(self, data):               
@@ -252,8 +252,8 @@ class OCPObjectWriter():
         #copy everything before first async op
         props = self.propChangeCache.copy()
         self.propChangeCache.clear()
-        out = self.propChangeOutlist.copy()
-        self.propChangeOutlist.clear()
+        out = self.propChangeInlist.copy()
+        self.propChangeInlist.clear()
         out.sort()
                
         try:
@@ -272,13 +272,13 @@ class OCPObjectWriter():
             #also in parallel: query the current outlist (to not update everytime a property changes)
             if self.objGroup == "Objects":
                 outlist = []
-                async def getOutlist():
+                async def getInlist():
                     uri = f"ocp.documents.{self.docId}.content.Document.{self.objGroup}.{self.name}.dependencies"
                     outlist = await self.connection.api.call(uri)
                     if outlist:
                         outlist.sort()
                     
-                tasks.append(getOutlist())
+                tasks.append(getInlist())
 
 
             #execute all parallel tasks

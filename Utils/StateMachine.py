@@ -263,6 +263,7 @@ class _State(QtCore.QObject):
         self._asyncCallbacks = []       # Async functions to be called when entering the state (and aborted when exited)
         self.__tasks = []               # Collection of all running asyncio tasks
         self.__attributes = []          # All attributes we need to set when entering/leaving
+        self.__event = asyncio.Event()  # Event to block till active
         
         if parent:
             parent._children.add(self)
@@ -360,7 +361,10 @@ class _State(QtCore.QObject):
         
         data = {"obj": obj, "attr": prop, "value": value, "reset": reset, "initial": None}
         self.__attributes.append(data)
-        
+    
+    async def waitTillActive(self, timeout = 10):
+        # async wait till the state gets active. Default timeout is 10s
+        await asyncio.wait_for(self.__event.wait(), timeout=timeout)
 
     def _onEntry(self):
         
@@ -389,6 +393,7 @@ class _State(QtCore.QObject):
             else:        
                 setattr(data["obj"], data["attr"], data["value"])
 
+        self.__event.set()
 
     def _onExit(self):
         
@@ -411,7 +416,8 @@ class _State(QtCore.QObject):
                     data["obj"].setProperty(data["attr"], data["initial"])
                 else:        
                     setattr(data["obj"], data["attr"], data["initial"])
-                    
+        
+        self.__event.clear()
             
 
 class StateMachine(QtCore.QObject):
