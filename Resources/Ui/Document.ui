@@ -294,7 +294,7 @@
       <enum>Qt::NoFocus</enum>
      </property>
      <property name="text">
-      <string>Close</string>
+      <string>Leave</string>
      </property>
      <property name="autoRaise">
       <bool>false</bool>

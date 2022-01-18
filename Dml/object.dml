@@ -8,7 +8,7 @@ Data {
     property string fcName
     
     event onSetupFinished    //no args. Emitted from FreeCAD
-    event onObjectRecomputed //no args
+    event onObjectRecomputed //no args. Emitted from FreeCAD
     event onExtensionCreated //extension
     event onExtensionRemoved //extension
     

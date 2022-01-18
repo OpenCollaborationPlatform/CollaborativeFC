@@ -42,7 +42,7 @@ class Handler():
           
         self.__manager = manager  
         self.__session = None
-        self.__logger  = logging.getLogger("Test handler")
+        self.__logger  = logging.getLogger("Testhandler")
         
         #register the Error raise filter to ensure that during testing all error messages lead to test stop
         #Note: Attach to handler, as adding to logger itself does not propagate to child loggers
@@ -87,7 +87,7 @@ class Handler():
     
     async def __onJoin(self, session, details):
         #little remark that we joined (needed for test executable, it waits for this)
-        FreeCAD.Console.PrintMessage("Connection to OCP test server established\n")
+        self.__logger.info("Connection to OCP test server established")
         
         #store the session for later use
         self.__session = session

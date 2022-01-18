@@ -19,6 +19,7 @@
 
 import asyncio, uuid, os
 import FreeCAD
+from PySide2 import QtCore
 import Utils.StateMachine as SM
 from Manager.NodeDocument import NodeDocumentManager
 from Documents.OnlineDocument import OnlineDocument
@@ -31,7 +32,7 @@ class Entity(SM.StateMachine):
         - etc.
     '''
     
-    # State Machine UML: www.plantuml.com/plantuml/png/XLHHJzmy47pthrXuuE6JxWz4w8J4rqgLgjB28q8ejPTYATWdnw52YF_UsDdRc-JIAmzSTcQy6QyzkUfpc_Bmqfdn8JDT9nv_d5It_19VnqhAhz6s7RqR6lycvFzeVmoStkZoqZv7RtcxhUpzVm-qsMoLXoLVGkOKsWwx-Dx64DYMDmD-_Zr5otr_JcqlpWIfeXdII4anqBVes7o8wrhHE_Qz6_yFlMm4xKx3s0c-QgDqcxQiAeKQcfW2A2izQtzLLXPdykepEqKNz4teV63m2wFZp3R3-5SqdvpF1l7LyNQnn-dg7n9DhNJ6_snwznRiIa_4crhGRv-ViUVyO6IRI0bKsLlUTTwscHkwFtkoBjg7lqZdRxvVQ3_CgPE_sN5OR0QnfXOwcgaV749ACQrSkTiX11z-cUCZgoiM-FKK4n_36lkvpMrt83vA1kGz6cpvhLZDSqEFZrrvGAhkeJ2X7ed6VAGqmFlvqSK5dNdtC5TXfb4v5sxtdnWukUgADXq_PUHjkNdEcE8CpTJa5Aj-UfmB93k5Z_K9wEC9I3U2TN77WPqojIKSUkKD8BGPTkZhgVKTkrEAzcTCUIa01ou6DaRlEE5tHCS2zCXZPaLY1CCtw2ArUL8aJfSQzBFYLiuHWgT31OnMxQmBrCgS7mKbDcAXF1xjG2-HaTYfFGrSGvnIgOn2137LTIC6OTIL1ymiQ34Z3HfABFauzDnAWhLRBOtP9mw2hAFaObKnl5-oI8TvMYHdYneT3epLOAxXIo6On4-wIxeSB35N7Dpmqlq1
+    # State Machine UML: www.plantuml.com/plantuml/png/XLHTQzim57tNhxZjGny6-GEcX4AtmM2iM_eOGl7acrMWI46MEqh9VvybtoZ7hklv8P7EERgw7pw-QsCTOdUmgbz4fll0_LyZkmqV_4k_a-rthsjBRuhwPq0-U_shu_1AjxVwsHlDwtLcjvzsj5gj2mz7lhd8mTKMevXMU-TOfvi1l_uPlEQslQQwbSm4IQ8nKicMlACVlc5ragppZjumxcF_sxLII7faCNjlEZxKM5G5gcXW4f1PhBseCeCDU36fq0ykVt3ME8Rae4ySMKVezOpcIsEYGdosbzQtsCho857bNMdeVuC-lZez5nFmAc_ehudFuvZOE2aJAO4ok-6ZDRg_lQBjrLutNky-a8vltawq9xKqzOSZksanW5LvKrepn8CXXE23Z10hstJE6VT7lHzPFZ71xmTF6E_csAzrhEs5EAKNNkufBfR_Z6NpLlJqPDC2gLn3ObmUIV5qJnMtdlj7DpTqPPhTM8K6HkLOk3v_Js1oEIjQMTv7v7Lwyngbn4DoZJWdfMg6vLWWtacypokWttT0eX6SyqTst5oOHE7G4wy0eLLtnBpsjR7SB2dgtpx4gG0oQBnZfSexJlWTAMq1kkVHio9HWCaD44RIN1P9fikQQROoHpHUQIfWX3QMT1O4aWhogUva6qaXBNDsU4ow9UHydvGIIvRKYnahuX3IJXM8mCBbN8-1KSl92wOcj2Gg0IeABDwvn5mNTqkql5Ngx4OmUIc8Kwg0oRp0mjBePP4qUwp1vfodZfw7huXWOas9Bivhu8YwOzTq1_iF
     
     class States(SM.States):
         
@@ -147,9 +148,10 @@ class Entity(SM.StateMachine):
         self.addTransition(Entity.States.Node.Status.Online.Replicate, Entity.States.Node.Status.Detect, Entity.Events.closed)
         self.addTransition(Entity.States.Node.Status.Online.Replicate, Entity.States.Node.Status.Online.SyncProcess, Entity.Events.opened)
         self.addTransition(Entity.States.Node.Status.Online.Edit, Entity.States.Node.Status.Online.Replicate, Entity.Events.closed)
+        self.addTransition(Entity.States.Node.Status.Online.Edit, Entity.States.Node.Status.Online.CloseProcess, Entity.Events.close)
         self.addTransition(Entity.States.Node.Status.Online.Replicate, Entity.States.Node.Status.Online.CloseProcess, Entity.Events.close)
         self.addTransition(Entity.States.Node.Status.Online.CloseProcess, Entity.States.Node.Status.Detect, Entity.Events.abort)
-        self.addTransition(Entity.States.Node.Status.Online.CloseProcess, Entity.States.Node.Status.Online.Replicate, Entity.Events._failed)
+        self.addTransition(Entity.States.Node.Status.Online.CloseProcess, Entity.States.Node.Status.Detect, Entity.Events._failed)
         self.addTransition(Entity.States.Node.Status.Online.CloseProcess, Entity.States.Node.Status.Detect, Entity.Events._done)
         
         # node state error internals
@@ -243,8 +245,18 @@ class Entity(SM.StateMachine):
             if status == "open":
                 self.processEvent(Entity.Events._online)
             elif status == "invited":
-                self.processEvent(Entity.Events._invited)
+                # if we are invited and have a local document, we need to spawn a new entity
+                # this could happen if we have a close event in edit state, where only the 
+                # node part is closed
+                if not self.fcdocument:
+                    self.processEvent(Entity.Events._invited)
+                else:
+                    id = self.id
+                    self.id = None
+                    self._onSpwanInvitedEntity(id)
+                    self.processEvent(Entity.Events._local)
             else:
+                # go local. If there is no fcdocument we go to removed from there
                 self.processEvent(Entity.Events._local)
         
         except Exception as e:
@@ -328,12 +340,6 @@ class Entity(SM.StateMachine):
     def _openDoc(self):
         with self._blocker:
             self.fcdocument = FreeCAD.newDocument("Unnamed")
-
-    @SM.transition(States.Node.Status.Online.Edit, States.Node.Status.Online.Replicate, Events.close)
-    def _closeDoc(self):
-        with self._blocker:
-            FreeCAD.closeDocument(self.fcdocument.Name)
-            self.fcdocument = None
  
             
     @SM.onEnter(States.Node.Status.Online.CloseProcess)
@@ -353,6 +359,7 @@ class Entity(SM.StateMachine):
     # Cleanup and general stuff
     # #########################
  
+    _onSpwanInvitedEntity = QtCore.Signal(str)
  
     @SM.onFinish
     async def _close(self):
@@ -401,3 +408,46 @@ class Entity(SM.StateMachine):
                 return state.name.split('.')[-1]
             
         return "Unknown"
+    
+    async def collaborate(self, timeout = 10):
+        # convienience function to bring the entity into collaboration state
+        
+        if Entity.States.Node.Status.Online.Edit in self.activeStates:
+            return
+        
+        elif Entity.States.Local in self.activeStates:
+            
+            self.processEvent(Entity.Events.open)
+            await self.state(Entity.States.Node.Status.Online.Edit).waitTillActive(timeout = timeout)
+            return
+        
+        elif Entity.States.Node.Status.Invited in self.activeStates:
+            
+            self.processEvent(Entity.Events.open)
+            await self.state(Entity.States.Node.Status.Online.Replicate).waitTillActive(timeout = timeout)
+            self.processEvent(Entity.Events.open)
+            await self.state(Entity.States.Node.Status.Online.Edit).waitTillActive(timeout = timeout)
+            return
+        
+        elif Entity.States.Node.Status.Online.Replicate in self.activeStates:
+            self.processEvent(Entity.Events.open)
+            await self.state(Entity.States.Node.Status.Online.Edit).waitTillActive(timeout = timeout)
+            return
+        
+        
+        raise Exception("Current state does not allow collaboration")
+
+
+    async def stopCollaboration(self, timeout = 10):
+        #convinience function to stop collaboration 
+        
+        if Entity.States.Local in self.activeStates:
+            return
+        
+        elif Entity.States.Node.Status.Online in self.activeStates:
+            self.processEvent(Entity.Events.close)
+            await self.state(Entity.States.Local).waitTillActive(timeout = timeout)
+            return
+        
+        raise Exception("Current state does not allow closing the collaboration")
+            

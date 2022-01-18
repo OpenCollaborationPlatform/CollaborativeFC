@@ -53,6 +53,8 @@ class FreeCADOnlineObject(OCPErrorHandler):
                 self._runner     = parentOnlineObj._runner
 
         self._registerSubErrorhandler(self._runner)
+        self._runner.setRecoverTask(OCPErrorHandler.OCPError.Application, self.download)
+        self._runner.setRecoverTask(OCPErrorHandler.OCPError.Connection, self.download)
 
         self.Writer = OCPObjectWriter(name, objGroup, onlinedoc, self.logger)
         self.Reader = OCPObjectReader(name, objGroup, onlinedoc, self.logger)
@@ -197,9 +199,11 @@ class FreeCADOnlineObject(OCPErrorHandler):
             
             #write all properties.
             props = obj.PropertiesList
+            inlist = []
+            if hasattr(obj, "InList"):
+                inlist = [inObj.Name for inObj in obj.InList]
             for prop in props:
-                value = Property.convertPropertyToWamp(obj, prop)
-                self.Writer.changeProperty(prop, value, obj.OutList)
+                self.Writer.changeProperty(prop, value, obj.InList)
             
             tasks.append(self.Writer.processPropertyChanges())
 
@@ -289,12 +293,12 @@ class OnlineObject(FreeCADOnlineObject):
     
     def changeProperty(self, prop):
         value = Property.convertPropertyToWamp(self.obj, prop)
-        outlist = [obj.Name for obj in self.obj.OutList]
-        self._runner.run(self.__changeProperty, prop, value, outlist)
+        inlist = [obj.Name for obj in self.obj.InList]
+        self._runner.run(self.__changeProperty, prop, value, inlist)
         
-    def __changeProperty(self, prop, value, outlist):
+    def __changeProperty(self, prop, value, inlist):
         #indirection for batcher named tasks
-        self.Writer.changeProperty(prop, value, outlist)
+        self.Writer.changeProperty(prop, value, inlist)
 
  
     def changePropertyStatus(self, prop):
@@ -401,9 +405,9 @@ class OnlineViewProvider(FreeCADOnlineObject):
         #indirection for batcher named tasks
         self.Writer.changePropertyStatus(prop, info)
 
-    def __changeProperty(self, prop, value, outlist):
+    def __changeProperty(self, prop, value, inlist):
         #indirection for batcher named tasks
-        self.Writer.changeProperty(prop, value, outlist)
+        self.Writer.changeProperty(prop, value, inlist)
         
     def __addDynamicProperty(self, prop, info):
         #indirection for batcher named tasks
