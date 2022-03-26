@@ -188,7 +188,13 @@ class __ObserverBase():
     def _getOnlineDocument(self, fcdoc):
         
         result = None
-        entity = self.handler.getEntity("fcdocument", fcdoc)
+        
+        if fcdoc.isDerivedFrom("App::Document"):
+            entity = self.handler.getEntity("fcdocument", fcdoc)
+        else:
+            # Gui document
+            entity = self.handler.getEntity("fcdocument", fcdoc.Document)
+            
         if entity:
             result = entity.online_document
             
@@ -352,7 +358,7 @@ class __DocumentObserver(__ObserverBase):
     
     def slotAddedDynamicExtension(self, obj, extension):
         #works for >=0.19, both DocumentObject and ViewProviders
-        
+               
         doc = obj.Document
         
         if self.isDeactivatedFor(doc):

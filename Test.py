@@ -124,8 +124,8 @@ class Handler():
         # wait till all tasks in the document with given ID are finished
         try:
             for entity in self.__manager.getEntities():
-                if entity.onlinedoc != None and entity.id == docId:
-                    await entity.onlinedoc.waitTillCloseout(timeout)
+                if entity.online_document != None and entity.id == docId:
+                    await entity.online_document.waitTillCloseout(timeout)
                     self.__logger.debug(f"Closeout finished for {docId}")
                     return True
             
@@ -172,8 +172,8 @@ class Handler():
         try:
             entities = self.__manager.getEntities()
             for entity in entities:
-                if entity.onlinedoc and entity.id == docId:
-                    await entity.onlinedoc.waitTillCloseout(30)
+                if entity.online_document and entity.id == docId:
+                    await entity.online_document.waitTillCloseout(30)
                     
         except Exception as e: 
             print(f"Participation in synchronize failed, cannot wait for closeout of current actions: {e}")

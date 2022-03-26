@@ -36,13 +36,10 @@ class _Task():
         
     async def execute(self):
         
-        try:
-            if asyncio.iscoroutinefunction(self.Func):
-                await self.Func(*self.Args)
-            else:
-                self.Func(*self.Args)
-        except Exception as e:
-            self._processException(e)
+        if asyncio.iscoroutinefunction(self.Func):
+            await self.Func(*self.Args)
+        else:
+            self.Func(*self.Args)
                 
     def name(self):
         return self.Func.__self__.__class__.__name__ + "." + self.Func.__name__
@@ -54,6 +51,7 @@ class _TaskErrorHandler(OCPErrorHandler):
         Recover = auto()    # Revocer action failed
     
     def __init__(self):
+        super().__init__()
         self.__recoverTask = {}
         
     def setRecoverTask(self, error: Enum, fnc, *args):
@@ -218,7 +216,6 @@ class BatchedOrderedRunner(_TaskErrorHandler):
 
     def registerBatcher(self, batcher):        
         self.__batcher.append(batcher)
-        self._registerSubErrorhandler(batcher)
         
 
     async def waitTillCloseout(self, timeout = 10):     
@@ -264,7 +261,6 @@ class BatchedOrderedRunner(_TaskErrorHandler):
                     
                 #work the tasks in order
                 while self.__tasks:
-                                       
                     try:
                         executed  = await Batcher.executeBatchersOnTasks(self.__batcher, self.__tasks)
                         if executed > 0:
@@ -275,6 +271,7 @@ class BatchedOrderedRunner(_TaskErrorHandler):
                             await task.execute()
 
                     except Exception as e:
+                        self.__logger.debug(f"Process exception: {e}")
                         self._processException(e)
                 
                 self.__finishEvent.set()
@@ -282,16 +279,15 @@ class BatchedOrderedRunner(_TaskErrorHandler):
 
 
             except Exception as e:
-                self.logger.error(f"Unexpected exception in BatchedOrderedRunner: {e}")
+                self.__logger.error(f"Unexpected exception in BatchedOrderedRunner: {e}")
                 self._processException(e)
                 
         if not self.__shutdown:            
-            self.logger.error(f"Unexpected shutdown in BatchedOrderedRunner: {e}")
+            self.__logger.error(f"Unexpected shutdown in BatchedOrderedRunner: {e}")
         
            
     def run(self, fnc, *args):
-        
-        self.__tasks.append(Task(fnc, args))
+        self.__tasks.append(_Task(fnc, args))
         self.__syncEvent.set()
         
     def queued(self):

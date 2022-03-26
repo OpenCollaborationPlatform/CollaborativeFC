@@ -109,7 +109,7 @@ class OnlineDocument(OCPErrorHandler):
         return False
     
     def newObject(self, obj):
-        
+               
         if self.shouldExcludeTypeId(obj.TypeId):
             return
                 
