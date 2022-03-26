@@ -191,6 +191,7 @@ class Manager(QtCore.QObject, OCPErrorHandler):
         
         entity = self.getEntity('fcdocument', doc)
         if entity:
+            entity.fcdocument = None
             entity.processEvent(Entity.Events.closed)
  
 

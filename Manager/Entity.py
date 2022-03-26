@@ -225,8 +225,8 @@ class Entity(SM.StateMachine):
 
     @SM.transition(States.Local.Internal, States.Removed, Events.close)
     def _closeLocalDoc(self):
-        with self._blocker:
-            if self.fcdocument:
+        if self.fcdocument:
+            with self._blocker:
                 FreeCAD.closeDocument(self.fcdocument.Name)
                 self.fcdocument=None
     
@@ -260,7 +260,6 @@ class Entity(SM.StateMachine):
                 self.processEvent(Entity.Events._local)
         
         except Exception as e:
-            print("detect error: ", e)
             self.processEvent(Entity.Events._local)
 
 
@@ -338,8 +337,9 @@ class Entity(SM.StateMachine):
             
     @SM.transition(States.Node.Status.Online.Replicate, States.Node.Status.Online.SyncProcess, Events.open)
     def _openDoc(self):
-        with self._blocker:
-            self.fcdocument = FreeCAD.newDocument("Unnamed")
+        if not self.fcdocument:
+            with self._blocker:
+                self.fcdocument = FreeCAD.newDocument("Unnamed")
  
             
     @SM.onEnter(States.Node.Status.Online.CloseProcess)
@@ -409,7 +409,7 @@ class Entity(SM.StateMachine):
             
         return "Unknown"
     
-    async def collaborate(self, timeout = 10):
+    async def collaborate(self, timeout = 10, doc_name = "unknown"):
         # convienience function to bring the entity into collaboration state
         
         if Entity.States.Node.Status.Online.Edit in self.activeStates:
@@ -423,6 +423,9 @@ class Entity(SM.StateMachine):
         
         elif Entity.States.Node.Status.Invited in self.activeStates:
             
+            with self._blocker:
+                self.fcdocument = FreeCAD.newDocument(doc_name)
+            
             self.processEvent(Entity.Events.open)
             await self.state(Entity.States.Node.Status.Online.Replicate).waitTillActive(timeout = timeout)
             self.processEvent(Entity.Events.open)
@@ -430,6 +433,10 @@ class Entity(SM.StateMachine):
             return
         
         elif Entity.States.Node.Status.Online.Replicate in self.activeStates:
+            
+            with self._blocker:
+                self.fcdocument = FreeCAD.newDocument(doc_name)
+                
             self.processEvent(Entity.Events.open)
             await self.state(Entity.States.Node.Status.Online.Edit).waitTillActive(timeout = timeout)
             return

@@ -48,7 +48,7 @@ class FreeCADOnlineObject(OCPErrorHandler):
         
         else:
             if parentOnlineObj is None:
-                self._runner     = BatchedOrderedRunner(self.logger) #used by the object to sync outgoing events
+                self._runner     = BatchedOrderedRunner(self.logger)
             else:
                 self._runner     = parentOnlineObj._runner
 
@@ -76,7 +76,7 @@ class FreeCADOnlineObject(OCPErrorHandler):
             printdata = data.copy()
             del printdata["ocp_message"]
             del printdata["exception"]
-            self.logger.Error(f"{err}: {printdata}")
+            self.logger.error(f"{err}: {printdata}")
         
         super()._handleError(source, error, data)
     
@@ -203,7 +203,7 @@ class FreeCADOnlineObject(OCPErrorHandler):
             if hasattr(obj, "InList"):
                 inlist = [inObj.Name for inObj in obj.InList]
             for prop in props:
-                self.Writer.changeProperty(prop, value, obj.InList)
+                self.Writer.changeProperty(prop, Property.convertPropertyToWamp(obj, prop), obj.InList)
             
             tasks.append(self.Writer.processPropertyChanges())
 
@@ -231,8 +231,8 @@ class OnlineObject(FreeCADOnlineObject):
         
         for batcher in batchers:
             self._runner.registerBatcher(batcher)
-
-        cbs = [b.copy() for b in batchers]            
+        
+        cbs = [b.copy() for b in batchers]
         self._runner.registerBatcher(Batcher.MultiBatcher(cbs))
 
         

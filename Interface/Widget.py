@@ -132,8 +132,12 @@ class UIWidget(QtWidgets.QFrame):
         #try to find the correct position for the popup
         pos = QtGui.QCursor.pos()
         widget = QtWidgets.QApplication.widgetAt(pos)
-        point = widget.rect().bottomLeft()
-        global_point = widget.mapToGlobal(point)
+        if widget:
+            point = widget.rect().bottomLeft()
+            global_point = widget.mapToGlobal(point)
+        else: 
+            global_point = pos
+        
         self.move(global_point)            
         super().show()
 
