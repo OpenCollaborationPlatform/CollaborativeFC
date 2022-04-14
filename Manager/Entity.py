@@ -21,10 +21,11 @@ import asyncio, uuid, os
 import FreeCAD
 from PySide2 import QtCore
 import Utils.StateMachine as SM
+from Utils import Errorhandling
 from Manager.NodeDocument import NodeDocumentManager
 from Documents.OnlineDocument import OnlineDocument
 
-class Entity(SM.StateMachine):
+class Entity(SM.StateMachine, Errorhandling.OCPErrorHandler):
     ''' data structure describing a entity in the collaboration framework. A entity is a things that can be calloborated on, e.g.:
         - A local Freecad document
         - A invited ocp document on the node
@@ -184,6 +185,13 @@ class Entity(SM.StateMachine):
         raise Exception("Either fcdoc or id must be provided to set initial state")
 
 
+    def _handleError(self, source, error, data):
+        
+        #handle errors
+        print(f"Entity Error: {source}:\n{error}\n{data}")
+        pass
+
+
     # Local substatus
     # ###############
     
@@ -218,6 +226,7 @@ class Entity(SM.StateMachine):
                 if self._onlinedoc:
                     await asyncio.wait_for(self._onlinedoc.close(), timeout=1)
             finally:
+                self._processException(e)
                 self._onlinedoc = None          
                 self.error = e
                 self.processEvent(Entity.Events._failed)
@@ -225,11 +234,14 @@ class Entity(SM.StateMachine):
 
     @SM.transition(States.Local.Internal, States.Removed, Events.close)
     def _closeLocalDoc(self):
-        if self.fcdocument:
-            with self._blocker:
-                FreeCAD.closeDocument(self.fcdocument.Name)
-                self.fcdocument=None
-    
+        try:
+            if self.fcdocument:
+                with self._blocker:
+                    FreeCAD.closeDocument(self.fcdocument.Name)
+                    self.fcdocument=None
+        except Exception as e:
+            self._processException(e)
+
     @SM.transition(States.Local.Disconnected, States.Local.Internal, Events.close)
     def _closeDisconnectedDoc(self):
         self._id = None
@@ -260,6 +272,7 @@ class Entity(SM.StateMachine):
                 self.processEvent(Entity.Events._local)
         
         except Exception as e:
+            self._processException(e)
             self.processEvent(Entity.Events._local)
 
 
@@ -273,6 +286,7 @@ class Entity(SM.StateMachine):
         except asyncio.CancelledError:
             self.processEvent(Entity.Events.abort)
         except Exception as e:
+            self._processException(e)
             self.error = e
             self.processEvent(Entity.Events._failed)
 
@@ -289,13 +303,19 @@ class Entity(SM.StateMachine):
     @SM.onEnter(States.Node.Status.Online)
     async def _enterOnline2(self):
         # setup the manager delayed after creation
-        await self._manager.setup()
+        try:
+            await self._manager.setup()
+        except Exception as e:
+            self._processException(e)
         
     @SM.onExit(States.Node.Status.Online)
     async def _exitOnline(self):
-        manager = self._manager
-        self._manager = None
-        await manager.close()
+        try:
+            manager = self._manager
+            self._manager = None
+            await manager.close()
+        except Exception as e:
+            self._processException(e)
     
     @SM.onEnter(States.Node.Status.Online.SyncProcess)
     async def _syncDoc(self):
@@ -321,6 +341,7 @@ class Entity(SM.StateMachine):
                 if self._onlinedoc:
                     await asyncio.wait_for(self._onlinedoc.close(), timeout=1)
             finally:
+                self._processException(e)
                 self._onlinedoc = None          
                 self.error = e
                 self.processEvent(Entity.Events._failed)
@@ -333,13 +354,16 @@ class Entity(SM.StateMachine):
             self._onlinedoc = None
             await asyncio.wait_for(odoc.close(), timeout=5)
         except Exception as e:
-            print("Failed close online doc: ", e)
+            self._processException(e)
             
     @SM.transition(States.Node.Status.Online.Replicate, States.Node.Status.Online.SyncProcess, Events.open)
     def _openDoc(self):
-        if not self.fcdocument:
-            with self._blocker:
-                self.fcdocument = FreeCAD.newDocument("Unnamed")
+        try:
+            if not self.fcdocument:
+                with self._blocker:
+                    self.fcdocument = FreeCAD.newDocument("Unnamed")
+        except Exception as e:
+            self._processException(e)
  
             
     @SM.onEnter(States.Node.Status.Online.CloseProcess)
@@ -352,6 +376,7 @@ class Entity(SM.StateMachine):
         except asyncio.CancelledError:
             self.processEvent(Entity.Events.abort)
         except Exception as e:
+            self._processException(e)
             self.error = e
             self.processEvent(Entity.Events._failed)
  
@@ -363,10 +388,18 @@ class Entity(SM.StateMachine):
  
     @SM.onFinish
     async def _close(self):
-        if self._manager:
-            await self._manager.close()
-        if self._onlinedoc:
-            await self._onlinedoc._close()
+        try:
+            if self._manager:
+                await self._manager.close()
+            if self._onlinedoc:
+                await self._onlinedoc._close()
+        
+        except Exception as e:
+            self._processException(e)
+            
+        finally:
+            self._manager = None
+            self._onlinedoc = None
     
     @property
     def node_document_manager(self):
@@ -412,35 +445,39 @@ class Entity(SM.StateMachine):
     async def collaborate(self, timeout = 10, doc_name = "unknown"):
         # convienience function to bring the entity into collaboration state
         
-        if Entity.States.Node.Status.Online.Edit in self.activeStates:
-            return
-        
-        elif Entity.States.Local in self.activeStates:
+        try:
+            if Entity.States.Node.Status.Online.Edit in self.activeStates:
+                return
             
-            self.processEvent(Entity.Events.open)
-            await self.state(Entity.States.Node.Status.Online.Edit).waitTillActive(timeout = timeout)
-            return
-        
-        elif Entity.States.Node.Status.Invited in self.activeStates:
-            
-            with self._blocker:
-                self.fcdocument = FreeCAD.newDocument(doc_name)
-            
-            self.processEvent(Entity.Events.open)
-            await self.state(Entity.States.Node.Status.Online.Replicate).waitTillActive(timeout = timeout)
-            self.processEvent(Entity.Events.open)
-            await self.state(Entity.States.Node.Status.Online.Edit).waitTillActive(timeout = timeout)
-            return
-        
-        elif Entity.States.Node.Status.Online.Replicate in self.activeStates:
-            
-            with self._blocker:
-                self.fcdocument = FreeCAD.newDocument(doc_name)
+            elif Entity.States.Local in self.activeStates:
                 
-            self.processEvent(Entity.Events.open)
-            await self.state(Entity.States.Node.Status.Online.Edit).waitTillActive(timeout = timeout)
+                self.processEvent(Entity.Events.open)
+                await self.state(Entity.States.Node.Status.Online.Edit).waitTillActive(timeout = timeout)
+                return
+            
+            elif Entity.States.Node.Status.Invited in self.activeStates:
+                
+                with self._blocker:
+                    self.fcdocument = FreeCAD.newDocument(doc_name)
+                
+                self.processEvent(Entity.Events.open)
+                await self.state(Entity.States.Node.Status.Online.Replicate).waitTillActive(timeout = timeout)
+                self.processEvent(Entity.Events.open)
+                await self.state(Entity.States.Node.Status.Online.Edit).waitTillActive(timeout = timeout)
+                return
+            
+            elif Entity.States.Node.Status.Online.Replicate in self.activeStates:
+                
+                with self._blocker:
+                    self.fcdocument = FreeCAD.newDocument(doc_name)
+                    
+                self.processEvent(Entity.Events.open)
+                await self.state(Entity.States.Node.Status.Online.Edit).waitTillActive(timeout = timeout)
+                return
+            
+        except Exception as e:
+            self._processException(e)
             return
-        
         
         raise Exception("Current state does not allow collaboration")
 
@@ -448,12 +485,17 @@ class Entity(SM.StateMachine):
     async def stopCollaboration(self, timeout = 10):
         #convinience function to stop collaboration 
         
-        if Entity.States.Local in self.activeStates:
-            return
-        
-        elif Entity.States.Node.Status.Online in self.activeStates:
-            self.processEvent(Entity.Events.close)
-            await self.state(Entity.States.Local).waitTillActive(timeout = timeout)
+        try:
+            if Entity.States.Local in self.activeStates:
+                return
+            
+            elif Entity.States.Node.Status.Online in self.activeStates:
+                self.processEvent(Entity.Events.close)
+                await self.state(Entity.States.Local).waitTillActive(timeout = timeout)
+                return
+            
+        except Exception as e:
+            self._processException(e)
             return
         
         raise Exception("Current state does not allow closing the collaboration")
