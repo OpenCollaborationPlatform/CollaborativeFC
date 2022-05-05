@@ -17,7 +17,7 @@
 # *   Suite 330, Boston, MA  02111-1307, USA                             *
 # ************************************************************************
 
-import asyncio, uuid, os
+import asyncio, uuid, os, traceback
 import FreeCAD
 from PySide2 import QtCore
 import Utils.StateMachine as SM
@@ -189,7 +189,21 @@ class Entity(SM.StateMachine, Errorhandling.OCPErrorHandler):
         
         #handle errors
         print(f"Entity Error: {source}:\n{error}\n{data}")
-        pass
+        if 'exception' in data:
+            e = data['exception']
+
+            stack_level = 1  # we start at the last line of the exception
+            stack = None
+            cwd = os.getcwd()
+            # traverse the stack to grab the first application code that throw an exception
+            while stack_level < 1000:
+                stack = traceback.extract_tb(e.__traceback__, -stack_level)[0]
+                if not stack.filename.startswith(cwd):
+                    stack_level += 1
+                else:
+                    break
+            filename, lineno, line = stack.filename, stack.lineno, stack.line
+            print("@" + filename + ":" + str(lineno) + "  `" + line + "`"  )
 
 
     # Local substatus

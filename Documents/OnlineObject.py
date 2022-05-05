@@ -203,7 +203,7 @@ class FreeCADOnlineObject(OCPErrorHandler):
             if hasattr(obj, "InList"):
                 inlist = [inObj.Name for inObj in obj.InList]
             for prop in props:
-                self.Writer.changeProperty(prop, Property.convertPropertyToWamp(obj, prop), obj.InList)
+                self.Writer.changeProperty(prop, Property.convertPropertyToWamp(obj, prop), inlist)
             
             tasks.append(self.Writer.processPropertyChanges())
 
