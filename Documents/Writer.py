@@ -223,12 +223,12 @@ class OCPObjectWriter():
             raise e
             
     
-    def changeProperty(self, prop, value, intlist):        
+    def changeProperty(self, prop, value, inlist):        
         # change a property to new value and outlist. Note: Value must be already in serializabe format
         # Not async as it will be batched by runner
         
         self.propChangeCache[prop] = value
-        self.propChangeInlist = intlist #we are only interested in the last set outlist, not intermediate steps
+        self.propChangeInlist = inlist #we are only interested in the last set outlist, not intermediate steps
     
     
     async def __getCidForData(self, data):               
