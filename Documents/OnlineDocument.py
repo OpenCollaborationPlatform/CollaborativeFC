@@ -408,14 +408,13 @@ class OnlineDocument(OCPErrorHandler):
     async def asyncSetup(self):
         # Loads the existing FreeCAD doc into the ocp node
         # called from entity, and not a runner, hence requires any exception to be raised
-        try:                
+        try:    
+            tasks = []
             for fcobj in self.document.Objects:
                 
                 if self.shouldExcludeTypeId(fcobj.TypeId):
                     continue
-                
-                tasks = []
-                
+                                
                 #create and setup the online object
                 oobj = OnlineObject(fcobj, self)
                 self.objects[fcobj.Name] = oobj
@@ -428,8 +427,8 @@ class OnlineDocument(OCPErrorHandler):
 
                 # TODO: setup document properties
                 
-                if tasks:
-                    await asyncio.gather(*tasks)
+            if tasks:
+                await asyncio.gather(*tasks)
             
         except Exception as e:
             attachErrorData(e, "ocp_message", "Unable to setup document")

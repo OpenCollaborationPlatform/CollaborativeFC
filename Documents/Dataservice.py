@@ -27,6 +27,7 @@ class DataService():
         self.__data = {}
         self.uri = u'freecad.{0}.dataUpload'.format(fcid)
         self.__connection = connection
+        self.chunksize = 1024*256 #should be 0.25mb
     
     async def setup(self):
         await self.__connection.api.register("dataservice", self.__dataUpload, self.uri, RegisterOptions(details_arg='details'))
@@ -52,9 +53,8 @@ class DataService():
 
         if details.progress:
             data = self.getData(key)
-            size = 1024*256 #should be 0.25mb
-            for i in range(0, len(data), size):
-                block = data[i:i+size]
+            for i in range(0, len(data), self.chunksize):
+                block = data[i:i+self.chunksize]
                 details.progress(bytes(block))
                 
         else: 

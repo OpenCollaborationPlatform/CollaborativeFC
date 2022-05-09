@@ -19,7 +19,8 @@
 # ************************************************************************
 
 
-import asyncio, logging
+import asyncio, logging, uuid
+from asyncio.queues import Queue
 from autobahn.asyncio.component import Component
 from autobahn import wamp
 from PySide2 import QtCore
@@ -27,69 +28,58 @@ from Qasync import asyncSlot
 import Utils
 import FreeCAD
 
-
-class API(QtCore.QObject, Utils.AsyncSlotObject):
-    #Class to handle the WAMP connection to the OCP node
-       
-    def __init__(self, node, logger):
+class _Session():
+    # Abstraction of a wamp session with extra functionality for reconnecting
+    
+    def __init__(self, id, index, readyCB, leaveCB):
         
-        QtCore.QObject.__init__(self)
+        self.__id  = id
+        self.index = index
+        self.__readyCB = readyCB
+        self.__leaveCB = leaveCB
         
-        self.__node = node
         self.__wamp = None
-        self.__session = None        
-        self.__readyEvent = asyncio.Event()
+        self.__session = None
+        
         self.__registered = {}          # key: [(args, kwargs)]
         self.__registeredSessions = {}  # key: [sessions]
         self.__subscribed = {}
         self.__subscribedSessions = {}
-        self.__logger = logger
-        self.__settings = FreeCAD.ParamGet("User parameter:BaseApp/Preferences/Mod").GetGroup("Collaboration")
 
-        # connect to node ready events for auto reconnect
-        self.__node.runningChanged.connect(self.__nodeChange)
+    @property
+    def connected(self):
+        return self.__session != None
 
-    
-    async def waitTillReady(self):
-        await self.__readyEvent.wait()
-        
-   
-    async def connectToNode(self):
-        
-        self.__logger.debug(f"Try to connect")
-        
-        if not self.__node.running:
-            raise Exception("Cannot connect API if node is not running")
+    def connect(self, uri, port):
         
         if self.connected:
             return
-        
-        #make the OCP node connection!            
-        uri = f"ws://{self.__node.apiUri}:{self.__node.apiPort}/ws"
-        self.__wamp = Component(  transports={
-                                    "url":uri,
+
+        url = f"ws://{uri}:{port}/ws"
+        self.__wamp = Component(transports={
+                                    "url":url,
                                     "serializers": ['msgpack'],
                                     "initial_retry_delay": 10
                                 },
-                                realm = "ocp")
+                                realm = "ocp",
+                                authentication={
+                                    "anonymous": {
+                                        "authid": str(self.__id),
+                                    }
+                                },
+                                )
         self.__wamp.on('join', self.__onJoin)
         self.__wamp.on('leave', self.__onLeave)
-        self.__wamp.on('disconnect', self.__onDisconnect)
-        self.__wamp.on('ready', self.__onReady)
-
-        #run the component
         self.__wamp.start()
-        
-        
-    async def disconnectFromNode(self):
 
-        # close the connection
-        self.__logger.debug(f"Try to disconnect")
+
+    async def disconnect(self):
+        
         if self.__wamp:
             await self.__wamp.stop()
             self.__wamp = None
-   
-    
+
+        
     async def register(self, key, *args, **kwargs):
         # Registers an API function. It stays registered over multiple session and reconnects
         # Can be unregistered with the given key. Note: multiple register and subscribe calls can be 
@@ -128,9 +118,8 @@ class API(QtCore.QObject, Utils.AsyncSlotObject):
             for session in self.__subscribedSessions.pop(key, []):
                 await session.unsubscribe()
 
-            
+
     async def call(self, *args, **kwargs):
-        # calls api function
         
         if not self.connected: 
             raise Exception("Not connected to Node, cannot call API function")
@@ -145,8 +134,162 @@ class API(QtCore.QObject, Utils.AsyncSlotObject):
             
         # call
         return await self.__session.call(*args, **kwargs)
-        
+
+
+    # Wamp callbacks
+    # ********************************************************************************************
     
+    async def __onJoin(self, session, details):
+       
+        self.__session = session
+        
+        res = await session.call("wamp.session.get", details.session)
+        print(res)
+        
+        # in case we get a subscribe/register call during execution
+        registered = self.__registered.copy()
+        subscribed = self.__subscribed.copy()
+        
+        # register all functions
+        for key, argsList in registered.items():
+            
+            sessions = []
+            for args in argsList:
+                sessions.append(await self.__session.register(*(args[0]), **(args[1])))
+            
+            self.__registeredSessions[key] = sessions
+            
+        # subscribe to all events
+        for key, argsList in subscribed.items():
+            
+            sessions = []
+            for args in argsList:
+                sessions.append(await self.__session.subscribe(*(args[0]), **(args[1])))
+            
+            self.__subscribedSessions[key] = sessions
+            
+        self.__readyCB(self.index)                    
+            
+    async def __onLeave(self, session, reason):
+               
+        # clear all registered and subscribed session objects
+        self.__registeredSessions = {}
+        self.__subscribedSessions = {}
+        self.__session = None
+        
+        self.__leaveCB(self.index)
+
+
+class API(QtCore.QObject, Utils.AsyncSlotObject):
+    #Class to handle the WAMP connection to the OCP node
+    
+    _numSessions = 100
+    
+    def __init__(self, node, logger):
+        
+        QtCore.QObject.__init__(self)
+
+        self.__id = uuid.uuid4()        
+        self.__sessions = [_Session(self.__id, i, self.__onReady, self.__onLeave) for i in range(API._numSessions)]
+        self.__queue = Queue(API._numSessions)
+        self.__waiting = 0
+        
+        self.__node = node
+        self.__readyEvent = asyncio.Event()
+        self.__logger = logger
+        self.__settings = FreeCAD.ParamGet("User parameter:BaseApp/Preferences/Mod").GetGroup("Collaboration")
+
+        # connect to node ready events for auto reconnect
+        self.__node.runningChanged.connect(self.__nodeChange)
+
+    
+    async def waitTillReady(self):
+        await self.__readyEvent.wait()
+        
+   
+    async def connectToNode(self):
+        
+        self.__logger.debug(f"Try to connect")
+        
+        if not self.__node.running:
+            raise Exception("Cannot connect API if node is not running")
+        
+        if self.connected:
+            return
+        
+        # close the connection
+        for session in self.__sessions:
+            session.connect(self.__node.apiUri, self.__node.apiPort)
+                
+        
+    async def disconnectFromNode(self):
+
+        # close the connection
+        for session in self.__sessions:
+            await session.disconnect()
+   
+    
+    async def register(self, key, *args, **kwargs):
+        # Registers an API function. It stays registered over multiple session and reconnects
+        # Can be unregistered with the given key. Note: multiple register and subscribe calls can be 
+        # made with a single key
+        
+        regopts = [isinstance(s,wamp.RegisterOptions) for s in args]
+        if any(regopts):
+            opts = args[regopts.index(True)]
+            opts.invoke = 'roundrobin'        
+        elif "options" in kwargs:
+            opts = kwargs["options"]
+            opts.invoke = 'roundrobin'
+        else:
+            args.append(wamp.RegisterOptions(invoke='roundrobin'))
+                
+        for session in self.__sessions[1:]:
+            await session.register(key, *args, **kwargs)
+    
+    
+    async def subscribe(self, key, *args, **kwargs):
+        # Subscribe to API event. It stays subscribed over multiple session and reconnects
+        
+        await self.__sessions[0].subscribe(key, *args, **kwargs)
+    
+    
+    async def closeKey(self, key):
+        # remove all registered and subscribed functions for the given key
+
+        for session in self.__sessions:
+            await session.closeKey(key)
+            
+    async def call(self, *args, **kwargs):
+        # calls api function
+                
+        if not self.connected:
+            raise Exception("Not connected to Node, cannot call API function")
+        
+        # get the next valid session. This means poping sessions until we get a connected one.
+        # Note: It can happen that we disconnect while waiting for a session. This means the queue 
+        # get emptied and we will wait forever. To prevent this, None object will be added to the queue
+        # in this event. Receiving this means we raise an "not connected error"           
+        
+        self.__waiting += 1
+        
+        session = await self.__queue.get()
+        while session and not session.connected:
+            session = await self.__queue.get()
+          
+        if session is None:
+            raise Exception("Not connected to Node, cannot call API function")
+        
+        try:
+            self.__waiting -= 1
+            result = await session.call(*args, **kwargs)
+            return result
+
+        finally:
+            if session.connected:
+                self.__queue.put_nowait(session)
+ 
+            
     # Node callbacks
     # ********************************************************************************************
     
@@ -158,62 +301,44 @@ class API(QtCore.QObject, Utils.AsyncSlotObject):
         if self.reconnect and self.__node.running:
             await self.connectToNode()
             
-        if self.__wamp and not self.__node.running:
+        if self.connected and not self.__node.running:
             await self.disconnectFromNode()
     
     
-    # Wamp callbacks
+    # Session callbacks
     # ********************************************************************************************
     
-    async def __onJoin(self, session, details):
+    def __onReady(self, sessionidx):
        
-        self.__logger.debug(f"Join WAMP session")
-        self.__session = session
+        self.__queue.put_nowait(self.__sessions[sessionidx])
         
-        # register all functions
-        for key, argsList in self.__registered.items():
-            
-            sessions = []
-            for args in argsList:
-                sessions.append(await self.__session.register(*(args[0]), **(args[1])))
-            
-            self.__registeredSessions[key] = sessions
-            
-        # subscribe to all events
-        for key, argsList in self.__subscribed.items():
-            
-            sessions = []
-            for args in argsList:
-                sessions.append(await self.__session.subscribe(*(args[0]), **(args[1])))
-            
-            self.__subscribedSessions[key] = sessions
+        if not self.__readyEvent.is_set():
+            self.reconnected.emit()
+            self.connectedChanged.emit()
+            self.__readyEvent.set()
+            self.__logger.info("WAMP API ready")
                     
             
-    async def __onLeave(self, session, reason):
-        
-        self.__logger.debug(f"Leave WAMP session: {reason}")
-        
-        # clear all registered and subscribed session objects
-        self.__registeredSessions = {}
-        self.__subscribedSessions = {}
-        
-        self.__readyEvent.clear()
-        self.__session = None
-        
-        self.disconnected.emit()
-        self.connectedChanged.emit()            
-        
-        
-    async def __onDisconnect(self, *args, **kwargs):
-        self.__logger.info("API closed")
-        
-        
-    async def __onReady(self, *args):
-        self.reconnected.emit()
-        self.connectedChanged.emit()
-        self.__readyEvent.set()
-        self.__logger.info("API ready")
-       
+    def __onLeave(self, sessionidx):
+               
+        if not self.connected:
+            self.__logger.debug(f"Leave WAMP session: {reason}")
+            
+            # clear all registered and subscribed session objects
+            self.__registeredSessions = {}
+            self.__subscribedSessions = {}
+            
+            self.__readyEvent.clear()
+            
+            self.disconnected.emit()
+            self.connectedChanged.emit()
+            
+            # close all waiting calls, as there will be no more sessions in the queue
+            for v in [None]*self.__waiting:
+                self.__queue.put_nowait(v)
+            
+            self.__logger.info("WAMP API closed")
+
         
     # Qt Property/Signal API used from the UI
     # ********************************************************************************************
@@ -227,7 +352,7 @@ class API(QtCore.QObject, Utils.AsyncSlotObject):
 
     @QtCore.Property(bool, notify=connectedChanged)
     def connected(self):
-        return self.__session != None
+        return any([s.connected for s in self.__sessions])
     
     
     def getReconnect(self):
