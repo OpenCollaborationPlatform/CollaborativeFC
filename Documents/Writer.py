@@ -235,11 +235,14 @@ class OCPObjectWriter():
         #store the data for the processing!
         
         #make the data available in the provider
-        datakey = self.data.addData(data)
-        
-        #get the cid!
         uri = f"ocp.documents.{self.docId}.raw.CidByBinary"
-        cid = await self.connection.api.call(uri, self.data.uri, datakey)
+        if len(data) > self.data.chunksize:
+            datakey = self.data.addData(data)
+            cid = await self.connection.api.call(uri, self.data.uri, datakey)
+            
+        else:
+            cid = await self.connection.api.call(uri, data)
+
         return cid
         
     
