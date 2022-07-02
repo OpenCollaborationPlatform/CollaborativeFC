@@ -29,7 +29,7 @@ except Exception:
 try: 
     import autobahn
 except Exception:
-    importfail.append("autobahn[serialization]")
+    importfail.append("autobahn")
     pass
 
 try: 
@@ -64,11 +64,13 @@ if not importfail:
 
     signal.signal(signal.SIGUSR1, debug)  # Register handler
 
-        
     # txaio workaround
     # ******************************************
     import asyncio, txaio
-    txaio.config.loop = asyncio.get_event_loop() #workaround as component.start(loop=) does not propagate the loop correctly
+    if hasattr(txaio, "use_asyncio"):
+        txaio.use_asyncio()
+    else:
+        txaio.config.loop = asyncio.get_event_loop()
 
 
     # setup all the collaboration infrastructure

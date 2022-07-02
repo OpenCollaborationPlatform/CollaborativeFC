@@ -144,8 +144,7 @@ class _Session():
         self.__session = session
         
         res = await session.call("wamp.session.get", details.session)
-        print(res)
-        
+
         # in case we get a subscribe/register call during execution
         registered = self.__registered.copy()
         subscribed = self.__subscribed.copy()
@@ -183,7 +182,7 @@ class _Session():
 class API(QtCore.QObject, Utils.AsyncSlotObject):
     #Class to handle the WAMP connection to the OCP node
     
-    _numSessions = 100
+    _numSessions = 50
     
     def __init__(self, node, logger):
         

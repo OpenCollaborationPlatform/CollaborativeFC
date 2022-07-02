@@ -153,7 +153,7 @@ class Entity(SM.StateMachine, Errorhandling.OCPErrorHandler):
         self.addTransition(Entity.States.Node.Status.Online.Replicate, Entity.States.Node.Status.Online.CloseProcess, Entity.Events.close)
         self.addTransition(Entity.States.Node.Status.Online.CloseProcess, Entity.States.Node.Status.Detect, Entity.Events.abort)
         self.addTransition(Entity.States.Node.Status.Online.CloseProcess, Entity.States.Node.Status.Detect, Entity.Events._failed)
-        self.addTransition(Entity.States.Node.Status.Online.CloseProcess, Entity.States.Node.Status.Detect, Entity.Events._done)
+        self.addTransition(Entity.States.Node.Status.Online.CloseProcess, Entity.States.Local, Entity.Events._done)
         
         # node state error internals
         self.addTransition(Entity.States.Node.Error.Running, Entity.States.Node.Error.EditError, Entity.Events.editError)
@@ -267,6 +267,10 @@ class Entity(SM.StateMachine, Errorhandling.OCPErrorHandler):
     async def _detectNodeStatus(self):
 
         try:
+            if not self._id:
+                # nothing to check, go local. If the entity is nothing at all we go to removed from there
+                self.processEvent(Entity.Events._local)
+
             status = await self.__connection.api.call(u"ocp.documents.status", self._id)
             if status == "open":
                 self.processEvent(Entity.Events._online)
@@ -310,13 +314,13 @@ class Entity(SM.StateMachine, Errorhandling.OCPErrorHandler):
 
     @SM.onEnter(States.Node.Status.Online)
     def _enterOnline1(self):
-        # we need to setup the manager imediately, not with asyncio delay, as other callbacks for the state
-        # may acces it
+        # we need to set up the manager immediately, not with asyncio delay, as other callbacks for the state
+        # may access it
         self._manager = NodeDocumentManager(self._id, self.__connection)
 
     @SM.onEnter(States.Node.Status.Online)
     async def _enterOnline2(self):
-        # setup the manager delayed after creation
+        # set up the manager delayed after creation
         try:
             await self._manager.setup()
         except Exception as e:
@@ -385,6 +389,7 @@ class Entity(SM.StateMachine, Errorhandling.OCPErrorHandler):
                
         try:
             await self.__connection.api.call(u"ocp.documents.close", self._id)
+            self._id = None
             self.processEvent(Entity.Events._done)
        
         except asyncio.CancelledError:
@@ -457,16 +462,16 @@ class Entity(SM.StateMachine, Errorhandling.OCPErrorHandler):
         return "Unknown"
     
     async def collaborate(self, timeout = 10, doc_name = "unknown"):
-        # convienience function to bring the entity into collaboration state
+        # convenience function to bring the entity into collaboration state
         
         try:
             if Entity.States.Node.Status.Online.Edit in self.activeStates:
                 return
             
             elif Entity.States.Local in self.activeStates:
-                
+
                 self.processEvent(Entity.Events.open)
-                await self.state(Entity.States.Node.Status.Online.Edit).waitTillActive(timeout = timeout)
+                await self.state(Entity.States.Node.Status.Online.Edit).waitTillActive(timeout=timeout)
                 return
             
             elif Entity.States.Node.Status.Invited in self.activeStates:
@@ -475,9 +480,9 @@ class Entity(SM.StateMachine, Errorhandling.OCPErrorHandler):
                     self.fcdocument = FreeCAD.newDocument(doc_name)
                 
                 self.processEvent(Entity.Events.open)
-                await self.state(Entity.States.Node.Status.Online.Replicate).waitTillActive(timeout = timeout)
+                await self.state(Entity.States.Node.Status.Online.Replicate).waitTillActive(timeout=timeout)
                 self.processEvent(Entity.Events.open)
-                await self.state(Entity.States.Node.Status.Online.Edit).waitTillActive(timeout = timeout)
+                await self.state(Entity.States.Node.Status.Online.Edit).waitTillActive(timeout=timeout)
                 return
             
             elif Entity.States.Node.Status.Online.Replicate in self.activeStates:
@@ -497,7 +502,7 @@ class Entity(SM.StateMachine, Errorhandling.OCPErrorHandler):
 
 
     async def stopCollaboration(self, timeout = 10):
-        #convinience function to stop collaboration 
+        # convinience function to stop collaboration
         
         try:
             if Entity.States.Local in self.activeStates:
